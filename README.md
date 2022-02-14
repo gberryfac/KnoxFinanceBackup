@@ -8,15 +8,18 @@ First, install the dependencies with npm run:
 npm install
 ```
 
-Next, we need to populate the .env file with these values.\
-Copy the .env.example -> .env and fill out the value.\
-Reach out to the team if you need help on these variables. The `TEST_URI` needs to be an archive node.
+Next, we need to populate the .env file with these values. Copy the .env.example -> .env and fill out the value.
 
 ```bash
-TEST_URI=
+MAINNET_MNEMONIC=
+KOVAN_MNEMONIC=
+ARBITRUM_MNEMONIC=
+ARBITRUM_RINKEBY_MNEMONIC=
+TEST_MNEMONIC=
+
 MAINNET_URI=
 KOVAN_URI=
-ETHERSCAN_API_KEY=
-KOVAN_MNEMONIC=
-MAINNET_MNEMONIC=
+ARBITRUM_URI=
+ARBITRUM_RINKEBY_URI=
+TEST_URI=
 ```
