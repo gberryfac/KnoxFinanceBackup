@@ -8,12 +8,14 @@ interface IKnoxStrategy {
      * @param maturity timestamp of option maturity
      * @param strikePrice 64x64 fixed point representation of strike price
      * @param contractSize quantity of option contract tokens to exercise
+     * @param isCall whether this is a call or a put
      */
     function openPosition(
         address counterparty,
         uint64 maturity,
         int128 strikePrice,
-        uint256 contractSize
+        uint256 contractSize,
+        bool isCall
     ) external;
 
     /**
@@ -22,6 +24,7 @@ interface IKnoxStrategy {
      * @param maturity timestamp of option maturity
      * @param strikePrice 64x64 fixed point representation of strike price
      * @param contractSize quantity of option contract tokens to exercise
+     * @param isCall whether this is a call or a put
      * @param maxCost maximum acceptable cost after accounting for slippage (multi-leg strategies only)
      */
     function openPosition(
@@ -29,6 +32,7 @@ interface IKnoxStrategy {
         uint64 maturity,
         int128 strikePrice,
         uint256 contractSize,
+        bool isCall,
         uint256 maxCost
     ) external;
 
