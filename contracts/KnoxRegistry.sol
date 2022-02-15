@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity =0.8.11;
+pragma solidity >0.8.4;
 
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/utils/cryptography/draft-EIP712.sol";
@@ -18,11 +18,11 @@ contract KnoxRegistry is EIP712, Ownable {
      ***********************************************/
 
     struct Transaction {
-        uint64 deadline;
-        uint64 strategyID;
-        uint64 k1StrikePrice;
-        uint64 k2StrikePrice;
-        uint64 premium;
+        address vault;
+        uint256 deadline;
+        uint256[] strikePrices;
+        uint256 spotPrice;
+        uint256 premium;
     }
 
     /************************************************
@@ -40,7 +40,7 @@ contract KnoxRegistry is EIP712, Ownable {
      * @param signature is an EIP-712 signed transaction generated off-chain by the signer
      * @param transaction is the metadata and trade parameters of the signature
      **/
-    function isValidSignature(
+    function authenticate(
         bytes memory signature,
         Transaction calldata transaction
     ) external view returns (bool) {
@@ -53,12 +53,12 @@ contract KnoxRegistry is EIP712, Ownable {
             keccak256(
                 abi.encode(
                     keccak256(
-                        "Transaction(uint64 deadline,uint64 strategyID,uint64 k1StrikePrice,uint64 k2StrikePrice,uint64 premium)"
+                        "Transaction(address vault,uint256 deadline,uint256[] strikePrices,uint256 spotPrice,uint256 premium)"
                     ),
+                    transaction.vault,
                     transaction.deadline,
-                    transaction.strategyID,
-                    transaction.k1StrikePrice,
-                    transaction.k2StrikePrice,
+                    transaction.strikePrices,
+                    transaction.spotPrice,
                     transaction.premium
                 )
             )
