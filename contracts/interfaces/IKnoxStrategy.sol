@@ -2,35 +2,47 @@
 pragma solidity ^0.8.10;
 
 interface IKnoxStrategy {
+    // /**
+    //  * @notice calculates the amount of capital required from the vault
+    //  * @param strikePrices K1, K2, ..., Kn strike prices
+    //  * @param spotPrice spot price of underlying
+    //  * @param contractSizes quantity of option contract tokens to exercise
+    //  */
+    // function calculateAmount(
+    //     uint256[] calldata strikePrices,
+    //     uint256 spotPrice,
+    //     uint256[] calldata contractSizes
+    // ) external view;
+
     /**
-     * @notice underwrites a long option on behalf of the counterparty
+     * @notice opens a single position
      * @param counterparty address who will receive the long token
      * @param maturity timestamp of option maturity
-     * @param strikePrice 64x64 fixed point representation of strike price
+     * @param strikePrice K1 strike price
      * @param contractSize quantity of option contract tokens to exercise
      * @param isCall whether this is a call or a put
      */
     function openPosition(
         address counterparty,
         uint64 maturity,
-        int128 strikePrice,
+        uint256 strikePrice,
         uint256 contractSize,
         bool isCall
     ) external;
 
     /**
-     * @notice underwrites a long option on behalf of the counterparty
+     * @notice opens multiple positions depending on the strategy
      * @param counterparty address who will receive the long token
      * @param maturity timestamp of option maturity
-     * @param strikePrice 64x64 fixed point representation of strike price
+     * @param strikePrices K1, K2, ..., Kn strike prices
      * @param contractSize quantity of option contract tokens to exercise
      * @param isCall whether this is a call or a put
-     * @param maxCost maximum acceptable cost after accounting for slippage (multi-leg strategies only)
+     * @param maxCost maximum acceptable cost after accounting for slippage
      */
-    function openPosition(
+    function openPositions(
         address counterparty,
         uint64 maturity,
-        int128 strikePrice,
+        uint256[] calldata strikePrices,
         uint256 contractSize,
         bool isCall,
         uint256 maxCost
