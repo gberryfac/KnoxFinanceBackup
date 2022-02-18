@@ -1,6 +1,6 @@
 import "@nomiclabs/hardhat-ethers";
 import "@nomiclabs/hardhat-waffle";
-import "hardhat-deploy";
+import "@typechain/hardhat";
 
 require("dotenv").config();
 
@@ -51,5 +51,10 @@ export default {
   },
   mocha: {
     timeout: 500000,
+  },
+  typechain: {
+    outDir: "./types",
+    target: "ethers-v5",
+    alwaysGenerateOverloads: false,
   },
 };
