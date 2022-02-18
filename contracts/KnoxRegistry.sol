@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity >0.8.4;
+pragma solidity 0.8.4;
 
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/utils/cryptography/draft-EIP712.sol";
@@ -18,11 +18,12 @@ contract KnoxRegistry is EIP712, Ownable {
      ***********************************************/
 
     struct Transaction {
+
         address vault;
-        uint256 deadline;
-        uint256[] strikePrices;
-        uint256 spotPrice;
-        uint256 premium;
+        uint64 deadline; // Unix timestamp
+        uint64 spotPrice; // with 9 digits in USD
+        uint64 premium; // with 9 digits precision as parts of deposited amount
+        uint64[] strikePrices; //With 9 digits precision, to save space
     }
 
     /************************************************
@@ -53,7 +54,7 @@ contract KnoxRegistry is EIP712, Ownable {
             keccak256(
                 abi.encode(
                     keccak256(
-                        "Transaction(address vault,uint256 deadline,uint256[] strikePrices,uint256 spotPrice,uint256 premium)"
+                        "Transaction(address vault,uint64 deadline,uint64[] strikePrices,uint64 spotPrice,uint64 premium)"
                     ),
                     transaction.vault,
                     transaction.deadline,

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.10;
+pragma solidity 0.8.4;
 
 interface IKnoxStrategy {
     // /**
@@ -51,7 +51,7 @@ interface IKnoxStrategy {
     /**
      * @notice removes all collateral from Premia following option expiration or exercise
      */
-    function closePosition() external;
+    function closePosition() external returns(uint64 payout /*amount available for MM to withdraw*/,uint64 payback/*amount that goes back to treasury*/);
 
     /**
      * @notice exercises long option
@@ -64,4 +64,7 @@ interface IKnoxStrategy {
         uint256 longTokenId,
         uint256 contractSize
     ) external;
+
+    
+    function getPositionSize(uint64 premiumSize, bytes memory strategyParameters) external returns (uint64);
 }
