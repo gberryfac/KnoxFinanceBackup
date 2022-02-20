@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.4;
 
-interface IKnoxStrategy {
+interface IStrategy {
     // /**
     //  * @notice calculates the amount of capital required from the vault
     //  * @param strikePrices K1, K2, ..., Kn strike prices
@@ -51,7 +51,12 @@ interface IKnoxStrategy {
     /**
      * @notice removes all collateral from Premia following option expiration or exercise
      */
-    function closePosition() external returns(uint64 payout /*amount available for MM to withdraw*/,uint64 payback/*amount that goes back to treasury*/);
+    function closePosition()
+        external
+        returns (
+            uint64 payout, /*amount available for MM to withdraw*/
+            uint64 payback /*amount that goes back to vault*/
+        );
 
     /**
      * @notice exercises long option
@@ -65,6 +70,8 @@ interface IKnoxStrategy {
         uint256 contractSize
     ) external;
 
-    
-    function getPositionSize(uint64 premiumSize, bytes memory strategyParameters) external returns (uint64);
+    function getPositionSize(
+        uint64 premiumSize,
+        bytes memory strategyParameters
+    ) external returns (uint64);
 }

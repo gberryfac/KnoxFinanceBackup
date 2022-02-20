@@ -1,4 +1,9 @@
-import { ethers, artifacts } from "hardhat";
+import hre, { ethers, artifacts } from "hardhat";
+import { Vault } from "./../../types/Vault";
+import { TestERC20 } from "./../../types/TestERC20";
+import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
+
+const { parseUnits } = hre.ethers.utils;
 
 export async function parseLog(
   contractName: string,
@@ -32,4 +37,21 @@ export async function parseLogs(
       }
     })
     .filter((x) => x);
+}
+
+export async function depositToVault(
+  vault: Vault,
+  baseToken: TestERC20,
+  signer: SignerWithAddress,
+  amountInGwei: string
+) {
+  await baseToken
+    .connect(signer)
+    .approve(vault.address, parseUnits(amountInGwei, "gwei"));
+
+  let tx = await vault
+    .connect(signer)
+    .deposit(parseUnits(amountInGwei, "gwei"));
+
+  return await tx.wait();
 }

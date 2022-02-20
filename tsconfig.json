@@ -5,6 +5,6 @@
     "moduleResolution": "node",
     "resolveJsonModule": true
   },
-  "include": ["./scripts", "./test", "./typechain"],
+  "include": ["./scripts", "./test", "./types"],
   "files": ["./hardhat.config.ts"]
 }

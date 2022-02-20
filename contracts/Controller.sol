@@ -1,45 +1,40 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.4;
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
+import "./interfaces/IRegistry.sol";
+import "./interfaces/IStrategy.sol";
+import "./interfaces/IVault.sol";
+
 import "hardhat/console.sol";
-import {IKnoxStrategy} from "./interfaces/IKnoxStrategy.sol";
-import {ITreasury} from "./FarmersTreasury.sol";
-
-interface IVerifier {
-    function verifySignature(bytes memory data, bytes memory signature)
-        external
-        returns (bool);
-
-    function getTreasuryAddress(bytes memory signature)
-        external
-        returns (address);
-}
 
 struct PositionRecord {
     int32 epochId;
     uint64 positionSize;
-    address treasury;
+    address vault;
 }
 
-contract StrategyManager {
+contract Controller {
     address public owner;
-    IVerifier public signatureVerifier;
+    IRegistry public signatureVerifier;
     uint256 constant WEI_PER_UNIT = 10**9;
-    mapping(address => IKnoxStrategy) public strategies; // mapping treausryAddress (in signature) => strategyLogicAddress
+    // mapping treausryAddress (in signature) => strategyLogicAddress
+    mapping(address => IStrategy) public strategies;
     mapping(address => PositionRecord[]) public openedPositions;
-
-    mapping(address => mapping(int32 => uint64)) public totalPositionSize; // treasury address => epoch => totalPositionSize
-    mapping(address => mapping(int32 => uint64)) public totalMMPayout; // treasury address => epoch => totalMMPayout
+    // vault address => epoch => totalPositionSize
+    mapping(address => mapping(int32 => uint64)) public totalPositionSize;
+    // vault address => epoch => totalMMPayout
+    mapping(address => mapping(int32 => uint64)) public totalMMPayout;
 
     constructor(address _signatureVerifier) {
         owner = msg.sender;
-        signatureVerifier = IVerifier(_signatureVerifier);
+        signatureVerifier = IRegistry(_signatureVerifier);
     }
 
-    function addOrUpdateStrategy(address treasury, address strategy) public {
+    function addOrUpdateStrategy(address vault, address strategy) public {
         require(msg.sender == owner, "strategy-manager/not-allowed");
-        strategies[treasury] = IKnoxStrategy(strategy);
+        strategies[vault] = IStrategy(strategy);
     }
 
     function transferOwnership(address newOwner) public {
@@ -56,7 +51,7 @@ contract StrategyManager {
         uint64 normalizedPremiumAmount = uint64(premiumAmount / WEI_PER_UNIT);
 
         require(
-            signatureVerifier.verifySignature(
+            signatureVerifier.authenticate(
                 strategyParameters,
                 strategyParametersSignature
             ),
@@ -67,15 +62,15 @@ contract StrategyManager {
             strategyParametersSignature
         );
 
-        uint64 positionSize = IKnoxStrategy(strategies[treasuryAddress])
+        uint64 positionSize = IStrategy(strategies[treasuryAddress])
             .getPositionSize(normalizedPremiumAmount, strategyParameters);
-        ITreasury treasury = ITreasury(treasuryAddress);
-        int32 epochId = treasury.currentEpoch();
+        IVault vault = IVault(treasuryAddress);
+        int32 epochId = vault.currentEpoch();
 
-        treasury.trustedBorrow(uint256(positionSize) * WEI_PER_UNIT);
+        vault.trustedBorrow(uint256(positionSize) * WEI_PER_UNIT);
 
         require(
-            treasury.baseToken().transferFrom(
+            vault.baseToken().transferFrom(
                 msg.sender,
                 address(this),
                 positionSize
@@ -93,7 +88,7 @@ contract StrategyManager {
         require(status, "strategy-manager/strategy-invocation-failed");
 
         openedPositions[msg.sender].push(
-            PositionRecord(epochId, positionSize, address(treasury))
+            PositionRecord(epochId, positionSize, address(vault))
         );
         totalPositionSize[treasuryAddress][epochId] =
             totalPositionSize[treasuryAddress][epochId] +
@@ -104,21 +99,20 @@ contract StrategyManager {
         /*called once per strategy/treausery for era by administrator*/
 
         require(msg.sender == owner, "strategy-manager/not-permitted");
-        ITreasury treasury = ITreasury(treasuryAddress);
-        int32 epochId = treasury.currentEpoch();
+        IVault vault = IVault(treasuryAddress);
+        int32 epochId = vault.currentEpoch();
 
         bytes memory callData = abi.encodeWithSignature("closePosition()");
 
-        (bool status, bytes memory retVal) = address(
-            strategies[treasuryAddress]
-        ).delegatecall(callData);
+        (, bytes memory retVal) = address(strategies[treasuryAddress])
+            .delegatecall(callData);
         (uint64 payout, uint64 payback) = abi.decode(retVal, (uint64, uint64));
 
-        IERC20 payoutToken = IERC20(treasury.baseToken());
+        IERC20 payoutToken = IERC20(vault.baseToken());
 
         payoutToken.approve(treasuryAddress, uint256(payback) * WEI_PER_UNIT);
 
-        treasury.trustedRepay(uint256(payback) * WEI_PER_UNIT);
+        vault.trustedRepay(uint256(payback) * WEI_PER_UNIT);
         totalMMPayout[treasuryAddress][epochId] = payout;
     }
 
@@ -126,23 +120,23 @@ contract StrategyManager {
         /*called independly by any MM to get payaout associated with position*/
         PositionRecord memory rec = openedPositions[msg.sender][index];
 
-        uint64 totalPositionSize = totalPositionSize[rec.treasury][rec.epochId];
-        uint64 totalPayout = totalMMPayout[rec.treasury][rec.epochId];
+        uint64 positionSize = totalPositionSize[rec.vault][rec.epochId];
+        uint64 totalPayout = totalMMPayout[rec.vault][rec.epochId];
 
         uint64 payout = uint64(
             (uint256(rec.positionSize) * uint256(totalPayout)) /
-                uint256(totalPositionSize)
+                uint256(positionSize)
         );
 
-        ITreasury treasury = ITreasury(rec.treasury);
-        IERC20 payoutToken = IERC20(treasury.baseToken());
+        IVault vault = IVault(rec.vault);
+        IERC20 payoutToken = IERC20(vault.baseToken());
 
         payoutToken.transfer(msg.sender, payout * WEI_PER_UNIT);
     }
 
-    function startNewPeriod(address treasury) public {
+    function startNewPeriod(address vaultAddress) public {
         require(msg.sender == owner, "strategy-manager/not-permitted");
-        ITreasury treasury = ITreasury(treasury);
-        treasury.createNewEpoch();
+        IVault vault = IVault(vaultAddress);
+        vault.createNewEpoch();
     }
 }

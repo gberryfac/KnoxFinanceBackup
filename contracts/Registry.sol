@@ -5,7 +5,7 @@ import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/utils/cryptography/draft-EIP712.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract KnoxRegistry is EIP712, Ownable {
+contract Registry is EIP712, Ownable {
     /************************************************
      *  CONSTANTS
      ***********************************************/
@@ -18,12 +18,11 @@ contract KnoxRegistry is EIP712, Ownable {
      ***********************************************/
 
     struct Transaction {
-
         address vault;
         uint64 deadline; // Unix timestamp
+        uint64[] strikePrices; //With 9 digits precision, to save space
         uint64 spotPrice; // with 9 digits in USD
         uint64 premium; // with 9 digits precision as parts of deposited amount
-        uint64[] strikePrices; //With 9 digits precision, to save space
     }
 
     /************************************************
