@@ -78,16 +78,17 @@ contract Vault {
     //used to activate scheduled withdrawals or update deposits
     function syncFarmer(address _farmer) private {
         Depositor memory depositor = depositors[_farmer];
-
-        // depositor = initializeDepositor(depositor);
+        depositor = initializeDepositor(depositor);
 
         // console.log("syncFarmer", uint256(int256(currentEpoch)));
         // console.log("syncFarmer - normalizedBalance", depositor.normalizedBalance);
 
         if (currentEpoch != -1 && depositor.lastEpoch < currentEpoch) {
             if (depositor.waitingAmount < 0) {
-                // withdraw funds
-                uint256 amountOwned = getAmountOwned(depositor);
+                // funds are withdrawn.
+                uint256 amountOwned = getAmountOwned(
+                    depositor.normalizedBalance
+                );
 
                 uint256 withdrawalAmount = uint256(
                     int256(-depositor.waitingAmount)
@@ -110,39 +111,30 @@ contract Vault {
 
                 amountOwned = amountOwned - withdrawalAmount;
                 depositor.normalizedBalance = getNormalizedBalance(amountOwned);
-                //console.log("amountOwned2", amountOwned);
-            } else {
-                uint256 amountOwned = getAmountOwned(depositor) +
-                    uint64(depositor.waitingAmount);
-
-                //console.log("amountOwned3", amountOwned);
+            } else if (depositor.waitingAmount > 0) {
+                // funds are deposited.
+                uint256 amountOwned = getAmountOwned(
+                    depositor.normalizedBalance
+                ) + uint64(depositor.waitingAmount);
 
                 depositor.normalizedBalance = getNormalizedBalance(amountOwned);
             }
-
-            console.log("currentEpoch", uint256(int256(currentEpoch)));
-            console.log(
-                "depositor.lastEpoch",
-                uint256(int256(depositor.lastEpoch))
-            );
 
             depositor.waitingAmount = 0;
             depositor.lastEpoch = currentEpoch;
             depositors[_farmer] = depositor;
 
-            //console.log("syncFarmer - normalizedBalance", depositor.normalizedBalance);
-
             emit DepositorSynced(_farmer, depositor.lastEpoch);
         }
     }
 
-    function getAmountOwned(Depositor memory depositor)
+    function getAmountOwned(uint64 normalizedBalance)
         internal
         view
         returns (uint256)
     {
         return
-            (depositor.normalizedBalance * epochs[currentEpoch].accumulator) /
+            (normalizedBalance * epochs[currentEpoch].accumulator) /
             ACCUMULATOR_ONE;
     }
 
@@ -170,20 +162,16 @@ contract Vault {
         );
 
         amount = amount / (10**9);
-        int64 signedAmount = int64(uint64(amount));
 
-        totalWaitingAmount = totalWaitingAmount + signedAmount;
+        syncFarmer(msg.sender);
 
         Depositor memory depositor;
-        // hoist logic in "initializeDepositor"
-        depositor = initializeDepositor(depositors[msg.sender]);
-
-        // if (depositor.lastEpoch < currentEpoch) {
-        syncFarmer(msg.sender);
         depositor = depositors[msg.sender];
-        // }
 
+        int64 signedAmount = int64(uint64(amount));
+        totalWaitingAmount = totalWaitingAmount + signedAmount;
         depositor.waitingAmount = depositor.waitingAmount + signedAmount;
+
         depositors[msg.sender] = depositor;
 
         emit FundsDeposited(msg.sender, amount, depositor.lastEpoch);

@@ -3,7 +3,7 @@ import { expect } from "chai";
 import * as time from "./helpers/time";
 
 import { Vault } from "./../types/Vault";
-import { TestERC20 } from "../types/TestERC20";
+import { TestERC20 } from "./../types/TestERC20";
 import { parseLogs, depositToVault } from "./helpers/utils";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 
@@ -52,143 +52,143 @@ describe.only("Knox Vault", () => {
   });
 
   describe("deposit", () => {
-    // beforeEach(async () => {
-    //   initSnapshotId = await hre.ethers.provider.send("evm_snapshot", []);
-    // });
+    beforeEach(async () => {
+      initSnapshotId = await hre.ethers.provider.send("evm_snapshot", []);
+    });
 
-    // afterEach(async () => {
-    //   await hre.ethers.provider.send("evm_revert", [initSnapshotId]);
-    // });
+    afterEach(async () => {
+      await hre.ethers.provider.send("evm_revert", [initSnapshotId]);
+    });
 
-    // it("should fail if called without approval", async () => {
-    //   let tx = vault.deposit(1000);
-    //   await expect(tx).to.be.revertedWith("ERC20: insufficient allowance");
-    // });
+    it("should fail if called without approval", async () => {
+      let tx = vault.deposit(1000);
+      await expect(tx).to.be.revertedWith("ERC20: insufficient allowance");
+    });
 
-    // it("should succeed if approval is set", async () => {
-    //   await depositToVault(vault, baseToken, farmer, "1000");
-    // });
+    it("should succeed if approval is set", async () => {
+      await depositToVault(vault, baseToken, farmer, "1000");
+    });
 
-    // it("should change farmer waiting deposit", async () => {
-    //   let farmersDataBefore = await vault.depositors(farmer.address);
+    it("should change farmer waiting deposit", async () => {
+      let farmersDataBefore = await vault.depositors(farmer.address);
 
-    //   await depositToVault(vault, baseToken, farmer, "1000");
+      await depositToVault(vault, baseToken, farmer, "1000");
 
-    //   let farmersDataAfter = await vault.depositors(farmer.address);
+      let farmersDataAfter = await vault.depositors(farmer.address);
 
-    //   expect(farmersDataAfter.waitingAmount.toNumber()).to.be.equal(
-    //     farmersDataBefore.waitingAmount.add(1000).toNumber()
-    //   );
-    // });
+      expect(farmersDataAfter.waitingAmount.toNumber()).to.be.equal(
+        farmersDataBefore.waitingAmount.add(1000).toNumber()
+      );
+    });
 
-    // it("should update farmer waiting deposit", async () => {
-    //   let farmersDataBefore = await vault.depositors(farmer.address);
+    it("should update farmer waiting deposit", async () => {
+      let farmersDataBefore = await vault.depositors(farmer.address);
 
-    //   await depositToVault(vault, baseToken, farmer, "1000");
-    //   await depositToVault(vault, baseToken, farmer, "1000");
+      await depositToVault(vault, baseToken, farmer, "1000");
+      await depositToVault(vault, baseToken, farmer, "1000");
 
-    //   let farmersDataAfter = await vault.depositors(farmer.address);
+      let farmersDataAfter = await vault.depositors(farmer.address);
 
-    //   expect(farmersDataAfter.waitingAmount.toNumber()).to.be.equal(
-    //     farmersDataBefore.waitingAmount.add(2000).toNumber()
-    //   );
-    // });
+      expect(farmersDataAfter.waitingAmount.toNumber()).to.be.equal(
+        farmersDataBefore.waitingAmount.add(2000).toNumber()
+      );
+    });
 
-    // it("should update correct farmer waiting deposit", async () => {
-    //   let farmersDataBefore = await vault.depositors(farmer.address);
-    //   let deployerDataBefore = await vault.depositors(deployer.address);
+    it("should update correct farmer waiting deposit", async () => {
+      let farmersDataBefore = await vault.depositors(farmer.address);
+      let deployerDataBefore = await vault.depositors(deployer.address);
 
-    //   await depositToVault(vault, baseToken, farmer, "1000");
-    //   await depositToVault(vault, baseToken, deployer, "1000");
-    //   await depositToVault(vault, baseToken, farmer, "1000");
+      await depositToVault(vault, baseToken, farmer, "1000");
+      await depositToVault(vault, baseToken, deployer, "1000");
+      await depositToVault(vault, baseToken, farmer, "1000");
 
-    //   let farmersDataAfter = await vault.depositors(farmer.address);
-    //   let deployerDataAfter = await vault.depositors(deployer.address);
+      let farmersDataAfter = await vault.depositors(farmer.address);
+      let deployerDataAfter = await vault.depositors(deployer.address);
 
-    //   expect(farmersDataAfter.waitingAmount.toNumber()).to.be.equal(
-    //     farmersDataBefore.waitingAmount.add(2000).toNumber()
-    //   );
+      expect(farmersDataAfter.waitingAmount.toNumber()).to.be.equal(
+        farmersDataBefore.waitingAmount.add(2000).toNumber()
+      );
 
-    //   expect(deployerDataAfter.waitingAmount.toNumber()).to.be.equal(
-    //     deployerDataBefore.waitingAmount.add(1000).toNumber()
-    //   );
-    // });
+      expect(deployerDataAfter.waitingAmount.toNumber()).to.be.equal(
+        deployerDataBefore.waitingAmount.add(1000).toNumber()
+      );
+    });
 
-    // it("should change total waiting amount by same value", async () => {
-    //   let totalWaitingBefore = await vault.totalWaitingAmount();
+    it("should change total waiting amount by same value", async () => {
+      let totalWaitingBefore = await vault.totalWaitingAmount();
 
-    //   await depositToVault(vault, baseToken, farmer, "1000");
+      await depositToVault(vault, baseToken, farmer, "1000");
 
-    //   let totalWaitingAfter = await vault.totalWaitingAmount();
+      let totalWaitingAfter = await vault.totalWaitingAmount();
 
-    //   expect(totalWaitingAfter.toNumber()).to.be.equal(
-    //     totalWaitingBefore.add(1000).toNumber()
-    //   );
-    // });
+      expect(totalWaitingAfter.toNumber()).to.be.equal(
+        totalWaitingBefore.add(1000).toNumber()
+      );
+    });
 
-    // it("should not change total available amount", async () => {
-    //   let totalAvailableAmountBefore = await vault.totalAvailableAmount();
+    it("should not change total available amount", async () => {
+      let totalAvailableAmountBefore = await vault.totalAvailableAmount();
 
-    //   await depositToVault(vault, baseToken, farmer, "1000");
+      await depositToVault(vault, baseToken, farmer, "1000");
 
-    //   let totalAvailableAmountAfter = await vault.totalAvailableAmount();
+      let totalAvailableAmountAfter = await vault.totalAvailableAmount();
 
-    //   expect(totalAvailableAmountAfter.toNumber()).to.be.equal(
-    //     totalAvailableAmountBefore.toNumber()
-    //   );
-    // });
+      expect(totalAvailableAmountAfter.toNumber()).to.be.equal(
+        totalAvailableAmountBefore.toNumber()
+      );
+    });
 
-    // it("should increase vault token balance", async () => {
-    //   let balanceBefore = await baseToken.balanceOf(vault.address);
+    it("should increase vault token balance", async () => {
+      let balanceBefore = await baseToken.balanceOf(vault.address);
 
-    //   await depositToVault(vault, baseToken, farmer, "1000");
+      await depositToVault(vault, baseToken, farmer, "1000");
 
-    //   let balanceAfter = await baseToken.balanceOf(vault.address);
+      let balanceAfter = await baseToken.balanceOf(vault.address);
 
-    //   expect(balanceBefore.toNumber()).to.be.equal(
-    //     balanceAfter.sub(parseUnits("1000", "gwei")).toNumber()
-    //   );
-    // });
+      expect(balanceBefore.toNumber()).to.be.equal(
+        balanceAfter.sub(parseUnits("1000", "gwei")).toNumber()
+      );
+    });
 
-    // it("should decrease farmers token balance", async () => {
-    //   let balanceBefore = await baseToken.balanceOf(farmer.address);
+    it("should decrease farmers token balance", async () => {
+      let balanceBefore = await baseToken.balanceOf(farmer.address);
 
-    //   await depositToVault(vault, baseToken, farmer, "1000");
+      await depositToVault(vault, baseToken, farmer, "1000");
 
-    //   let balanceAfter = await baseToken.balanceOf(farmer.address);
+      let balanceAfter = await baseToken.balanceOf(farmer.address);
 
-    //   expect(balanceAfter.toString()).to.be.equal(
-    //     balanceBefore.sub(parseUnits("1000", "gwei")).toString()
-    //   );
-    // });
+      expect(balanceAfter.toString()).to.be.equal(
+        balanceBefore.sub(parseUnits("1000", "gwei")).toString()
+      );
+    });
 
-    // describe("epoch -1", async () => {
-    //   beforeEach(async () => {
-    //     initSnapshotId = await hre.ethers.provider.send("evm_snapshot", []);
-    //   });
+    describe("epoch -1", async () => {
+      beforeEach(async () => {
+        initSnapshotId = await hre.ethers.provider.send("evm_snapshot", []);
+      });
 
-    //   afterEach(async () => {
-    //     await hre.ethers.provider.send("evm_revert", [initSnapshotId]);
-    //   });
+      afterEach(async () => {
+        await hre.ethers.provider.send("evm_revert", [initSnapshotId]);
+      });
 
-    //   it("should not sync farmer", async () => {
-    //     let receipt = await depositToVault(vault, baseToken, farmer, "1000");
-    //     let events = await parseLogs("Vault", receipt.events);
+      it("should not sync farmer", async () => {
+        let receipt = await depositToVault(vault, baseToken, farmer, "1000");
+        let events = await parseLogs("Vault", receipt.events);
 
-    //     expect(
-    //       events.filter((x) => x.name === "DepositorSynced").length
-    //     ).to.be.equal(0);
-    //   });
+        expect(
+          events.filter((x) => x.name === "DepositorSynced").length
+        ).to.be.equal(0);
+      });
 
-    //   it("should emit deposit event", async () => {
-    //     let receipt = await depositToVault(vault, baseToken, farmer, "1000");
-    //     let events = await parseLogs("Vault", receipt.events);
+      it("should emit deposit event", async () => {
+        let receipt = await depositToVault(vault, baseToken, farmer, "1000");
+        let events = await parseLogs("Vault", receipt.events);
 
-    //     expect(
-    //       events.filter((x) => x.name === "FundsDeposited").length
-    //     ).to.be.equal(1);
-    //   });
-    // });
+        expect(
+          events.filter((x) => x.name === "FundsDeposited").length
+        ).to.be.equal(1);
+      });
+    });
 
     describe("epoch > -1", async () => {
       beforeEach(async () => {
@@ -211,12 +211,102 @@ describe.only("Knox Vault", () => {
 
       it("should emit deposit event", async () => {
         await baseToken.approve(vault.address, parseUnits("1000", "gwei"));
+
         let tx = await vault.deposit(parseUnits("1000", "gwei"));
         let receipt = await tx.wait();
         let events = await parseLogs("Vault", receipt.events);
+
         expect(
           events.filter((x) => x.name === "FundsDeposited").length
         ).to.be.equal(1);
+      });
+
+      it("should have funds waiting", async () => {
+        await depositToVault(vault, baseToken, farmer, "1000");
+
+        let totalWaiting = await vault.totalWaitingAmount();
+        let farmerWaitingAmount = await vault.depositors(farmer.address);
+
+        expect(totalWaiting.toNumber()).to.be.equal(1000);
+        expect(farmerWaitingAmount.waitingAmount.toNumber()).to.be.equal(1000);
+      });
+
+      it("should update funds waiting", async () => {
+        await depositToVault(vault, baseToken, farmer, "1000");
+        await depositToVault(vault, baseToken, deployer, "1000");
+
+        let totalWaiting = await vault.totalWaitingAmount();
+        let farmerWaitingAmount = await vault.depositors(farmer.address);
+        let deployerWaitingAmount = await vault.depositors(deployer.address);
+
+        expect(totalWaiting.toNumber()).to.be.equal(2000);
+        expect(farmerWaitingAmount.waitingAmount.toNumber()).to.be.equal(1000);
+        expect(deployerWaitingAmount.waitingAmount.toNumber()).to.be.equal(
+          1000
+        );
+
+        await depositToVault(vault, baseToken, farmer, "1000");
+
+        totalWaiting = await vault.totalWaitingAmount();
+        farmerWaitingAmount = await vault.depositors(farmer.address);
+        deployerWaitingAmount = await vault.depositors(deployer.address);
+
+        expect(totalWaiting.toNumber()).to.be.equal(3000);
+        expect(farmerWaitingAmount.waitingAmount.toNumber()).to.be.equal(2000);
+        expect(deployerWaitingAmount.waitingAmount.toNumber()).to.be.equal(
+          1000
+        );
+      });
+
+      it("should move vault funds to available on new epoch", async () => {
+        await depositToVault(vault, baseToken, farmer, "1000");
+        await depositToVault(vault, baseToken, deployer, "1000");
+
+        let totalAvailable = await vault.totalAvailableAmount();
+        let totalWaiting = await vault.totalWaitingAmount();
+
+        expect(totalAvailable.toNumber()).to.be.equal(0);
+        expect(totalWaiting.toNumber()).to.be.equal(2000);
+
+        await vault.connect(controller).createNewEpoch();
+
+        totalAvailable = await vault.totalAvailableAmount();
+        totalWaiting = await vault.totalWaitingAmount();
+
+        expect(totalAvailable.toNumber()).to.be.equal(2000);
+        expect(totalWaiting.toNumber()).to.be.equal(0);
+      });
+
+      it("should remove waiting funds after new epoch, on deposit", async () => {
+        await depositToVault(vault, baseToken, farmer, "1000");
+
+        let farmerWaitingAmount = await vault.depositors(farmer.address);
+
+        expect(farmerWaitingAmount.waitingAmount.toNumber()).to.be.equal(1000);
+
+        await vault.connect(controller).createNewEpoch();
+        await depositToVault(vault, baseToken, farmer, "100");
+
+        farmerWaitingAmount = await vault.depositors(farmer.address);
+
+        expect(farmerWaitingAmount.waitingAmount.toNumber()).to.be.equal(100);
+      });
+
+      it("should update normialized balance after new epoch, on deposit", async () => {
+        await depositToVault(vault, baseToken, farmer, "1000");
+
+        let farmerWaitingAmount = await vault.depositors(farmer.address);
+
+        expect(farmerWaitingAmount.normalizedBalance.toNumber()).to.be.equal(0);
+
+        await vault.connect(controller).createNewEpoch();
+        await depositToVault(vault, baseToken, farmer, "100");
+
+        farmerWaitingAmount = await vault.depositors(farmer.address);
+
+        expect(farmerWaitingAmount.normalizedBalance.toNumber()).to.be.equal(
+          1000
+        );
       });
     });
   });
