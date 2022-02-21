@@ -39,7 +39,17 @@ export async function parseLogs(
     .filter((x) => x);
 }
 
-export async function depositToVault(
+export async function approveAndDepositToVault(
+  vault: Vault,
+  baseToken: TestERC20,
+  signer: SignerWithAddress,
+  amountInGwei: string
+) {
+  await approveVault(vault, baseToken, signer, amountInGwei);
+  return await depositToVault(vault, signer, amountInGwei);
+}
+
+export async function approveVault(
   vault: Vault,
   baseToken: TestERC20,
   signer: SignerWithAddress,
@@ -48,10 +58,28 @@ export async function depositToVault(
   await baseToken
     .connect(signer)
     .approve(vault.address, parseUnits(amountInGwei, "gwei"));
+}
 
+export async function depositToVault(
+  vault: Vault,
+  signer: SignerWithAddress,
+  amountInGwei: string
+) {
   let tx = await vault
     .connect(signer)
     .deposit(parseUnits(amountInGwei, "gwei"));
+
+  return await tx.wait();
+}
+
+export async function withdrawFromVault(
+  vault: Vault,
+  signer: SignerWithAddress,
+  amountInGwei: string
+) {
+  let tx = await vault
+    .connect(signer)
+    .withdraw(parseUnits(amountInGwei, "gwei"));
 
   return await tx.wait();
 }

@@ -18,8 +18,8 @@ contract Vault {
     uint256 immutable genesisTimestamp;
     IERC20 public immutable baseToken;
 
-    // length of each epoch
-    uint256 constant WEEK_SPAN = 7 * 24 * 3600;
+    // length of each epoch minus 2 hours
+    uint256 constant WEEK_SPAN = (7 * 24 * 3600) - 7200;
     // this number is interpreted as 1 if in accumulator
     uint64 constant ACCUMULATOR_ONE = 10**15;
     // this is amount of wei by which you need to multiply Depositor or Epoch balances to get correct onchain amount
@@ -80,9 +80,6 @@ contract Vault {
         Depositor memory depositor = depositors[_farmer];
         depositor = initializeDepositor(depositor);
 
-        // console.log("syncFarmer", uint256(int256(currentEpoch)));
-        // console.log("syncFarmer - normalizedBalance", depositor.normalizedBalance);
-
         if (currentEpoch != -1 && depositor.lastEpoch < currentEpoch) {
             if (depositor.waitingAmount < 0) {
                 // funds are withdrawn.
@@ -93,8 +90,6 @@ contract Vault {
                 uint256 withdrawalAmount = uint256(
                     int256(-depositor.waitingAmount)
                 );
-
-                console.log("amountOwned1", amountOwned);
 
                 require(
                     amountOwned >= withdrawalAmount,
@@ -129,7 +124,7 @@ contract Vault {
     }
 
     function getAmountOwned(uint64 normalizedBalance)
-        internal
+        private
         view
         returns (uint256)
     {
@@ -139,7 +134,7 @@ contract Vault {
     }
 
     function getNormalizedBalance(uint256 amountOwned)
-        internal
+        private
         view
         returns (uint64)
     {
@@ -161,7 +156,7 @@ contract Vault {
             "vault/deposit-failed"
         );
 
-        amount = amount / (10**9);
+        amount = amount / WEI_PER_UNIT;
 
         syncFarmer(msg.sender);
 
@@ -181,8 +176,9 @@ contract Vault {
     //this function can be called anytime by any depositor to withdraw funds from pool,
     //if funds are in use they will not be withdrawn till another withdraw method in new epoch
     function withdraw(uint256 amount) public {
-        Depositor memory depositor = depositors[msg.sender];
         int64 amountInUnits = int64(uint64(amount / WEI_PER_UNIT));
+
+        Depositor memory depositor = depositors[msg.sender];
         if (depositor.lastEpoch < currentEpoch) {
             syncFarmer(msg.sender);
             depositor = depositors[msg.sender];
@@ -198,7 +194,7 @@ contract Vault {
                     address(msg.sender),
                     uint256(int256(amountInUnits)) * WEI_PER_UNIT
                 ),
-                "vault/withdrow-failed"
+                "vault/withdraw-failed"
             );
         } else {
             totalWaitingAmount =
@@ -213,7 +209,7 @@ contract Vault {
                         address(msg.sender),
                         uint256(int256(amountInUnits)) * WEI_PER_UNIT
                     ),
-                    "vault/withdrow-failed"
+                    "vault/withdraw-failed"
                 );
                 depositor.waitingAmount =
                     depositor.waitingAmount -
@@ -226,7 +222,7 @@ contract Vault {
                             uint256(int256(depositor.waitingAmount)) *
                                 WEI_PER_UNIT
                         ),
-                        "vault/withdrow-failed"
+                        "vault/withdraw-failed"
                     );
                 }
                 depositor.waitingAmount =

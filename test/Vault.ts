@@ -1,14 +1,16 @@
 import hre from "hardhat";
-import { expect } from "chai";
+const { getContractFactory } = hre.ethers;
+const { parseUnits } = hre.ethers.utils;
+
 import * as time from "./helpers/time";
+import * as utils from "./helpers/utils";
 
 import { Vault } from "./../types/Vault";
 import { TestERC20 } from "./../types/TestERC20";
-import { parseLogs, depositToVault } from "./helpers/utils";
-import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 
-const { getContractFactory } = hre.ethers;
-const { parseUnits } = hre.ethers.utils;
+import { expect, util } from "chai";
+import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
+import { Signer } from "ethers";
 
 describe.only("Knox Vault", () => {
   let deployer: SignerWithAddress;
@@ -32,10 +34,11 @@ describe.only("Knox Vault", () => {
     baseToken = (await factoryERC20.deploy(
       "TestToken",
       "TT",
-      parseUnits("1", "ether")
+      parseUnits("3", "ether")
     )) as TestERC20;
 
-    await baseToken.transfer(farmer.address, parseUnits("500", "finney"));
+    await baseToken.transfer(farmer.address, parseUnits("1", "ether"));
+    await baseToken.transfer(controller.address, parseUnits("1", "ether"));
 
     vault = (await factoryFarmersTreasury.deploy(
       baseToken.address,
@@ -66,13 +69,13 @@ describe.only("Knox Vault", () => {
     });
 
     it("should succeed if approval is set", async () => {
-      await depositToVault(vault, baseToken, farmer, "1000");
+      await utils.approveAndDepositToVault(vault, baseToken, farmer, "1000");
     });
 
     it("should change farmer waiting deposit", async () => {
       let farmersDataBefore = await vault.depositors(farmer.address);
 
-      await depositToVault(vault, baseToken, farmer, "1000");
+      await utils.approveAndDepositToVault(vault, baseToken, farmer, "1000");
 
       let farmersDataAfter = await vault.depositors(farmer.address);
 
@@ -84,8 +87,8 @@ describe.only("Knox Vault", () => {
     it("should update farmer waiting deposit", async () => {
       let farmersDataBefore = await vault.depositors(farmer.address);
 
-      await depositToVault(vault, baseToken, farmer, "1000");
-      await depositToVault(vault, baseToken, farmer, "1000");
+      await utils.approveAndDepositToVault(vault, baseToken, farmer, "1000");
+      await utils.approveAndDepositToVault(vault, baseToken, farmer, "1000");
 
       let farmersDataAfter = await vault.depositors(farmer.address);
 
@@ -98,9 +101,9 @@ describe.only("Knox Vault", () => {
       let farmersDataBefore = await vault.depositors(farmer.address);
       let deployerDataBefore = await vault.depositors(deployer.address);
 
-      await depositToVault(vault, baseToken, farmer, "1000");
-      await depositToVault(vault, baseToken, deployer, "1000");
-      await depositToVault(vault, baseToken, farmer, "1000");
+      await utils.approveAndDepositToVault(vault, baseToken, farmer, "1000");
+      await utils.approveAndDepositToVault(vault, baseToken, deployer, "1000");
+      await utils.approveAndDepositToVault(vault, baseToken, farmer, "1000");
 
       let farmersDataAfter = await vault.depositors(farmer.address);
       let deployerDataAfter = await vault.depositors(deployer.address);
@@ -117,7 +120,7 @@ describe.only("Knox Vault", () => {
     it("should change total waiting amount by same value", async () => {
       let totalWaitingBefore = await vault.totalWaitingAmount();
 
-      await depositToVault(vault, baseToken, farmer, "1000");
+      await utils.approveAndDepositToVault(vault, baseToken, farmer, "1000");
 
       let totalWaitingAfter = await vault.totalWaitingAmount();
 
@@ -129,7 +132,7 @@ describe.only("Knox Vault", () => {
     it("should not change total available amount", async () => {
       let totalAvailableAmountBefore = await vault.totalAvailableAmount();
 
-      await depositToVault(vault, baseToken, farmer, "1000");
+      await utils.approveAndDepositToVault(vault, baseToken, farmer, "1000");
 
       let totalAvailableAmountAfter = await vault.totalAvailableAmount();
 
@@ -139,26 +142,26 @@ describe.only("Knox Vault", () => {
     });
 
     it("should increase vault token balance", async () => {
-      let balanceBefore = await baseToken.balanceOf(vault.address);
+      let farmerBalanceBefore = await baseToken.balanceOf(vault.address);
 
-      await depositToVault(vault, baseToken, farmer, "1000");
+      await utils.approveAndDepositToVault(vault, baseToken, farmer, "1000");
 
-      let balanceAfter = await baseToken.balanceOf(vault.address);
+      let farmerBalanceAfter = await baseToken.balanceOf(vault.address);
 
-      expect(balanceBefore.toNumber()).to.be.equal(
-        balanceAfter.sub(parseUnits("1000", "gwei")).toNumber()
+      expect(farmerBalanceBefore.toNumber()).to.be.equal(
+        farmerBalanceAfter.sub(parseUnits("1000", "gwei")).toNumber()
       );
     });
 
     it("should decrease farmers token balance", async () => {
-      let balanceBefore = await baseToken.balanceOf(farmer.address);
+      let farmerBalanceBefore = await baseToken.balanceOf(farmer.address);
 
-      await depositToVault(vault, baseToken, farmer, "1000");
+      await utils.approveAndDepositToVault(vault, baseToken, farmer, "1000");
 
-      let balanceAfter = await baseToken.balanceOf(farmer.address);
+      let farmerBalanceAfter = await baseToken.balanceOf(farmer.address);
 
-      expect(balanceAfter.toString()).to.be.equal(
-        balanceBefore.sub(parseUnits("1000", "gwei")).toString()
+      expect(farmerBalanceAfter.toString()).to.be.equal(
+        farmerBalanceBefore.sub(parseUnits("1000", "gwei")).toString()
       );
     });
 
@@ -172,8 +175,13 @@ describe.only("Knox Vault", () => {
       });
 
       it("should not sync farmer", async () => {
-        let receipt = await depositToVault(vault, baseToken, farmer, "1000");
-        let events = await parseLogs("Vault", receipt.events);
+        let receipt = await utils.approveAndDepositToVault(
+          vault,
+          baseToken,
+          farmer,
+          "1000"
+        );
+        let events = await utils.parseLogs("Vault", receipt.events);
 
         expect(
           events.filter((x) => x.name === "DepositorSynced").length
@@ -181,8 +189,13 @@ describe.only("Knox Vault", () => {
       });
 
       it("should emit deposit event", async () => {
-        let receipt = await depositToVault(vault, baseToken, farmer, "1000");
-        let events = await parseLogs("Vault", receipt.events);
+        let receipt = await utils.approveAndDepositToVault(
+          vault,
+          baseToken,
+          farmer,
+          "1000"
+        );
+        let events = await utils.parseLogs("Vault", receipt.events);
 
         expect(
           events.filter((x) => x.name === "FundsDeposited").length
@@ -201,8 +214,13 @@ describe.only("Knox Vault", () => {
       });
 
       it("should sync farmer", async () => {
-        let receipt = await depositToVault(vault, baseToken, farmer, "1000");
-        let events = await parseLogs("Vault", receipt.events);
+        let receipt = await utils.approveAndDepositToVault(
+          vault,
+          baseToken,
+          farmer,
+          "1000"
+        );
+        let events = await utils.parseLogs("Vault", receipt.events);
 
         expect(
           events.filter((x) => x.name === "DepositorSynced").length
@@ -214,7 +232,7 @@ describe.only("Knox Vault", () => {
 
         let tx = await vault.deposit(parseUnits("1000", "gwei"));
         let receipt = await tx.wait();
-        let events = await parseLogs("Vault", receipt.events);
+        let events = await utils.parseLogs("Vault", receipt.events);
 
         expect(
           events.filter((x) => x.name === "FundsDeposited").length
@@ -222,7 +240,7 @@ describe.only("Knox Vault", () => {
       });
 
       it("should have funds waiting", async () => {
-        await depositToVault(vault, baseToken, farmer, "1000");
+        await utils.approveAndDepositToVault(vault, baseToken, farmer, "1000");
 
         let totalWaiting = await vault.totalWaitingAmount();
         let farmerWaitingAmount = await vault.depositors(farmer.address);
@@ -232,8 +250,13 @@ describe.only("Knox Vault", () => {
       });
 
       it("should update funds waiting", async () => {
-        await depositToVault(vault, baseToken, farmer, "1000");
-        await depositToVault(vault, baseToken, deployer, "1000");
+        await utils.approveAndDepositToVault(vault, baseToken, farmer, "1000");
+        await utils.approveAndDepositToVault(
+          vault,
+          baseToken,
+          deployer,
+          "1000"
+        );
 
         let totalWaiting = await vault.totalWaitingAmount();
         let farmerWaitingAmount = await vault.depositors(farmer.address);
@@ -245,7 +268,7 @@ describe.only("Knox Vault", () => {
           1000
         );
 
-        await depositToVault(vault, baseToken, farmer, "1000");
+        await utils.approveAndDepositToVault(vault, baseToken, farmer, "1000");
 
         totalWaiting = await vault.totalWaitingAmount();
         farmerWaitingAmount = await vault.depositors(farmer.address);
@@ -259,8 +282,13 @@ describe.only("Knox Vault", () => {
       });
 
       it("should move vault funds to available on new epoch", async () => {
-        await depositToVault(vault, baseToken, farmer, "1000");
-        await depositToVault(vault, baseToken, deployer, "1000");
+        await utils.approveAndDepositToVault(vault, baseToken, farmer, "1000");
+        await utils.approveAndDepositToVault(
+          vault,
+          baseToken,
+          deployer,
+          "1000"
+        );
 
         let totalAvailable = await vault.totalAvailableAmount();
         let totalWaiting = await vault.totalWaitingAmount();
@@ -278,14 +306,14 @@ describe.only("Knox Vault", () => {
       });
 
       it("should remove waiting funds after new epoch, on deposit", async () => {
-        await depositToVault(vault, baseToken, farmer, "1000");
+        await utils.approveAndDepositToVault(vault, baseToken, farmer, "1000");
 
         let farmerWaitingAmount = await vault.depositors(farmer.address);
 
         expect(farmerWaitingAmount.waitingAmount.toNumber()).to.be.equal(1000);
 
         await vault.connect(controller).createNewEpoch();
-        await depositToVault(vault, baseToken, farmer, "100");
+        await utils.approveAndDepositToVault(vault, baseToken, farmer, "100");
 
         farmerWaitingAmount = await vault.depositors(farmer.address);
 
@@ -293,14 +321,14 @@ describe.only("Knox Vault", () => {
       });
 
       it("should update normialized balance after new epoch, on deposit", async () => {
-        await depositToVault(vault, baseToken, farmer, "1000");
+        await utils.approveAndDepositToVault(vault, baseToken, farmer, "1000");
 
         let farmerWaitingAmount = await vault.depositors(farmer.address);
 
         expect(farmerWaitingAmount.normalizedBalance.toNumber()).to.be.equal(0);
 
         await vault.connect(controller).createNewEpoch();
-        await depositToVault(vault, baseToken, farmer, "100");
+        await utils.approveAndDepositToVault(vault, baseToken, farmer, "100");
 
         farmerWaitingAmount = await vault.depositors(farmer.address);
 
@@ -311,112 +339,146 @@ describe.only("Knox Vault", () => {
     });
   });
 
-  // describe("withdraw", () => {
-  //   describe("in the same epoch", () => {
-  //     beforeEach(async () => {
-  //       initSnapshotId = await hre.ethers.provider.send("evm_snapshot", []);
-  //       await baseToken.approve(vault.address, parseUnits("2000", "gwei"));
-  //       await vault.deposit(parseUnits("1000", "gwei"));
-  //       await vault.connect(farmer).createNewEpoch();
-  //       let start = await vault.currentEpochStart();
-  //       await time.increaseTo(start.add(1));
-  //       await vault.connect(farmer).trustedBorrow(parseUnits("1000", "gwei"));
-  //       await vault.deposit(parseUnits("900", "gwei"));
-  //     });
+  describe("withdraw", () => {
+    describe("deposits made within the current epoch", () => {
+      beforeEach(async () => {
+        initSnapshotId = await hre.ethers.provider.send("evm_snapshot", []);
 
-  //     it("should immediately withdraw sum equal this epoch deposit", async () => {
-  //       let balanceBefore = await baseToken.balanceOf(deployer.address);
-  //       let tx = await vault.withdraw(parseUnits("900", "gwei"));
-  //       await tx.wait();
-  //       let balanceAfter = await baseToken.balanceOf(deployer.address);
-  //       expect(
-  //         balanceBefore.add(parseUnits("900", "gwei")).toString()
-  //       ).to.be.equal(balanceAfter.toString());
-  //     });
+        await utils.approveVault(vault, baseToken, farmer, "2000");
+        await utils.depositToVault(vault, farmer, "1000");
 
-  //     it("should immediately withdraw sum smaller than this epoch deposit", async () => {
-  //       let balanceBefore = await baseToken.balanceOf(deployer.address);
-  //       let tx = await vault.withdraw(parseUnits("800", "gwei"));
-  //       await tx.wait();
-  //       let balanceAfter = await baseToken.balanceOf(deployer.address);
-  //       expect(
-  //         balanceBefore.add(parseUnits("800", "gwei")).toString()
-  //       ).to.be.equal(balanceAfter.toString());
-  //     });
+        await vault.connect(controller).createNewEpoch();
 
-  //     it("should only withdraw waiting amount and schedule rest if withdraw is bigger than epoch deposit", async () => {
-  //       let balanceBefore = await baseToken.balanceOf(deployer.address);
-  //       let tx = await vault.withdraw(parseUnits("1000", "gwei"));
-  //       await tx.wait();
-  //       let balanceAfter = await baseToken.balanceOf(deployer.address);
-  //       expect(
-  //         balanceBefore.add(parseUnits("900", "gwei")).toString()
-  //       ).to.be.equal(balanceAfter.toString());
-  //       let data = await vault.depositors(deployer.address);
-  //       expect(data.waitingAmount.toNumber()).to.be.equal(-100);
-  //     });
+        let startEpoch = await vault.currentEpochStart();
 
-  //     afterEach(async () => {
-  //       await hre.ethers.provider.send("evm_revert", [initSnapshotId]);
-  //     });
-  //   });
+        await time.increaseTo(startEpoch.add(1));
 
-  //   describe("in next epoch", () => {
-  //     beforeEach(async () => {
-  //       initSnapshotId = await hre.ethers.provider.send("evm_snapshot", []);
-  //       await baseToken.approve(vault.address, parseUnits("2000", "gwei"));
-  //       await baseToken
-  //         .connect(farmer)
-  //         .approve(vault.address, parseUnits("5000", "gwei"));
-  //       await vault.deposit(parseUnits("1000", "gwei"));
-  //       //console.log("DEP 1000");
-  //       await vault.connect(farmer).createNewEpoch();
-  //       let start = await vault.currentEpochStart();
-  //       await time.increaseTo(start.add(1));
-  //       await vault.connect(farmer).trustedBorrow(parseUnits("1000", "gwei"));
-  //       await vault.deposit(parseUnits("900", "gwei"));
-  //       //console.log("DEP 900");
-  //       await vault.connect(farmer).trustedRepay(parseUnits("1200", "gwei"));
-  //       await vault.connect(farmer).createNewEpoch();
-  //     });
+        await vault
+          .connect(controller)
+          .trustedBorrow(parseUnits("1000", "gwei"));
 
-  //     afterEach(async () => {
-  //       await hre.ethers.provider.send("evm_revert", [initSnapshotId]);
-  //     });
+        await utils.depositToVault(vault, farmer, "900");
+      });
 
-  //     it("should schedule withdrawal without payout", async () => {
-  //       let balanceBefore = await baseToken.balanceOf(deployer.address);
-  //       let tx = await vault.withdraw(parseUnits("900", "gwei"));
-  //       await tx.wait();
-  //       let balanceAfter = await baseToken.balanceOf(deployer.address);
-  //       expect(balanceBefore.toString()).to.be.equal(balanceAfter.toString());
-  //       let farmerDataAfter = await vault.depositors(deployer.address);
-  //       expect(farmerDataAfter.waitingAmount).to.be.equal(-900);
-  //     });
+      afterEach(async () => {
+        await hre.ethers.provider.send("evm_revert", [initSnapshotId]);
+      });
 
-  //     it("should withdraw after re-request in new epoch", async () => {
-  //       let balanceBefore = await baseToken.balanceOf(deployer.address);
-  //       let tx = await vault.withdraw(parseUnits("900", "gwei"));
-  //       await tx.wait();
-  //       await vault.connect(farmer).createNewEpoch();
-  //       await vault.withdraw(0);
-  //       let balanceAfter = await baseToken.balanceOf(deployer.address);
-  //       expect(
-  //         balanceBefore.add(parseUnits("900", "gwei")).toString()
-  //       ).to.be.equal(balanceAfter.toString());
-  //       let farmerDataAfter = await vault.depositors(deployer.address);
-  //       expect(farmerDataAfter.waitingAmount).to.be.equal(0);
-  //     });
-  //   });
+      it("should instantly withdraw sum equal to current epoch deposit", async () => {
+        let farmerBalanceBefore = await baseToken.balanceOf(farmer.address);
 
-  //   describe("between epochs", () => {
-  //     beforeEach(async () => {
-  //       initSnapshotId = await hre.ethers.provider.send("evm_snapshot", []);
-  //     });
+        await utils.withdrawFromVault(vault, farmer, "900");
 
-  //     afterEach(async () => {
-  //       await hre.ethers.provider.send("evm_revert", [initSnapshotId]);
-  //     });
-  //   });
-  // });
+        let farmerBalanceAfter = await baseToken.balanceOf(farmer.address);
+
+        expect(
+          farmerBalanceBefore.add(parseUnits("900", "gwei")).toString()
+        ).to.be.equal(farmerBalanceAfter.toString());
+      });
+
+      it("should instantly withdraw sum smaller than current epoch deposit", async () => {
+        let farmerBalanceBefore = await baseToken.balanceOf(farmer.address);
+
+        await utils.withdrawFromVault(vault, farmer, "800");
+
+        let farmerBalanceAfter = await baseToken.balanceOf(farmer.address);
+
+        expect(
+          farmerBalanceBefore.add(parseUnits("800", "gwei")).toString()
+        ).to.be.equal(farmerBalanceAfter.toString());
+      });
+
+      it("should only withdraw waiting amount and schedule rest if withdraw is bigger than epoch deposit", async () => {
+        let farmerBalanceBefore = await baseToken.balanceOf(farmer.address);
+
+        await utils.withdrawFromVault(vault, farmer, "1000");
+
+        let farmerBalanceAfter = await baseToken.balanceOf(farmer.address);
+
+        expect(
+          farmerBalanceBefore.add(parseUnits("900", "gwei")).toString()
+        ).to.be.equal(farmerBalanceAfter.toString());
+
+        let farmerVaultBalance = await vault.depositors(farmer.address);
+
+        expect(farmerVaultBalance.waitingAmount.toNumber()).to.be.equal(-100);
+      });
+    });
+
+    describe("in next epoch", () => {
+      beforeEach(async () => {
+        initSnapshotId = await hre.ethers.provider.send("evm_snapshot", []);
+
+        await utils.approveVault(vault, baseToken, farmer, "2000");
+        await utils.approveVault(vault, baseToken, controller, "5000");
+
+        await utils.depositToVault(vault, farmer, "1000");
+
+        await vault.connect(controller).createNewEpoch();
+        let startEpoch = await vault.currentEpochStart();
+        await time.increaseTo(startEpoch.add(1));
+
+        await vault
+          .connect(controller)
+          .trustedBorrow(parseUnits("1000", "gwei"));
+
+        await utils.depositToVault(vault, farmer, "900");
+        await vault
+          .connect(controller)
+          .trustedRepay(parseUnits("1200", "gwei"));
+
+        await vault.connect(controller).createNewEpoch();
+      });
+
+      afterEach(async () => {
+        await hre.ethers.provider.send("evm_revert", [initSnapshotId]);
+      });
+
+      it("should schedule withdrawal without payout", async () => {
+        let farmerBalanceBefore = await baseToken.balanceOf(farmer.address);
+
+        await utils.withdrawFromVault(vault, farmer, "900");
+
+        let farmerBalanceAfter = await baseToken.balanceOf(farmer.address);
+
+        expect(farmerBalanceBefore.toString()).to.be.equal(
+          farmerBalanceAfter.toString()
+        );
+
+        let farmerDataAfter = await vault.depositors(farmer.address);
+
+        expect(farmerDataAfter.waitingAmount).to.be.equal(-900);
+      });
+
+      it("should withdraw after re-request in new epoch", async () => {
+        let farmerBalanceBefore = await baseToken.balanceOf(farmer.address);
+
+        await utils.withdrawFromVault(vault, farmer, "900");
+
+        await vault.connect(controller).createNewEpoch();
+
+        await utils.withdrawFromVault(vault, farmer, "0");
+
+        let farmerBalanceAfter = await baseToken.balanceOf(farmer.address);
+
+        expect(
+          farmerBalanceBefore.add(parseUnits("900", "gwei")).toString()
+        ).to.be.equal(farmerBalanceAfter.toString());
+
+        let farmerDataAfter = await vault.depositors(farmer.address);
+
+        expect(farmerDataAfter.waitingAmount).to.be.equal(0);
+      });
+    });
+
+    describe("between epochs", () => {
+      beforeEach(async () => {
+        initSnapshotId = await hre.ethers.provider.send("evm_snapshot", []);
+      });
+
+      afterEach(async () => {
+        await hre.ethers.provider.send("evm_revert", [initSnapshotId]);
+      });
+    });
+  });
 });
