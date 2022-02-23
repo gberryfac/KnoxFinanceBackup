@@ -67,7 +67,7 @@ contract Controller {
         IVault vault = IVault(treasuryAddress);
         int32 epochId = vault.currentEpoch();
 
-        vault.trustedBorrow(uint256(positionSize) * WEI_PER_UNIT);
+        vault.borrow(uint256(positionSize) * WEI_PER_UNIT);
 
         require(
             vault.baseToken().transferFrom(
@@ -112,7 +112,7 @@ contract Controller {
 
         payoutToken.approve(treasuryAddress, uint256(payback) * WEI_PER_UNIT);
 
-        vault.trustedRepay(uint256(payback) * WEI_PER_UNIT);
+        vault.repay(uint256(payback) * WEI_PER_UNIT);
         totalMMPayout[treasuryAddress][epochId] = payout;
     }
 

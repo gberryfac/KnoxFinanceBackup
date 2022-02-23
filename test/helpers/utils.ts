@@ -43,43 +43,55 @@ export async function approveAndDepositToVault(
   vault: Vault,
   baseToken: TestERC20,
   signer: SignerWithAddress,
-  amountInGwei: string
+  amountInEther: string
 ) {
-  await approveVault(vault, baseToken, signer, amountInGwei);
-  return await depositToVault(vault, signer, amountInGwei);
+  await approveVault(vault, baseToken, signer, amountInEther);
+  return await depositToVault(vault, signer, amountInEther);
 }
 
 export async function approveVault(
   vault: Vault,
   baseToken: TestERC20,
   signer: SignerWithAddress,
-  amountInGwei: string
+  amountInEther: string
 ) {
   await baseToken
     .connect(signer)
-    .approve(vault.address, parseUnits(amountInGwei, "gwei"));
+    .approve(vault.address, parseUnits(amountInEther, "ether"));
 }
 
 export async function depositToVault(
   vault: Vault,
   signer: SignerWithAddress,
-  amountInGwei: string
+  amountInEther: string
 ) {
   let tx = await vault
     .connect(signer)
-    .deposit(parseUnits(amountInGwei, "gwei"));
+    .deposit(parseUnits(amountInEther, "ether"));
 
   return await tx.wait();
 }
 
-export async function withdrawFromVault(
+export async function instantWithdraw(
   vault: Vault,
   signer: SignerWithAddress,
-  amountInGwei: string
+  amountInEther: string
 ) {
   let tx = await vault
     .connect(signer)
-    .withdraw(parseUnits(amountInGwei, "gwei"));
+    .instantWithdraw(parseUnits(amountInEther, "ether"));
+
+  return await tx.wait();
+}
+
+export async function initiateWithdraw(
+  vault: Vault,
+  signer: SignerWithAddress,
+  amountInEther: string
+) {
+  let tx = await vault
+    .connect(signer)
+    .initiateWithdraw(parseUnits(amountInEther, "ether"));
 
   return await tx.wait();
 }

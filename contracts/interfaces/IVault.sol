@@ -6,9 +6,9 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 interface IVault {
     function baseToken() external returns (IERC20);
 
-    function trustedBorrow(uint256 amount) external;
+    function borrow(uint256 amount) external;
 
-    function trustedRepay(uint256 amount) external;
+    function repay(uint256 amount) external;
 
     function currentEpoch() external returns (int32);
 
