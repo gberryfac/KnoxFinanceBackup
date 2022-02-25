@@ -16,23 +16,20 @@ interface IStrategy {
 
     /**
      * @notice opens a single position
-     * @param counterparty address who will receive the long token
      * @param maturity timestamp of option maturity
      * @param strikePrice K1 strike price
-     * @param contractSize quantity of option contract tokens to exercise
+     * @param size quantity of option contract tokens to exercise
      * @param isCall whether this is a call or a put
      */
     function openPosition(
-        address counterparty,
-        uint64 maturity,
+        uint256 maturity,
         uint256 strikePrice,
-        uint256 contractSize,
+        uint256 size,
         bool isCall
     ) external;
 
     /**
      * @notice opens multiple positions depending on the strategy
-     * @param counterparty address who will receive the long token
      * @param maturity timestamp of option maturity
      * @param strikePrices K1, K2, ..., Kn strike prices
      * @param contractSize quantity of option contract tokens to exercise
@@ -40,8 +37,7 @@ interface IStrategy {
      * @param maxCost maximum acceptable cost after accounting for slippage
      */
     function openPositions(
-        address counterparty,
-        uint64 maturity,
+        uint256 maturity,
         uint256[] calldata strikePrices,
         uint256 contractSize,
         bool isCall,
@@ -54,8 +50,8 @@ interface IStrategy {
     function closePosition()
         external
         returns (
-            uint64 payout, /*amount available for MM to withdraw*/
-            uint64 payback /*amount that goes back to vault*/
+            uint256 payout, /*amount available for MM to withdraw*/
+            uint256 payback /*amount that goes back to vault*/
         );
 
     /**
@@ -70,8 +66,5 @@ interface IStrategy {
         uint256 contractSize
     ) external;
 
-    function getPositionSize(
-        uint64 premiumSize,
-        bytes memory strategyParameters
-    ) external returns (uint64);
+    function getPositionSize() external returns (uint256);
 }

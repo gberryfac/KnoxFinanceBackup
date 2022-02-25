@@ -205,11 +205,6 @@ describe.only("Knox Vault", async () => {
         await expect(tx).to.be.revertedWith("ERC20: insufficient allowance");
       });
 
-      it("should succeed if approval is set", async () => {
-        await utils.approveAndDepositToVault(vault, baseToken, farmer, "100");
-      });
-
-      // TODO: CHECK LP TOKENS HAVE BEEN SENT TO USER IN SEPARATE TEST
       it("should create deposit receipt if funds are provided", async () => {
         await utils.approveAndDepositToVault(vault, baseToken, farmer, "100");
 
@@ -220,7 +215,26 @@ describe.only("Knox Vault", async () => {
         );
       });
 
-      // TODO: CHECK LP TOKENS HAVE BEEN SENT TO USER IN SEPARATE TEST
+      it("should debit correct amount of base tokens from farmer", async () => {
+        await utils.approveAndDepositToVault(vault, baseToken, farmer, "100");
+
+        let baseTokenBalance = await baseToken.balanceOf(farmer.address);
+
+        expect(baseTokenBalance.toString()).to.be.equal(
+          parseUnits("0", "ether").toString()
+        );
+      });
+
+      it("should credit correct amount of lp tokens from farmer", async () => {
+        await utils.approveAndDepositToVault(vault, baseToken, farmer, "100");
+
+        let lpTokenBalance = await vault.balanceOf(farmer.address);
+
+        expect(lpTokenBalance.toString()).to.be.equal(
+          parseUnits("100", "ether").toString()
+        );
+      });
+
       it("should update deposit receipt if funds are provided", async () => {
         await utils.approveAndDepositToVault(vault, baseToken, farmer, "50");
         await utils.approveAndDepositToVault(vault, baseToken, farmer, "50");
@@ -232,7 +246,6 @@ describe.only("Knox Vault", async () => {
         );
       });
 
-      // TODO: CHECK LP TOKENS HAVE BEEN SENT TO USER IN SEPARATE TEST
       it("should create/update deposit receipt for each user if funds are provided", async () => {
         await utils.approveAndDepositToVault(vault, baseToken, farmer, "10");
         await utils.approveAndDepositToVault(vault, baseToken, deployer, "100");
@@ -247,6 +260,40 @@ describe.only("Knox Vault", async () => {
           parseUnits("20", "ether").toString()
         );
         expect(deployerAmount.toString()).to.be.equal(
+          parseUnits("100", "ether").toString()
+        );
+      });
+
+      it("should debit correct amount of base tokens to each user", async () => {
+        await utils.approveAndDepositToVault(vault, baseToken, farmer, "10");
+        await utils.approveAndDepositToVault(vault, baseToken, deployer, "100");
+        await utils.approveAndDepositToVault(vault, baseToken, farmer, "10");
+
+        let farmerBaseTokenBalance = await baseToken.balanceOf(farmer.address);
+        let deployerBaseTokenBalance = await baseToken.balanceOf(
+          deployer.address
+        );
+
+        expect(farmerBaseTokenBalance.toString()).to.be.equal(
+          parseUnits("80", "ether").toString()
+        );
+        expect(deployerBaseTokenBalance.toString()).to.be.equal(
+          parseUnits("700", "ether").toString()
+        );
+      });
+
+      it("should credit correct amount of lp tokens to each user", async () => {
+        await utils.approveAndDepositToVault(vault, baseToken, farmer, "10");
+        await utils.approveAndDepositToVault(vault, baseToken, deployer, "100");
+        await utils.approveAndDepositToVault(vault, baseToken, farmer, "10");
+
+        let farmerLPTokenBalance = await vault.balanceOf(farmer.address);
+        let deployerLPTokenBalance = await vault.balanceOf(deployer.address);
+
+        expect(farmerLPTokenBalance.toString()).to.be.equal(
+          parseUnits("20", "ether").toString()
+        );
+        expect(deployerLPTokenBalance.toString()).to.be.equal(
           parseUnits("100", "ether").toString()
         );
       });
@@ -320,8 +367,6 @@ describe.only("Knox Vault", async () => {
 
         expect(epoch.index.toNumber()).to.be.equal(0);
         expect(epoch.expiry.toNumber()).to.be.equal(block.timestamp);
-        expect(epoch.balance.toString()).to.be.equal(parseUnits("0", "ether"));
-        expect(epoch.pricePerFullShare.toNumber()).to.be.equal(0);
         expect(epoch.withholding.toString()).to.be.equal(
           parseUnits("0", "ether")
         );
@@ -352,8 +397,6 @@ describe.only("Knox Vault", async () => {
         expect(epoch.expiry.toNumber()).to.be.equal(
           block.timestamp + (7 * 24 * 3600 - 7200)
         );
-        expect(epoch.balance.toString()).to.be.equal(parseUnits("10", "ether"));
-        expect(epoch.pricePerFullShare.toNumber()).to.be.equal(0);
         expect(epoch.withholding.toString()).to.be.equal(
           parseUnits("0", "ether")
         );
@@ -422,12 +465,8 @@ describe.only("Knox Vault", async () => {
         await expect(tx).to.be.revertedWith("vault/instant-withdraw-failed");
       });
 
-      // TODO: FIX THIS TEST :^)
       it("should withdraw funds at 1:1 ratio", async () => {
         await utils.approveAndDepositToVault(vault, baseToken, farmer, "50");
-
-        // // Price Per Share should not affect the instant withdrawals.
-        // await baseToken.transfer(vault.address, parseUnits("2", "ether"));
 
         let balance = await vault.balanceOf(farmer.address);
         balance = balance.div(2);
@@ -435,31 +474,9 @@ describe.only("Knox Vault", async () => {
         await vault.connect(farmer).instantWithdraw(balance);
 
         let amount = await (await vault.deposits(farmer.address)).amount;
-        console.log("Amount!:", amount);
 
-        // await utils.instantWithdraw(vault, farmer, "25");
-        expect(amount.toString()).to.be.equal(parseUnits("30", "ether"));
+        expect(amount.toString()).to.be.equal(parseUnits("20", "ether"));
       });
-
-      // TODO: CHECK THAT TOKENS RECEIVED WITH instantWithdraw() DO NOT INCLUDE PROFITS IF TOKENS
-      // ARE SENT TO VAULT
-      // it("should withdraw funds at 1:1 ratio", async () => {
-      //   await utils.approveAndDepositToVault(vault, baseToken, farmer, "50");
-
-      //   // // Price Per Share should not affect the instant withdrawals.
-      //   // await baseToken.transfer(vault.address, parseUnits("2", "ether"));
-
-      //   let balance = await vault.balanceOf(farmer.address);
-      //   balance = balance.div(2);
-
-      //   await vault.connect(farmer).instantWithdraw(balance);
-
-      //   let amount = await (await vault.deposits(farmer.address)).amount;
-      //   console.log("Amount!:", amount);
-
-      //   // await utils.instantWithdraw(vault, farmer, "25");
-      //   expect(amount.toString()).to.be.equal(parseUnits("30", "ether"));
-      // });
     });
   });
 
@@ -506,8 +523,6 @@ describe.only("Knox Vault", async () => {
 
         expect(epoch.index.toNumber()).to.be.equal(0);
         expect(epoch.expiry.toNumber()).to.be.equal(block.timestamp);
-        expect(epoch.balance.toString()).to.be.equal(parseUnits("0", "ether"));
-        expect(epoch.pricePerFullShare.toNumber()).to.be.equal(0);
         expect(epoch.withholding.toString()).to.be.equal(
           parseUnits("0", "ether")
         );
@@ -613,6 +628,14 @@ describe.only("Knox Vault", async () => {
         await hre.ethers.provider.send("evm_revert", [initSnapshotId]);
       });
 
+      it("should fail if an amount is requested which exceeds the amount deposited", async () => {
+        let tx = utils.initiateWithdraw(vault, farmer, "50");
+
+        await expect(tx).to.be.revertedWith(
+          "vault/insufficient-lp-token-balance"
+        );
+      });
+
       it("should update withholding receipt between epochs", async () => {
         await utils.initiateWithdraw(vault, farmer, "15");
 
@@ -621,7 +644,34 @@ describe.only("Knox Vault", async () => {
         expect(amount.toString()).to.be.equal(parseUnits("25", "ether"));
       });
     });
+
+    describe("initiate withdraw (vault state)", () => {
+      describe("epoch == 0", () => {
+        beforeEach(async () => {
+          initSnapshotId = await hre.ethers.provider.send("evm_snapshot", []);
+
+          await utils.approveAndDepositToVault(vault, baseToken, farmer, "50");
+        });
+
+        afterEach(async () => {
+          await hre.ethers.provider.send("evm_revert", [initSnapshotId]);
+        });
+
+        it("should not decrease vault token balance", async () => {
+          let vaultBalanceBefore = await baseToken.balanceOf(vault.address);
+
+          await utils.initiateWithdraw(vault, farmer, "25");
+
+          let vaultBalanceAfter = await baseToken.balanceOf(vault.address);
+
+          expect(vaultBalanceBefore.toString()).to.be.equal(
+            vaultBalanceAfter.sub(parseUnits("0", "ether")).toString()
+          );
+        });
+      });
+    });
   });
 });
 
+// TODO: COMBINATIONS OF deposit() & initiateWithdraw() - this should be ok because user burns their lp tokens, and the epoch withholding cancels out the deposit
 // TODO: COMBINATIONS OF instantWithdraw() & initiateWithdraw()

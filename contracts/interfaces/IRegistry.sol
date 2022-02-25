@@ -2,11 +2,22 @@
 pragma solidity 0.8.4;
 
 interface IRegistry {
-    function authenticate(bytes memory data, bytes memory signature)
-        external
-        returns (bool);
+    struct Transaction {
+        address controller;
+        uint256 deadline;
+        uint256 maturity;
+        uint256[] strikePrices;
+        uint256 spotPrice;
+        uint256 premium;
+        bool isCall;
+    }
 
-    function getTreasuryAddress(bytes memory signature)
-        external
-        returns (address);
+    function authenticate(
+        bytes memory signature,
+        uint256 deadline,
+        uint256 strikePrices,
+        uint256 spotPrice,
+        uint256 premium,
+        bool isCall
+    ) external view returns (bool)
 }

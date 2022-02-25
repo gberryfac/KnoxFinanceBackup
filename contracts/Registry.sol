@@ -14,18 +14,6 @@ contract Registry is EIP712, Ownable {
     string public constant version = "v0.0.1";
 
     /************************************************
-     *  STRUCTS
-     ***********************************************/
-
-    struct Transaction {
-        address vault;
-        uint64 deadline; // Unix timestamp
-        uint64[] strikePrices; //With 9 digits precision, to save space
-        uint64 spotPrice; // with 9 digits in USD
-        uint64 premium; // with 9 digits precision as parts of deposited amount
-    }
-
-    /************************************************
      *  CONSTRUCTOR
      ***********************************************/
 
@@ -37,12 +25,17 @@ contract Registry is EIP712, Ownable {
 
     /**
      * @notice Authenticates the signature and transaction data provided by the signer
-     * @param signature is an EIP-712 signed transaction generated off-chain by the signer
+     * @param signature is an EIP-712 signature
      * @param transaction is the metadata and trade parameters of the signature
      **/
     function authenticate(
         bytes memory signature,
-        Transaction calldata transaction
+        uint256 deadline,
+        uint256 maturity,
+        uint256 strikePrices,
+        uint256 spotPrice,
+        uint256 premium,
+        bool isCall
     ) external view returns (bool) {
         require(
             block.timestamp < transaction.deadline,
@@ -53,13 +46,15 @@ contract Registry is EIP712, Ownable {
             keccak256(
                 abi.encode(
                     keccak256(
-                        "Transaction(address vault,uint64 deadline,uint64[] strikePrices,uint64 spotPrice,uint64 premium)"
+                        "Transaction(address controller, uint256 deadline, uint256 maturity, uint256[] strikePrices, uint256 spotPrice, uint256 premium, bool isCall)"
                     ),
-                    transaction.vault,
-                    transaction.deadline,
-                    transaction.strikePrices,
-                    transaction.spotPrice,
-                    transaction.premium
+                    msg.sender,
+                    deadline,
+                    maturity,
+                    strikePrices,
+                    spotPrice,
+                    premium,
+                    isCall
                 )
             )
         );
