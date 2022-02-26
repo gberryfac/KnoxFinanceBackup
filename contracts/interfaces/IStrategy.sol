@@ -2,18 +2,6 @@
 pragma solidity 0.8.4;
 
 interface IStrategy {
-    // /**
-    //  * @notice calculates the amount of capital required from the vault
-    //  * @param strikePrices K1, K2, ..., Kn strike prices
-    //  * @param spotPrice spot price of underlying
-    //  * @param contractSizes quantity of option contract tokens to exercise
-    //  */
-    // function calculateAmount(
-    //     uint256[] calldata strikePrices,
-    //     uint256 spotPrice,
-    //     uint256[] calldata contractSizes
-    // ) external view;
-
     /**
      * @notice opens a single position
      * @param maturity timestamp of option maturity

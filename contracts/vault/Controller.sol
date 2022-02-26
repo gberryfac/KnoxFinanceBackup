@@ -29,7 +29,7 @@ contract Controller {
     ) {
         owner = msg.sender;
         vault = IVault(_vault);
-        baseToken = vault.baseToken();
+        baseToken = IVault(_vault).baseToken();
         registry = IRegistry(_registry);
         strategy = IStrategy(_strategy);
     }
@@ -46,48 +46,49 @@ contract Controller {
     ) public {
         require(
             registry.authenticate(
-                bytes memory signature,
-                uint256 deadline,
-                uint256 maturity
-                uint256 strikePrice,
-                uint256 spotPrice,
-                uint256 premium,
-                bool isCall
+                signature,
+                deadline,
+                maturity,
+                strikePrice,
+                spotPrice,
+                premium,
+                isCall
             ),
             "controller/invalid-signature"
         );
 
         uint256 positionSize = premium.mul(size);
         baseToken.safeTransferFrom(msg.sender, address(this), positionSize);
+
         vault.borrow(positionSize);
 
-        bytes memory callData = abi.encodeWithSignature(
+        bytes memory call = abi.encodeWithSignature(
             "openPosition(uint256 maturity, uint256 strikePrice, uint256 size, bool isCall)",
             abi.encode(maturity, strikePrice, size, isCall)
         );
 
-        (bool status, ) = address(strategy).delegatecall(callData);
-        require(status, "controller/strategy-invocation-failed");
+        (bool success, ) = address(strategy).delegatecall(call);
+        require(success, "controller/strategy-invocation-failed");
     }
 
-    // function settlePosition(address treasuryAddress) public {
-    //     require(msg.sender == owner, "controller/not-permitted");
-    //     IVault vault = IVault(treasuryAddress);
-    //     int32 epochId = vault.currentEpoch();
+    function closePosition() public {
+        bytes memory call = abi.encodeWithSignature("closePosition()");
 
-    //     bytes memory callData = abi.encodeWithSignature("closePosition()");
+        (bool success, bytes memory data) = address(strategy).delegatecall(
+            call
+        );
 
-    //     (, bytes memory retVal) = address(strategies[treasuryAddress])
-    //         .delegatecall(callData);
-    //     (uint64 payout, uint64 payback) = abi.decode(retVal, (uint64, uint64));
+        require(success, "controller/strategy-invocation-failed");
+        (uint256 payout, uint256 collateral) = abi.decode(
+            data,
+            (uint256, uint256)
+        );
 
-    //     IERC20 payoutToken = IERC20(vault.baseToken());
+        // TODO: Store payout for each MM
 
-    //     payoutToken.approve(treasuryAddress, uint256(payback) * WEI_PER_UNIT);
-
-    //     vault.repay(uint256(payback) * WEI_PER_UNIT);
-    //     totalMMPayout[treasuryAddress][epochId] = payout;
-    // }
+        baseToken.approve(address(vault), collateral);
+        baseToken.safeTransfer(address(vault), collateral);
+    }
 
     // /*called independly by any MM to get payout associated with position*/
     // function withdrawPayout(uint256 index) public {

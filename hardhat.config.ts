@@ -1,6 +1,8 @@
 import "@nomiclabs/hardhat-ethers";
 import "@nomiclabs/hardhat-waffle";
 import "@typechain/hardhat";
+import "solidity-coverage";
+import "hardhat-contract-sizer";
 
 require("dotenv").config();
 

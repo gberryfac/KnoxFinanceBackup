@@ -12,6 +12,7 @@ import { expect } from "chai";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 
 let block;
+const EPOCH_SPAN_IN_SECONDS = 7 * 24 * 3600 - 7200;
 
 describe.only("Knox Vault", async () => {
   let deployer: SignerWithAddress;
@@ -46,14 +47,17 @@ describe.only("Knox Vault", async () => {
       "KV-LPT",
       baseToken.address,
       controller.address,
-      block.timestamp
+      block.timestamp + EPOCH_SPAN_IN_SECONDS
     )) as Vault;
   });
 
-  describe("deposit (user state)", () => {
+  describe("deposit (user)", () => {
     describe("epoch == 0", () => {
       beforeEach(async () => {
         initSnapshotId = await hre.ethers.provider.send("evm_snapshot", []);
+
+        let epoch = await vault.epoch();
+        await time.increaseTo(epoch.expiry.add(1));
       });
 
       afterEach(async () => {
@@ -305,8 +309,11 @@ describe.only("Knox Vault", async () => {
 
         await utils.approveAndDepositToVault(vault, baseToken, farmer, "10");
 
-        await vault.rollover();
         let epoch = await vault.epoch();
+        await time.increaseTo(epoch.expiry.add(1));
+
+        await vault.rollover();
+        epoch = await vault.epoch();
         await time.increaseTo(epoch.expiry.add(1));
       });
 
@@ -328,10 +335,13 @@ describe.only("Knox Vault", async () => {
     });
   });
 
-  describe("deposit (vault state)", () => {
+  describe("deposit (vault)", () => {
     describe("epoch == 0", () => {
       beforeEach(async () => {
         initSnapshotId = await hre.ethers.provider.send("evm_snapshot", []);
+
+        let epoch = await vault.epoch();
+        await time.increaseTo(epoch.expiry.add(1));
       });
 
       afterEach(async () => {
@@ -352,34 +362,11 @@ describe.only("Knox Vault", async () => {
     });
   });
 
-  describe("deposit (epoch state)", () => {
+  describe("instant withdraw (user)", () => {
     describe("epoch == 0", () => {
       beforeEach(async () => {
         initSnapshotId = await hre.ethers.provider.send("evm_snapshot", []);
-      });
 
-      afterEach(async () => {
-        await hre.ethers.provider.send("evm_revert", [initSnapshotId]);
-      });
-
-      it("should not change current epoch state if rollover isn't called", async () => {
-        let epoch = await vault.epoch();
-
-        expect(epoch.index.toNumber()).to.be.equal(0);
-        expect(epoch.expiry.toNumber()).to.be.equal(block.timestamp);
-        expect(epoch.withholding.toString()).to.be.equal(
-          parseUnits("0", "ether")
-        );
-      });
-    });
-
-    describe("epoch == 1", () => {
-      beforeEach(async () => {
-        initSnapshotId = await hre.ethers.provider.send("evm_snapshot", []);
-
-        await utils.approveAndDepositToVault(vault, baseToken, farmer, "10");
-
-        await vault.rollover();
         let epoch = await vault.epoch();
         await time.increaseTo(epoch.expiry.add(1));
       });
@@ -388,34 +375,7 @@ describe.only("Knox Vault", async () => {
         await hre.ethers.provider.send("evm_revert", [initSnapshotId]);
       });
 
-      it("should change epoch state after rollover is called", async () => {
-        await utils.approveAndDepositToVault(vault, baseToken, farmer, "50");
-
-        let epoch = await vault.epoch();
-
-        expect(epoch.index.toNumber()).to.be.equal(1);
-        expect(epoch.expiry.toNumber()).to.be.equal(
-          block.timestamp + (7 * 24 * 3600 - 7200)
-        );
-        expect(epoch.withholding.toString()).to.be.equal(
-          parseUnits("0", "ether")
-        );
-      });
-    });
-  });
-
-  describe("instant withdraw (user state)", () => {
-    describe("epoch == 0", () => {
-      beforeEach(async () => {
-        initSnapshotId = await hre.ethers.provider.send("evm_snapshot", []);
-      });
-
-      afterEach(async () => {
-        await hre.ethers.provider.send("evm_revert", [initSnapshotId]);
-      });
-
-      // TODO: CHECK LP TOKENS HAVE BEEN SENT TO USER IN SEPARATE TEST
-      it("should fail if no funds have been deposited`", async () => {
+      it("should fail if no funds have been deposited", async () => {
         let tx = vault.instantWithdraw(1000);
 
         await expect(tx).to.be.revertedWith(
@@ -423,7 +383,6 @@ describe.only("Knox Vault", async () => {
         );
       });
 
-      // TODO: CHECK LP TOKENS HAVE BEEN SENT TO USER IN SEPARATE TEST
       it("should fail if withdraw amount > deposit amount", async () => {
         await utils.approveAndDepositToVault(vault, baseToken, farmer, "10");
 
@@ -434,7 +393,6 @@ describe.only("Knox Vault", async () => {
         );
       });
 
-      // TODO: CHECK LP TOKENS HAVE BEEN SENT TO USER IN SEPARATE TEST
       it("should withdraw funds that were deposited", async () => {
         await utils.approveAndDepositToVault(vault, baseToken, farmer, "50");
         await utils.instantWithdraw(vault, farmer, "50");
@@ -451,8 +409,11 @@ describe.only("Knox Vault", async () => {
 
         await utils.approveAndDepositToVault(vault, baseToken, farmer, "10");
 
-        await vault.rollover();
         let epoch = await vault.epoch();
+        await time.increaseTo(epoch.expiry.add(1));
+
+        await vault.rollover();
+        epoch = await vault.epoch();
         await time.increaseTo(epoch.expiry.add(1));
       });
 
@@ -463,6 +424,20 @@ describe.only("Knox Vault", async () => {
       it("should fail if funds have not been deposited in current epoch", async () => {
         let tx = utils.instantWithdraw(vault, farmer, "10");
         await expect(tx).to.be.revertedWith("vault/instant-withdraw-failed");
+      });
+
+      it("should withdraw funds deposited within the same epoch", async () => {
+        await utils.approveAndDepositToVault(vault, baseToken, farmer, "50");
+
+        await baseToken.transfer(deployer.address, parseUnits("5", "ether"));
+
+        let balance = await vault.balanceOf(farmer.address);
+
+        await vault.connect(farmer).instantWithdraw(balance);
+
+        let amount = await (await vault.deposits(farmer.address)).amount;
+
+        expect(amount.toString()).to.be.equal(parseUnits("50", "ether"));
       });
 
       it("should withdraw funds at 1:1 ratio", async () => {
@@ -480,10 +455,13 @@ describe.only("Knox Vault", async () => {
     });
   });
 
-  describe("instant withdraw (vault state)", () => {
+  describe("instant withdraw (vault)", () => {
     describe("epoch == 0", () => {
       beforeEach(async () => {
         initSnapshotId = await hre.ethers.provider.send("evm_snapshot", []);
+
+        let epoch = await vault.epoch();
+        await time.increaseTo(epoch.expiry.add(1));
       });
 
       afterEach(async () => {
@@ -505,42 +483,20 @@ describe.only("Knox Vault", async () => {
     });
   });
 
-  describe("instant withdraw (epoch state)", () => {
+  describe("initiate withdraw (user)", () => {
     describe("epoch == 0", () => {
       beforeEach(async () => {
         initSnapshotId = await hre.ethers.provider.send("evm_snapshot", []);
 
-        await utils.approveAndDepositToVault(vault, baseToken, farmer, "50");
-        await utils.instantWithdraw(vault, farmer, "25");
-      });
-
-      afterEach(async () => {
-        await hre.ethers.provider.send("evm_revert", [initSnapshotId]);
-      });
-
-      it("should not change current epoch state if rollover isn't called", async () => {
         let epoch = await vault.epoch();
-
-        expect(epoch.index.toNumber()).to.be.equal(0);
-        expect(epoch.expiry.toNumber()).to.be.equal(block.timestamp);
-        expect(epoch.withholding.toString()).to.be.equal(
-          parseUnits("0", "ether")
-        );
-      });
-    });
-  });
-
-  describe("initiate withdraw (user state)", () => {
-    describe("epoch == 0", () => {
-      beforeEach(async () => {
-        initSnapshotId = await hre.ethers.provider.send("evm_snapshot", []);
+        await time.increaseTo(epoch.expiry.add(1));
       });
 
       afterEach(async () => {
         await hre.ethers.provider.send("evm_revert", [initSnapshotId]);
       });
 
-      it("should fail if no funds have been deposited`", async () => {
+      it("should fail if no funds have been deposited", async () => {
         let tx = vault.initiateWithdraw(parseUnits("100", "ether"));
 
         await expect(tx).to.be.revertedWith(
@@ -556,8 +512,11 @@ describe.only("Knox Vault", async () => {
         await utils.approveAndDepositToVault(vault, baseToken, farmer, "10");
         await utils.approveAndDepositToVault(vault, baseToken, deployer, "100");
 
-        await vault.rollover();
         let epoch = await vault.epoch();
+        await time.increaseTo(epoch.expiry.add(1));
+
+        await vault.rollover();
+        epoch = await vault.epoch();
         await time.increaseTo(epoch.expiry.add(1));
       });
 
@@ -565,7 +524,7 @@ describe.only("Knox Vault", async () => {
         await hre.ethers.provider.send("evm_revert", [initSnapshotId]);
       });
 
-      it("should fail if withdrawal amount exceeds deposit amount`", async () => {
+      it("should fail if withdrawal amount exceeds deposit amount", async () => {
         let tx = vault
           .connect(farmer)
           .initiateWithdraw(parseUnits("11", "ether"));
@@ -575,7 +534,7 @@ describe.only("Knox Vault", async () => {
         );
       });
 
-      it("should create withholding receipt if lp tokens are provided`", async () => {
+      it("should create withholding receipt if lp tokens are provided", async () => {
         await utils.initiateWithdraw(vault, farmer, "10");
 
         let amount = (await vault.withholding(farmer.address)).amount;
@@ -583,7 +542,7 @@ describe.only("Knox Vault", async () => {
         expect(amount.toString()).to.be.equal(parseUnits("10", "ether"));
       });
 
-      it("should update withholding receipt if lp tokens are provided`", async () => {
+      it("should update withholding receipt if lp tokens are provided", async () => {
         await utils.initiateWithdraw(vault, farmer, "3");
         await utils.initiateWithdraw(vault, farmer, "5");
 
@@ -613,8 +572,11 @@ describe.only("Knox Vault", async () => {
 
         await utils.approveAndDepositToVault(vault, baseToken, farmer, "50");
 
-        await vault.rollover();
         let epoch = await vault.epoch();
+        await time.increaseTo(epoch.expiry.add(1));
+
+        await vault.rollover();
+        epoch = await vault.epoch();
         await time.increaseTo(epoch.expiry.add(1));
 
         await utils.initiateWithdraw(vault, farmer, "10");
@@ -645,12 +607,15 @@ describe.only("Knox Vault", async () => {
       });
     });
 
-    describe("initiate withdraw (vault state)", () => {
+    describe("initiate withdraw (vault)", () => {
       describe("epoch == 0", () => {
         beforeEach(async () => {
           initSnapshotId = await hre.ethers.provider.send("evm_snapshot", []);
 
           await utils.approveAndDepositToVault(vault, baseToken, farmer, "50");
+
+          let epoch = await vault.epoch();
+          await time.increaseTo(epoch.expiry.add(1));
         });
 
         afterEach(async () => {
@@ -666,6 +631,174 @@ describe.only("Knox Vault", async () => {
 
           expect(vaultBalanceBefore.toString()).to.be.equal(
             vaultBalanceAfter.sub(parseUnits("0", "ether")).toString()
+          );
+        });
+      });
+    });
+
+    describe("withdraw (user)", () => {
+      describe("epoch == 0", () => {
+        beforeEach(async () => {
+          initSnapshotId = await hre.ethers.provider.send("evm_snapshot", []);
+
+          let epoch = await vault.epoch();
+          await time.increaseTo(epoch.expiry.add(1));
+        });
+
+        afterEach(async () => {
+          await hre.ethers.provider.send("evm_revert", [initSnapshotId]);
+        });
+
+        it("should fail if epoch has not elapsed", async () => {
+          let tx = vault.withdraw();
+
+          await expect(tx).to.be.revertedWith("vault/withdraw-not-initiated");
+        });
+      });
+
+      describe("epoch == 1", () => {
+        beforeEach(async () => {
+          initSnapshotId = await hre.ethers.provider.send("evm_snapshot", []);
+
+          await utils.approveAndDepositToVault(vault, baseToken, farmer, "50");
+          await utils.approveAndDepositToVault(
+            vault,
+            baseToken,
+            deployer,
+            "100"
+          );
+        });
+
+        afterEach(async () => {
+          await hre.ethers.provider.send("evm_revert", [initSnapshotId]);
+        });
+
+        it("should fail if withdraw amount is 0 or less", async () => {
+          await utils.initiateWithdraw(vault, farmer, "0");
+
+          let epoch = await vault.epoch();
+          await time.increaseTo(epoch.expiry.add(1));
+
+          await vault.rollover();
+          let tx = vault.withdraw();
+
+          await expect(tx).to.be.revertedWith("vault/withdraw-not-initiated");
+        });
+
+        it("should update withholding receipt", async () => {
+          await utils.initiateWithdraw(vault, farmer, "10");
+
+          let epoch = await vault.epoch();
+          await time.increaseTo(epoch.expiry.add(1));
+
+          await vault.rollover();
+          await utils.withdrawFromVault(vault, farmer);
+
+          let amount = (await vault.withholding(farmer.address)).amount;
+
+          expect(amount.toString()).to.be.equal(parseUnits("0", "ether"));
+        });
+
+        it("should update withholding receipt of correct user", async () => {
+          await utils.initiateWithdraw(vault, farmer, "5");
+          await utils.initiateWithdraw(vault, deployer, "65");
+          await utils.initiateWithdraw(vault, farmer, "4");
+
+          let epoch = await vault.epoch();
+          await time.increaseTo(epoch.expiry.add(1));
+
+          await vault.rollover();
+
+          await utils.withdrawFromVault(vault, farmer);
+          await utils.withdrawFromVault(vault, deployer);
+
+          let farmerAmount = (await vault.withholding(farmer.address)).amount;
+          let deployerAmount = (await vault.withholding(deployer.address))
+            .amount;
+
+          expect(farmerAmount.toString()).to.be.equal(parseUnits("0", "ether"));
+          expect(deployerAmount.toString()).to.be.equal(
+            parseUnits("0", "ether")
+          );
+        });
+      });
+    });
+
+    describe("rollover)", () => {
+      describe("epoch == 0", () => {
+        beforeEach(async () => {
+          initSnapshotId = await hre.ethers.provider.send("evm_snapshot", []);
+        });
+
+        afterEach(async () => {
+          await hre.ethers.provider.send("evm_revert", [initSnapshotId]);
+        });
+
+        it("should fail if epoch has not expired", async () => {
+          let tx = vault.rollover();
+
+          await expect(tx).to.be.revertedWith("vault/epoch-has-not-expired");
+        });
+
+        it("should not change current epoch state if rollover isn't called", async () => {
+          let epoch = await vault.epoch();
+
+          expect(epoch.index.toNumber()).to.be.equal(0);
+          expect(epoch.expiry.toNumber()).to.be.equal(
+            block.timestamp + EPOCH_SPAN_IN_SECONDS
+          );
+          expect(epoch.withholding.toString()).to.be.equal(
+            parseUnits("0", "ether")
+          );
+        });
+      });
+
+      describe("epoch == 1", () => {
+        beforeEach(async () => {
+          initSnapshotId = await hre.ethers.provider.send("evm_snapshot", []);
+
+          await utils.approveAndDepositToVault(vault, baseToken, farmer, "50");
+
+          let epoch = await vault.epoch();
+          await time.increaseTo(epoch.expiry.add(1));
+
+          await vault.rollover();
+          epoch = await vault.epoch();
+          await time.increaseTo(epoch.expiry.add(1));
+
+          await utils.initiateWithdraw(vault, farmer, "30");
+        });
+
+        afterEach(async () => {
+          await hre.ethers.provider.send("evm_revert", [initSnapshotId]);
+        });
+
+        it("should increment index and roll forward expiry", async () => {
+          let epoch = await vault.epoch();
+
+          expect(epoch.index.toNumber()).to.be.equal(1);
+          expect(epoch.expiry.toNumber()).to.be.equal(
+            block.timestamp + 2 * EPOCH_SPAN_IN_SECONDS
+          );
+        });
+
+        it("should change epoch withholding amount to amount requested", async () => {
+          let epoch = await vault.epoch();
+
+          expect(epoch.withholding.toString()).to.be.equal(
+            parseUnits("30", "ether")
+          );
+        });
+
+        it("should return epoch 0", async () => {
+          let epoch = await vault.epochs(0);
+
+          expect(epoch.index.toNumber()).to.be.equal(0);
+          expect(epoch.expiry.toNumber()).to.be.equal(
+            block.timestamp + EPOCH_SPAN_IN_SECONDS
+          );
+          expect(epoch.withholding.toString()).to.be.equal(
+            parseUnits("0", "ether")
           );
         });
       });

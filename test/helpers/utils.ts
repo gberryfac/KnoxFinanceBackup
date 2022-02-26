@@ -95,3 +95,12 @@ export async function initiateWithdraw(
 
   return await tx.wait();
 }
+
+export async function withdrawFromVault(
+  vault: Vault,
+  signer: SignerWithAddress
+) {
+  let tx = await vault.connect(signer).withdraw();
+
+  return await tx.wait();
+}

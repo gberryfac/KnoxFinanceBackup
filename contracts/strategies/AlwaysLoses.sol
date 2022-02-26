@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.4;
 
-contract Strategy {
+contract AlwaysLoses {
     /************************************************
      *  TYPE DECLARATIONS
      ***********************************************/
@@ -35,11 +35,5 @@ contract Strategy {
         bool isCall
     ) external {}
 
-    /************************************************
-     *  SETTERS
-     ***********************************************/
-
-    /************************************************
-     *  GETTERS
-     ***********************************************/
+    function closePosition() {}
 }

@@ -14,9 +14,5 @@ interface IVault {
 
     function borrow(uint256 amount) external;
 
-    function repay(uint256 amount) external;
-
-    function epoch() external returns (Epoch);
-
     function rollover() external;
 }

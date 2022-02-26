@@ -15,7 +15,7 @@ contract Vault is ERC20 {
     address public controller;
     IERC20 public immutable baseToken;
 
-    uint256 constant WEEK_SPAN = 7 * 24 * 3600 - 7200;
+    uint256 constant EPOCH_SPAN_IN_SECONDS = 7 * 24 * 3600 - 7200;
 
     mapping(address => Receipt) public deposits;
     mapping(address => Receipt) public withholding;
@@ -34,19 +34,16 @@ contract Vault is ERC20 {
         uint256 withholding;
     }
 
-    // event DepositorSynced(address depositor, int32 epoch);
-    // event FundsDeposited(address depositor, uint256 amount, int32 epochNumber);
-
     constructor(
         string memory _name,
         string memory _symbol,
         address _baseToken,
         address _controller,
-        uint256 _startTimestamp
+        uint256 _expiry
     ) ERC20(_name, _symbol) {
         baseToken = IERC20(_baseToken);
         controller = _controller;
-        epoch = Epoch({index: 0, expiry: _startTimestamp, withholding: 0});
+        epoch = Epoch({index: 0, expiry: _expiry, withholding: 0});
     }
 
     function deposit(uint256 _amount) public {
@@ -109,10 +106,6 @@ contract Vault is ERC20 {
         baseToken.safeTransfer(msg.sender, _amount);
     }
 
-    function initiateWithdrawAll() public {
-        initiateWithdraw(balanceOf(msg.sender));
-    }
-
     function initiateWithdraw(uint256 _shares) public {
         require(
             balanceOf(msg.sender) >= _shares,
@@ -125,12 +118,14 @@ contract Vault is ERC20 {
 
         Receipt memory receipt = withholding[msg.sender];
         receipt.amount += _amount;
+        receipt.epochIndex = epoch.index;
+
         withholding[msg.sender] = receipt;
 
         epoch.withholding += _amount;
     }
 
-    function claim() public {
+    function withdraw() public {
         Receipt memory receipt = withholding[msg.sender];
         uint256 _amount = receipt.amount;
 
@@ -138,7 +133,7 @@ contract Vault is ERC20 {
         // withdrawal within the current epoch.
         require(
             receipt.epochIndex < epoch.index && _amount > 0,
-            "vault/claim-not-found"
+            "vault/withdraw-not-initiated"
         );
 
         baseToken.safeTransfer(msg.sender, _amount);
@@ -149,7 +144,7 @@ contract Vault is ERC20 {
         epoch.withholding -= _amount;
     }
 
-    function rollover() external {
+    function rollover() public {
         require(epoch.expiry < block.timestamp, "vault/epoch-has-not-expired");
 
         Epoch memory prevEpoch = epoch;
@@ -158,23 +153,24 @@ contract Vault is ERC20 {
         // check if Controller has settled positions before calculating epoch balance.
 
         epoch = Epoch({
-            index: epoch.index + 1,
-            expiry: epoch.expiry + WEEK_SPAN,
+            index: prevEpoch.index + 1,
+            expiry: prevEpoch.expiry + EPOCH_SPAN_IN_SECONDS,
             withholding: prevEpoch.withholding
         });
     }
 
-    function borrow() external {}
-
-    function repay() external {}
+    function borrow(uint256 amount) external {
+        // check if msg.sender if approved to borrow
+        baseToken.safeTransfer(msg.sender, amount);
+    }
 
     // /* transfers lp tokens to different account and adjusts the deposit/ withdrawal balances */
-    //     funciton transfer() public {
-
-    //     }
+    // funciton transfer() public {
+    // }
 
     function epochBalance() public view returns (uint256) {
         // Controller should repay all debts prior to this being called.
+        // Keep track of funds borrowed.
         return baseToken.balanceOf(address(this)).sub(epoch.withholding);
     }
 

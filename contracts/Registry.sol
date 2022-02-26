@@ -25,33 +25,28 @@ contract Registry is EIP712, Ownable {
 
     /**
      * @notice Authenticates the signature and transaction data provided by the signer
-     * @param signature is an EIP-712 signature
-     * @param transaction is the metadata and trade parameters of the signature
      **/
     function authenticate(
         bytes memory signature,
         uint256 deadline,
         uint256 maturity,
-        uint256 strikePrices,
+        uint256 strikePrice,
         uint256 spotPrice,
         uint256 premium,
         bool isCall
     ) external view returns (bool) {
-        require(
-            block.timestamp < transaction.deadline,
-            "Signature has expired"
-        );
+        require(block.timestamp < deadline, "Signature has expired");
 
         bytes32 digest = _hashTypedDataV4(
             keccak256(
                 abi.encode(
                     keccak256(
-                        "Transaction(address controller, uint256 deadline, uint256 maturity, uint256[] strikePrices, uint256 spotPrice, uint256 premium, bool isCall)"
+                        "Transaction(address controller, uint256 deadline, uint256 maturity, uint256 strikePrice, uint256 spotPrice, uint256 premium, bool isCall)"
                     ),
                     msg.sender,
                     deadline,
                     maturity,
-                    strikePrices,
+                    strikePrice,
                     spotPrice,
                     premium,
                     isCall
