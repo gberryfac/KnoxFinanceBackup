@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity =0.8.4;
+pragma solidity ^0.8.0;
 
 import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import {Vault} from "./Vault.sol";
@@ -50,8 +50,11 @@ library ShareMath {
         uint256 decimals
     ) internal pure returns (uint256 unredeemedShares) {
         if (depositReceipt.round > 0 && depositReceipt.round < currentRound) {
-            uint256 sharesFromRound =
-                assetToShares(depositReceipt.amount, assetPerShare, decimals);
+            uint256 sharesFromRound = assetToShares(
+                depositReceipt.amount,
+                assetPerShare,
+                decimals
+            );
 
             return
                 uint256(depositReceipt.unredeemedShares).add(sharesFromRound);
