@@ -4,10 +4,13 @@ import "@typechain/hardhat";
 import "solidity-coverage";
 import "hardhat-contract-sizer";
 
+import { BLOCK_NUMBER } from "./constants/constants";
+import { TEST_URI } from "./scripts/helpers/getDefaultEthersProvider";
+
 require("dotenv").config();
 
 // Defaults to CHAINID=1 so things will run with mainnet fork if not specified
-const CHAINID = process.env.CHAINID ? Number(process.env.CHAINID) : 42;
+const CHAINID = process.env.CHAINID ? Number(process.env.CHAINID) : 1;
 
 export default {
   solidity: {
@@ -26,7 +29,16 @@ export default {
       },
       chainId: CHAINID,
       forking: {
-        url: process.env.TEST_URI,
+        url: TEST_URI[CHAINID],
+        blockNumber: BLOCK_NUMBER[CHAINID],
+        gasLimit: 8e6,
+      },
+    },
+    mainnet: {
+      url: process.env.TEST_URI,
+      chainId: CHAINID,
+      accounts: {
+        mnemonic: process.env.MAINNET_MNEMONIC,
       },
     },
   },

@@ -35,5 +35,5 @@ contract AlwaysWins {
         bool isCall
     ) external {}
 
-    function closePosition() {}
+    function closePosition() public {}
 }

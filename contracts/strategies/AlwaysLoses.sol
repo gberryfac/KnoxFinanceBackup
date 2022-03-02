@@ -35,5 +35,5 @@ contract AlwaysLoses {
         bool isCall
     ) external {}
 
-    function closePosition() {}
+    function closePosition() public {}
 }
