@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity =0.8.4;
+pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -8,14 +8,16 @@ import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 
+import "./../interfaces/IWETH.sol";
 import "./../libraries/Vault.sol";
 import "./../libraries/VaultLifecycle.sol";
 import "./../libraries/ShareMath.sol";
-import "./../interfaces/IWETH.sol";
+import "./../storage/RibbonThetaVaultStorage.sol";
 
 import "hardhat/console.sol";
 
 contract RibbonVault is
+    RibbonThetaVaultStorage,
     ReentrancyGuardUpgradeable,
     OwnableUpgradeable,
     ERC20Upgradeable
@@ -70,14 +72,8 @@ contract RibbonVault is
      *  IMMUTABLES & CONSTANTS
      ***********************************************/
 
-    /// @notice WETH9 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2
     address public immutable WETH;
-
-    /// @notice USDC 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48
     address public immutable USDC;
-
-    /// @notice Deprecated: 15 minute timelock between commitAndClose and rollToNexOption.
-    uint256 public constant DELAY = 0;
 
     /// @notice 7 day period between each options sale.
     uint32 public constant PERIOD = 7 * 24 * 3600 - 7200;
@@ -115,20 +111,44 @@ contract RibbonVault is
         address indexed feeRecipient
     );
 
+    event InstantWithdraw(
+        address indexed account,
+        uint256 amount,
+        uint256 round
+    );
+
+    /************************************************
+     *  STRUCTS
+     ***********************************************/
+
+    /**
+     * @notice Initialization parameters for the vault.
+     * @param _owner is the owner of the vault with critical permissions
+     * @param _feeRecipient is the address to recieve vault performance and management fees
+     * @param _managementFee is the management fee pct.
+     * @param _performanceFee is the perfomance fee pct.
+     * @param _tokenName is the name of the token
+     * @param _tokenSymbol is the symbol of the token
+     */
+    struct InitParams {
+        address _owner;
+        address _keeper;
+        address _feeRecipient;
+        uint256 _managementFee;
+        uint256 _performanceFee;
+        string _tokenName;
+        string _tokenSymbol;
+    }
+
     /************************************************
      *  CONSTRUCTOR & INITIALIZATION
      ***********************************************/
 
-    // /**
-    //  * @notice Initializes the contract with immutable variables
-    //  * @param _weth is the Wrapped Ether contract
-    //  * @param _usdc is the USDC contract
-    //  * @param _gammaController is the contract address for opyn actions
-    //  * @param _marginPool is the contract address for providing collateral to opyn
-    //  * @param _gnosisEasyAuction is the contract address that facilitates gnosis auctions
-    //  * @param _uniswapRouter is the contract address for UniswapV3 router which handles swaps
-    //  * @param _uniswapFactory is the contract address for UniswapV3 factory
-    //  */
+    /**
+     * @notice Initializes the contract with immutable variables
+     * @param _weth is the Wrapped Ether contract
+     * @param _usdc is the USDC contract
+     */
     constructor(address _weth, address _usdc) {
         require(_weth != address(0), "!_weth");
         require(_usdc != address(0), "!_usdc");
@@ -140,44 +160,42 @@ contract RibbonVault is
     /**
      * @notice Initializes the OptionVault contract with storage variables.
      */
-    function baseInitialize(
-        address _owner,
-        address _keeper,
-        address _feeRecipient,
-        uint256 _managementFee,
-        uint256 _performanceFee,
-        string memory _tokenName,
-        string memory _tokenSymbol,
+    function initialize(
+        InitParams calldata _initParams,
         Vault.VaultParams calldata _vaultParams
-    ) internal initializer {
+    ) external initializer {
         VaultLifecycle.verifyInitializerParams(
-            _owner,
-            _keeper,
-            _feeRecipient,
-            _performanceFee,
-            _managementFee,
-            _tokenName,
-            _tokenSymbol,
+            _initParams._owner,
+            _initParams._keeper,
+            _initParams._feeRecipient,
+            _initParams._managementFee,
+            _initParams._performanceFee,
+            _initParams._tokenName,
+            _initParams._tokenSymbol,
             _vaultParams
         );
 
         __ReentrancyGuard_init();
-        __ERC20_init(_tokenName, _tokenSymbol);
+        __ERC20_init(_initParams._tokenName, _initParams._tokenSymbol);
         __Ownable_init();
-        transferOwnership(_owner);
+        transferOwnership(_initParams._owner);
 
-        keeper = _keeper;
+        keeper = _initParams._keeper;
 
-        feeRecipient = _feeRecipient;
-        performanceFee = _performanceFee;
-        managementFee = _managementFee.mul(Vault.FEE_MULTIPLIER).div(
-            WEEKS_PER_YEAR
-        );
+        feeRecipient = _initParams._feeRecipient;
+        performanceFee = _initParams._performanceFee;
+
+        managementFee = _initParams
+            ._managementFee
+            .mul(Vault.FEE_MULTIPLIER)
+            .div(WEEKS_PER_YEAR);
+
         vaultParams = _vaultParams;
 
         uint256 assetBalance = IERC20(vaultParams.asset).balanceOf(
             address(this)
         );
+
         ShareMath.assertUint104(assetBalance);
         vaultState.lastLockedAmount = uint104(assetBalance);
 
@@ -367,6 +385,33 @@ contract RibbonVault is
     }
 
     /**
+     * @notice Withdraws the assets on the vault using the outstanding `DepositReceipt.amount`
+     * @param amount is the amount to withdraw
+     */
+    function withdrawInstantly(uint256 amount) external nonReentrant {
+        Vault.DepositReceipt storage depositReceipt = depositReceipts[
+            msg.sender
+        ];
+
+        uint256 currentRound = vaultState.round;
+        require(amount > 0, "!amount");
+        require(depositReceipt.round == currentRound, "Invalid round");
+
+        uint256 receiptAmount = depositReceipt.amount;
+        require(receiptAmount >= amount, "Exceed amount");
+
+        // Subtraction underflow checks already ensure it is smaller than uint104
+        depositReceipt.amount = uint104(receiptAmount.sub(amount));
+        vaultState.totalPending = uint128(
+            uint256(vaultState.totalPending).sub(amount)
+        );
+
+        emit InstantWithdraw(msg.sender, amount, currentRound);
+
+        transferAsset(msg.sender, amount);
+    }
+
+    /**
      * @notice Initiates a withdrawal that can be processed once the round completes
      * @param numShares is the number of shares to withdraw
      */
@@ -415,9 +460,8 @@ contract RibbonVault is
 
     /**
      * @notice Completes a scheduled withdrawal from a past round. Uses finalized pps for the round
-     * @return withdrawAmount the current withdrawal amount
      */
-    function _completeWithdraw() internal returns (uint256) {
+    function completeWithdraw() external nonReentrant {
         Vault.Withdrawal storage withdrawal = withdrawals[msg.sender];
 
         uint256 withdrawalShares = withdrawal.shares;
@@ -447,7 +491,9 @@ contract RibbonVault is
         require(withdrawAmount > 0, "!withdrawAmount");
         transferAsset(msg.sender, withdrawAmount);
 
-        return withdrawAmount;
+        lastQueuedWithdrawAmount = uint128(
+            uint256(lastQueuedWithdrawAmount).sub(withdrawAmount)
+        );
     }
 
     /**
@@ -533,25 +579,19 @@ contract RibbonVault is
     /*
      * @notice Helper function that performs most administrative tasks
      * such as setting next option, minting new shares, getting vault fees, etc.
-     * @param lastQueuedWithdrawAmount is old queued withdraw amount
-     * @return newOption is the new option address
-     * @return lockedBalance is the new balance used to calculate next option purchase size or collateral size
-     * @return queuedWithdrawAmount is the new queued withdraw amount for this round
      */
-    function _rollover(uint256 lastQueuedWithdrawAmount)
-        internal
-        returns (uint256 lockedBalance, uint256 queuedWithdrawAmount)
-    {
+    function rollover() external onlyKeeper nonReentrant {
         require(block.timestamp >= vaultState.expiry, "!ready");
 
         address recipient = feeRecipient;
+        uint256 lockedBalance;
+        uint256 queuedWithdrawAmount;
+        uint256 newPricePerShare;
         uint256 mintShares;
         uint256 performanceFeeInAsset;
         uint256 totalVaultFee;
 
         {
-            uint256 newPricePerShare;
-
             (
                 lockedBalance,
                 queuedWithdrawAmount,
@@ -593,7 +633,10 @@ contract RibbonVault is
             transferAsset(payable(recipient), totalVaultFee);
         }
 
-        return (lockedBalance, queuedWithdrawAmount);
+        lastQueuedWithdrawAmount = queuedWithdrawAmount;
+
+        ShareMath.assertUint104(lockedBalance);
+        vaultState.lockedAmount = uint104(lockedBalance);
     }
 
     /************************************************

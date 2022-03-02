@@ -27,7 +27,7 @@ const WEEKS_PER_YEAR = 52142857;
 
 const chainId = network.config.chainId;
 
-describe("RibbonThetaVault", () => {
+describe("RibbonVault", () => {
   //   behavesLikeRibbonOptionsVault({
   //     name: `Ribbon WBTC Theta Vault (Call)`,
   //     tokenName: "Ribbon BTC Theta Vault",
@@ -258,7 +258,7 @@ function behavesLikeRibbonOptionsVault(params: {
 
       vault = (
         await deployProxy(
-          "RibbonThetaVault",
+          "RibbonVault",
           adminSigner,
           initializeArgs,
           deployArgs,
@@ -291,16 +291,13 @@ function behavesLikeRibbonOptionsVault(params: {
     let testVault: Contract;
     describe("#initialize", () => {
       time.revertToSnapshotAfterEach(async function () {
-        const RibbonThetaVault = await ethers.getContractFactory(
-          "RibbonThetaVault",
-          {
-            libraries: {
-              VaultLifecycle: vaultLifecycleLib.address,
-            },
-          }
-        );
+        const RibbonVault = await ethers.getContractFactory("RibbonVault", {
+          libraries: {
+            VaultLifecycle: vaultLifecycleLib.address,
+          },
+        });
 
-        testVault = await RibbonThetaVault.deploy(
+        testVault = await RibbonVault.deploy(
           WETH_ADDRESS[chainId],
           USDC_ADDRESS[chainId]
         );
@@ -548,12 +545,6 @@ function behavesLikeRibbonOptionsVault(params: {
     describe("#symbol", () => {
       it("returns the symbol", async function () {
         assert.equal(await vault.symbol(), tokenSymbol);
-      });
-    });
-
-    describe("#delay", () => {
-      it("returns the delay", async function () {
-        assert.equal((await vault.DELAY()).toNumber(), OPTION_DELAY);
       });
     });
 
