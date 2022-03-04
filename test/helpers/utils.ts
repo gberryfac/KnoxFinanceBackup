@@ -1,9 +1,12 @@
 import hre, { ethers, artifacts } from "hardhat";
+import { BigNumber, BigNumberish, Contract } from "ethers";
+
 // import { Vault } from "./../../types/Vault";
-import { TestERC20 } from "./../../types/TestERC20";
+import { MockERC20 } from "./../../types";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 
-const { parseUnits } = hre.ethers.utils;
+const { parseUnits, parseEther } = hre.ethers.utils;
+const chainId = hre.network.config.chainId;
 
 // export async function approveAndDepositToVault(
 //   vault: Vault,
