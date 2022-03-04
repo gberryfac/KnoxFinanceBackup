@@ -14,13 +14,27 @@ const CHAINID = process.env.CHAINID ? Number(process.env.CHAINID) : 1;
 
 export default {
   solidity: {
-    version: "0.8.4",
-    settings: {
-      optimizer: {
-        runs: 200,
-        enabled: true,
+    compilers: [
+      {
+        version: "0.8.10",
+        settings: {
+          optimizer: {
+            runs: 200,
+            enabled: true,
+          },
+        },
       },
-    },
+      // WETH
+      {
+        version: "0.4.18",
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 200,
+          },
+        },
+      },
+    ],
   },
   networks: {
     hardhat: {

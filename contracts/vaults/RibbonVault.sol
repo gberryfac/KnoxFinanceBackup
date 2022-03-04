@@ -73,7 +73,6 @@ contract RibbonVault is
      ***********************************************/
 
     address public immutable WETH;
-    address public immutable USDC;
 
     /// @notice 7 day period between each options sale.
     uint32 public constant PERIOD = 7 * 24 * 3600 - 7200;
@@ -147,14 +146,11 @@ contract RibbonVault is
     /**
      * @notice Initializes the contract with immutable variables
      * @param _weth is the Wrapped Ether contract
-     * @param _usdc is the USDC contract
      */
-    constructor(address _weth, address _usdc) {
+    constructor(address _weth) {
         require(_weth != address(0), "!_weth");
-        require(_usdc != address(0), "!_usdc");
 
         WETH = _weth;
-        USDC = _usdc;
     }
 
     /**

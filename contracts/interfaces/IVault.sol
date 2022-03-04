@@ -4,12 +4,6 @@ pragma solidity ^0.8.0;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 interface IVault {
-    struct Epoch {
-        uint256 index;
-        uint256 expiry;
-        uint256 withholding;
-    }
-
     function baseToken() external returns (IERC20);
 
     function borrow(uint256 amount) external;

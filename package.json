@@ -1,7 +1,7 @@
 {
   "scripts": {
-    "test": "npm run test:arb",
-    "test:arb": "CHAINID=1 npx hardhat test test/*.ts",
+    "test": "npm run test:eth",
+    "test:eth": "CHAINID=1 npx hardhat test test/*.ts",
     "compile": "CHAINID=1 npx hardhat compile",
     "prettier:sol": "npm run prettier --write contracts/*",
     "lint:ts": "eslint '**/*.ts'",
