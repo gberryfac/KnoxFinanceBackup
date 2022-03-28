@@ -28,11 +28,10 @@ contract Registry is EIP712, Ownable {
      **/
     function authenticate(
         bytes memory signature,
-        uint256 deadline,
-        uint256 maturity,
-        uint256 strikePrice,
-        uint256 spotPrice,
-        uint256 premium,
+        uint64 deadline,
+        uint64 maturity,
+        int128 strikePrice,
+        int128 premium,
         bool isCall
     ) external view returns (bool) {
         require(block.timestamp < deadline, "Signature has expired");
@@ -41,13 +40,12 @@ contract Registry is EIP712, Ownable {
             keccak256(
                 abi.encode(
                     keccak256(
-                        "Transaction(address controller, uint256 deadline, uint256 maturity, uint256 strikePrice, uint256 spotPrice, uint256 premium, bool isCall)"
+                        "Transaction(address controller, uint64 deadline, uint64 maturity, int128 strikePrice, int128 premium, bool isCall)"
                     ),
                     msg.sender,
                     deadline,
                     maturity,
                     strikePrice,
-                    spotPrice,
                     premium,
                     isCall
                 )

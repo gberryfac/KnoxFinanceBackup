@@ -1,78 +1,9 @@
-import hre, { ethers, artifacts } from "hardhat";
-import { BigNumber, BigNumberish, Contract } from "ethers";
+import { ethers, network } from "hardhat";
+import { Contract } from "ethers";
 
-// import { Vault } from "./../../types/Vault";
-import { MockERC20 } from "./../../types";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 
-const { parseUnits, parseEther } = hre.ethers.utils;
-const chainId = hre.network.config.chainId;
-
-// export async function approveAndDepositToVault(
-//   vault: Vault,
-//   baseToken: TestERC20,
-//   signer: SignerWithAddress,
-//   amountInEther: string
-// ) {
-//   await approveVault(vault, baseToken, signer, amountInEther);
-//   return await depositToVault(vault, signer, amountInEther);
-// }
-
-// export async function approveVault(
-//   vault: Vault,
-//   baseToken: TestERC20,
-//   signer: SignerWithAddress,
-//   amountInEther: string
-// ) {
-//   await baseToken
-//     .connect(signer)
-//     .approve(vault.address, parseUnits(amountInEther, "ether"));
-// }
-
-// export async function depositToVault(
-//   vault: Vault,
-//   signer: SignerWithAddress,
-//   amountInEther: string
-// ) {
-//   let tx = await vault
-//     .connect(signer)
-//     .deposit(parseUnits(amountInEther, "ether"));
-
-//   return await tx.wait();
-// }
-
-// export async function instantWithdraw(
-//   vault: Vault,
-//   signer: SignerWithAddress,
-//   amountInEther: string
-// ) {
-//   let tx = await vault
-//     .connect(signer)
-//     .instantWithdraw(parseUnits(amountInEther, "ether"));
-
-//   return await tx.wait();
-// }
-
-// export async function initiateWithdraw(
-//   vault: Vault,
-//   signer: SignerWithAddress,
-//   amountInEther: string
-// ) {
-//   let tx = await vault
-//     .connect(signer)
-//     .initiateWithdraw(parseUnits(amountInEther, "ether"));
-
-//   return await tx.wait();
-// }
-
-// export async function withdrawFromVault(
-//   vault: Vault,
-//   signer: SignerWithAddress
-// ) {
-//   let tx = await vault.connect(signer).withdraw();
-
-//   return await tx.wait();
-// }
+const { parseEther } = ethers.utils;
 
 export async function deployProxy(
   logicContractName: string,
@@ -102,4 +33,40 @@ export async function deployProxy(
     initBytes
   );
   return await ethers.getContractAt(logicContractName, proxy.address);
+}
+
+export async function impersonateWhale(account: string, ethBalance: string) {
+  await network.provider.request({
+    method: "hardhat_impersonateAccount",
+    params: [account],
+  });
+
+  await network.provider.send("hardhat_setBalance", [
+    account,
+    parseEther(ethBalance)._hex,
+  ]);
+
+  return await ethers.getSigner(account);
+}
+
+export async function setupUsers<
+  T extends { [contractName: string]: Contract }
+>(addresses: string[], contracts: T): Promise<({ address: string } & T)[]> {
+  const users: ({ address: string } & T)[] = [];
+  for (const address of addresses) {
+    users.push(await setupUser(address, contracts));
+  }
+  return users;
+}
+
+export async function setupUser<T extends { [contractName: string]: Contract }>(
+  address: string,
+  contracts: T
+): Promise<{ address: string } & T> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const user: any = { address };
+  for (const key of Object.keys(contracts)) {
+    user[key] = contracts[key].connect(await ethers.getSigner(address));
+  }
+  return user as { address: string } & T;
 }

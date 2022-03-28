@@ -1,11 +1,13 @@
-node_modules
-types
+node_modules/
+types/
 
 #Hardhat files
 cache
 artifacts
-.vscode
 .env
 coverage.json
 coverage/
+
 .DS_Store
+.vscode
+.mocharc*

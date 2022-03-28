@@ -1,11 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
-import {Vault} from "./Vault.sol";
+import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import "abdk-libraries-solidity/ABDKMath64x64.sol";
+
+import "./Vault.sol";
+
+import "hardhat/console.sol";
 
 library ShareMath {
     using SafeMath for uint256;
+    using ABDKMath64x64 for int128;
 
     uint256 internal constant PLACEHOLDER_UINT = 1;
 
@@ -14,10 +19,13 @@ library ShareMath {
         uint256 assetPerShare,
         uint256 decimals
     ) internal pure returns (uint256) {
-        // If this throws, it means that vault's roundPricePerShare[currentRound] has not been set yet
-        // which should never happen.
-        // Has to be larger than 1 because `1` is used in `initRoundPricePerShares` to prevent cold writes.
-        require(assetPerShare > PLACEHOLDER_UINT, "Invalid assetPerShare");
+        // If this throws, it means that vault's roundPricePerShare[currentRound] has not been set
+        // yet which should never happen. Has to be larger than 1 because `1` is used in
+        // `initRoundPricePerShares` to prevent cold writes.
+        require(
+            assetPerShare > PLACEHOLDER_UINT,
+            "share-math/invalid-assetPerShare"
+        );
 
         return assetAmount.mul(10**decimals).div(assetPerShare);
     }
@@ -27,10 +35,13 @@ library ShareMath {
         uint256 assetPerShare,
         uint256 decimals
     ) internal pure returns (uint256) {
-        // If this throws, it means that vault's roundPricePerShare[currentRound] has not been set yet
-        // which should never happen.
-        // Has to be larger than 1 because `1` is used in `initRoundPricePerShares` to prevent cold writes.
-        require(assetPerShare > PLACEHOLDER_UINT, "Invalid assetPerShare");
+        // If this throws, it means that vault's roundPricePerShare[currentRound] has not been set
+        // yet which should never happen. Has to be larger than 1 because `1` is used in
+        // `initRoundPricePerShares` to prevent cold writes.
+        require(
+            assetPerShare > PLACEHOLDER_UINT,
+            "share-math/invalid-assetPerShare"
+        );
 
         return shares.mul(assetPerShare).div(10**decimals);
     }
@@ -59,22 +70,27 @@ library ShareMath {
             return
                 uint256(depositReceipt.unredeemedShares).add(sharesFromRound);
         }
+
         return depositReceipt.unredeemedShares;
     }
 
     function pricePerShare(
         uint256 totalSupply,
         uint256 totalBalance,
-        uint256 pendingAmount,
+        uint256 queuedDeposits,
         uint256 decimals
     ) internal pure returns (uint256) {
         uint256 singleShare = 10**decimals;
         return
             totalSupply > 0
-                ? singleShare.mul(totalBalance.sub(pendingAmount)).div(
+                ? singleShare.mul(totalBalance.sub(queuedDeposits)).div(
                     totalSupply
                 )
                 : singleShare;
+    }
+
+    function assertUint128(uint256 num) internal pure {
+        require(num <= type(uint128).max, "share-math/overflow-uint128");
     }
 
     /************************************************
@@ -82,10 +98,6 @@ library ShareMath {
      ***********************************************/
 
     function assertUint104(uint256 num) internal pure {
-        require(num <= type(uint104).max, "Overflow uint104");
-    }
-
-    function assertUint128(uint256 num) internal pure {
-        require(num <= type(uint128).max, "Overflow uint128");
+        require(num <= type(uint104).max, "share-math/overflow-uint104");
     }
 }

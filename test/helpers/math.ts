@@ -1,5 +1,5 @@
-import { BigNumber } from "ethers";
-import { parseEther } from "@ethersproject/units";
+import { BigNumber, BigNumberish, ethers } from "ethers";
+const { parseEther } = ethers.utils;
 
 export const wdiv = (x: BigNumber, y: BigNumber) => {
   return x

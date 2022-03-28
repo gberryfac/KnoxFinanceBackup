@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-contract Registry {
+contract MockRegistry {
     bool public isTrue;
 
     constructor(bool _isTrue) {
@@ -10,11 +10,10 @@ contract Registry {
 
     function authenticate(
         bytes memory signature,
-        uint256 deadline,
-        uint256 maturity,
-        uint256 strikePrice,
-        uint256 spotPrice,
-        uint256 premium,
+        uint64 deadline,
+        uint64 maturity,
+        int128 strikePrice,
+        int128 premium,
         bool isCall
     ) external view returns (bool) {
         return isTrue;

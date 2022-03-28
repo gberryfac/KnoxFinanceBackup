@@ -6,25 +6,28 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
+import "abdk-libraries-solidity/ABDKMath64x64.sol";
 
+import "./../interfaces/IRegistry.sol";
 import "./../interfaces/IWETH.sol";
-import "./../libraries/Vault.sol";
-import "./../libraries/VaultLifecycle.sol";
 import "./../libraries/ShareMath.sol";
-import "./../storage/RibbonThetaVaultStorage.sol";
+import "./../libraries/Vault.sol";
+import "./../libraries/VaultErrors.sol";
+import "./../libraries/VaultLifecycle.sol";
+
+import "../KnoxToken.sol";
 
 import "hardhat/console.sol";
 
-contract RibbonVault is
-    RibbonThetaVaultStorage,
-    ReentrancyGuardUpgradeable,
+contract BaseVault is
+    KnoxToken,
     OwnableUpgradeable,
-    ERC20Upgradeable
+    ReentrancyGuardUpgradeable
 {
     using SafeERC20 for IERC20;
     using SafeMath for uint256;
     using ShareMath for Vault.DepositReceipt;
+    using ABDKMath64x64 for int128;
 
     /************************************************
      *  NON UPGRADEABLE STORAGE
@@ -33,13 +36,13 @@ contract RibbonVault is
     /// @notice Stores the user's pending deposit for the round
     mapping(address => Vault.DepositReceipt) public depositReceipts;
 
+    /// @notice Stores pending user withdrawals
+    mapping(address => Vault.Withdrawal) public withdrawals;
+
     /// @notice On every round's close, the pricePerShare value of an rTHETA token is stored
     /// This is used to determine the number of shares to be returned
     /// to a user with their DepositReceipt.depositAmount
-    mapping(uint256 => uint256) public roundPricePerShare;
-
-    /// @notice Stores pending user withdrawals
-    mapping(address => Vault.Withdrawal) public withdrawals;
+    mapping(uint256 => uint256) public lpTokenPricePerShare;
 
     /// @notice Vault's parameters like cap, decimals
     Vault.VaultParams public vaultParams;
@@ -64,8 +67,8 @@ contract RibbonVault is
     uint256[30] private ____gap;
 
     // *IMPORTANT* NO NEW STORAGE VARIABLES SHOULD BE ADDED HERE
-    // This is to prevent storage collisions. All storage variables should be appended to RibbonThetaVaultStorage
-    // or RibbonDeltaVaultStorage instead. Read this documentation to learn more:
+    // This is to prevent storage collisions. All storage variables should be appended to VaultStorage
+    // Read this documentation to learn more:
     // https://docs.openzeppelin.com/upgrades-plugins/1.x/writing-upgradeable#modifying-your-contracts
 
     /************************************************
@@ -73,9 +76,7 @@ contract RibbonVault is
      ***********************************************/
 
     address public immutable WETH;
-
-    /// @notice 7 day period between each options sale.
-    uint32 public constant PERIOD = 7 * 24 * 3600 - 7200;
+    address public immutable registry;
 
     // Number of weeks per year = 52.142857 weeks * FEE_MULTIPLIER = 52142857
     // Dividing by weeks per year requires doing num.mul(FEE_MULTIPLIER).div(WEEKS_PER_YEAR)
@@ -127,7 +128,6 @@ contract RibbonVault is
      * @param _managementFee is the management fee pct.
      * @param _performanceFee is the perfomance fee pct.
      * @param _tokenName is the name of the token
-     * @param _tokenSymbol is the symbol of the token
      */
     struct InitParams {
         address _owner;
@@ -136,7 +136,6 @@ contract RibbonVault is
         uint256 _managementFee;
         uint256 _performanceFee;
         string _tokenName;
-        string _tokenSymbol;
     }
 
     /************************************************
@@ -147,10 +146,12 @@ contract RibbonVault is
      * @notice Initializes the contract with immutable variables
      * @param _weth is the Wrapped Ether contract
      */
-    constructor(address _weth) {
-        require(_weth != address(0), "!_weth");
+    constructor(address _weth, address _registry) {
+        require(_weth != address(0), VaultErrors.ADDRESS_NOT_PROVIDED);
+        require(_registry != address(0), VaultErrors.ADDRESS_NOT_PROVIDED);
 
         WETH = _weth;
+        registry = _registry;
     }
 
     /**
@@ -167,12 +168,13 @@ contract RibbonVault is
             _initParams._managementFee,
             _initParams._performanceFee,
             _initParams._tokenName,
-            _initParams._tokenSymbol,
             _vaultParams
         );
 
         __ReentrancyGuard_init();
-        __ERC20_init(_initParams._tokenName, _initParams._tokenSymbol);
+
+        __KnoxToken_init(_initParams._tokenName);
+
         __Ownable_init();
         transferOwnership(_initParams._owner);
 
@@ -188,22 +190,17 @@ contract RibbonVault is
 
         vaultParams = _vaultParams;
 
-        uint256 assetBalance = IERC20(vaultParams.asset).balanceOf(
-            address(this)
-        );
-
-        ShareMath.assertUint104(assetBalance);
-        vaultState.lastLockedAmount = uint104(assetBalance);
-
         vaultState.round = 1;
-        vaultState.expiry = uint32(block.timestamp) + PERIOD;
+        vaultState.expiry = uint32(
+            VaultLifecycle.getNextFriday(block.timestamp)
+        );
     }
 
     /**
      * @dev Throws if called by any account other than the keeper.
      */
     modifier onlyKeeper() {
-        require(msg.sender == keeper, "!keeper");
+        require(msg.sender == keeper, VaultErrors.ADDRESS_NOT_KEEPER);
         _;
     }
 
@@ -216,7 +213,7 @@ contract RibbonVault is
      * @param newKeeper is the address of the new keeper
      */
     function setNewKeeper(address newKeeper) external onlyOwner {
-        require(newKeeper != address(0), "!newKeeper");
+        require(newKeeper != address(0), VaultErrors.ADDRESS_NOT_PROVIDED);
         keeper = newKeeper;
     }
 
@@ -225,8 +222,14 @@ contract RibbonVault is
      * @param newFeeRecipient is the address of the new fee recipient
      */
     function setFeeRecipient(address newFeeRecipient) external onlyOwner {
-        require(newFeeRecipient != address(0), "!newFeeRecipient");
-        require(newFeeRecipient != feeRecipient, "Must be new feeRecipient");
+        require(
+            newFeeRecipient != address(0),
+            VaultErrors.ADDRESS_NOT_PROVIDED
+        );
+        require(
+            newFeeRecipient != feeRecipient,
+            VaultErrors.NEW_ADDRESS_EQUALS_OLD
+        );
         feeRecipient = newFeeRecipient;
     }
 
@@ -237,7 +240,7 @@ contract RibbonVault is
     function setManagementFee(uint256 newManagementFee) external onlyOwner {
         require(
             newManagementFee < 100 * Vault.FEE_MULTIPLIER,
-            "Invalid management fee"
+            VaultErrors.INVALID_FEE_AMOUNT
         );
 
         // We are dividing annualized management fee by num weeks in a year
@@ -257,7 +260,7 @@ contract RibbonVault is
     function setPerformanceFee(uint256 newPerformanceFee) external onlyOwner {
         require(
             newPerformanceFee < 100 * Vault.FEE_MULTIPLIER,
-            "Invalid performance fee"
+            VaultErrors.INVALID_FEE_AMOUNT
         );
 
         emit PerformanceFeeSet(performanceFee, newPerformanceFee);
@@ -270,11 +273,14 @@ contract RibbonVault is
      * @param newCap is the new cap for deposits
      */
     function setCap(uint256 newCap) external onlyOwner {
-        require(newCap > 0, "!newCap");
+        require(newCap > 0, VaultErrors.VALUE_EXCEEDS_MINIMUM);
         ShareMath.assertUint104(newCap);
         emit CapSet(vaultParams.cap, newCap);
         vaultParams.cap = uint104(newCap);
     }
+
+    // function setRegistry() external onlyOwner {}
+    // function setExpiry() external onlyOwner {}
 
     /************************************************
      *  DEPOSIT & WITHDRAWALS
@@ -284,8 +290,8 @@ contract RibbonVault is
      * @notice Deposits ETH into the contract and mint vault shares. Reverts if the asset is not WETH.
      */
     function depositETH() external payable nonReentrant {
-        require(vaultParams.asset == WETH, "!WETH");
-        require(msg.value > 0, "!value");
+        require(vaultParams.asset == WETH, VaultErrors.INVALID_ASSET_ADDRESS);
+        require(msg.value > 0, VaultErrors.VALUE_EXCEEDS_MINIMUM);
 
         _depositFor(msg.value, msg.sender);
 
@@ -297,7 +303,7 @@ contract RibbonVault is
      * @param amount is the amount of `asset` to deposit
      */
     function deposit(uint256 amount) external nonReentrant {
-        require(amount > 0, "!amount");
+        require(amount > 0, VaultErrors.VALUE_EXCEEDS_MINIMUM);
 
         _depositFor(amount, msg.sender);
 
@@ -319,8 +325,8 @@ contract RibbonVault is
         external
         nonReentrant
     {
-        require(amount > 0, "!amount");
-        require(creditor != address(0));
+        require(amount > 0, VaultErrors.VALUE_EXCEEDS_MINIMUM);
+        require(creditor != address(0), VaultErrors.ADDRESS_NOT_PROVIDED);
 
         _depositFor(amount, creditor);
 
@@ -341,10 +347,13 @@ contract RibbonVault is
         uint256 currentRound = vaultState.round;
         uint256 totalWithDepositedAmount = totalBalance().add(amount);
 
-        require(totalWithDepositedAmount <= vaultParams.cap, "Exceed cap");
+        require(
+            totalWithDepositedAmount <= vaultParams.cap,
+            VaultErrors.VAULT_CAP_EXCEEDED
+        );
         require(
             totalWithDepositedAmount >= vaultParams.minimumSupply,
-            "Insufficient balance"
+            VaultErrors.DEPOSIT_MINIMUM_NOT_MET
         );
 
         emit Deposit(creditor, amount, currentRound);
@@ -354,7 +363,7 @@ contract RibbonVault is
         // If we have an unprocessed pending deposit from the previous rounds, we have to process it.
         uint256 unredeemedShares = depositReceipt.getSharesFromReceipt(
             currentRound,
-            roundPricePerShare[depositReceipt.round],
+            lpTokenPricePerShare[depositReceipt.round],
             vaultParams.decimals
         );
 
@@ -374,10 +383,12 @@ contract RibbonVault is
             unredeemedShares: uint128(unredeemedShares)
         });
 
-        uint256 newTotalPending = uint256(vaultState.totalPending).add(amount);
-        ShareMath.assertUint128(newTotalPending);
+        uint256 newQueuedDeposits = uint256(vaultState.queuedDeposits).add(
+            amount
+        );
 
-        vaultState.totalPending = uint128(newTotalPending);
+        ShareMath.assertUint128(newQueuedDeposits);
+        vaultState.queuedDeposits = uint128(newQueuedDeposits);
     }
 
     /**
@@ -390,21 +401,28 @@ contract RibbonVault is
         ];
 
         uint256 currentRound = vaultState.round;
-        require(amount > 0, "!amount");
-        require(depositReceipt.round == currentRound, "Invalid round");
+        require(amount > 0, VaultErrors.VALUE_EXCEEDS_MINIMUM);
+
+        require(
+            depositReceipt.round == currentRound,
+            VaultErrors.INSTANT_WITHDRAWAL_ROUND_ENDED
+        );
 
         uint256 receiptAmount = depositReceipt.amount;
-        require(receiptAmount >= amount, "Exceed amount");
+        require(
+            receiptAmount >= amount,
+            VaultErrors.WITHDRAWAL_AMOUNT_EXCEEDS_BALANCE
+        );
 
         // Subtraction underflow checks already ensure it is smaller than uint104
         depositReceipt.amount = uint104(receiptAmount.sub(amount));
-        vaultState.totalPending = uint128(
-            uint256(vaultState.totalPending).sub(amount)
+        vaultState.queuedDeposits = uint128(
+            uint256(vaultState.queuedDeposits).sub(amount)
         );
 
         emit InstantWithdraw(msg.sender, amount, currentRound);
 
-        transferAsset(msg.sender, amount);
+        _transferAsset(msg.sender, amount);
     }
 
     /**
@@ -412,10 +430,9 @@ contract RibbonVault is
      * @param numShares is the number of shares to withdraw
      */
     function initiateWithdraw(uint256 numShares) external nonReentrant {
-        require(numShares > 0, "!numShares");
+        require(numShares > 0, VaultErrors.VALUE_EXCEEDS_MINIMUM);
 
-        // We do a max redeem before initiating a withdrawal
-        // But we check if they must first have unredeemed shares
+        /* We do a max redeem before initiating a withdrawal. But we check if they must first have unredeemed shares */
         if (
             depositReceipts[msg.sender].amount > 0 ||
             depositReceipts[msg.sender].unredeemedShares > 0
@@ -423,21 +440,23 @@ contract RibbonVault is
             _redeem(0, true);
         }
 
-        // This caches the `round` variable used in shareBalances
+        // This caches the `round` variable used in lpShareBalances
         uint256 currentRound = vaultState.round;
         Vault.Withdrawal storage withdrawal = withdrawals[msg.sender];
-
-        bool withdrawalIsSameRound = withdrawal.round == currentRound;
 
         emit InitiateWithdraw(msg.sender, numShares, currentRound);
 
         uint256 existingShares = uint256(withdrawal.shares);
 
         uint256 withdrawalShares;
-        if (withdrawalIsSameRound) {
+        if (withdrawal.round == currentRound) {
             withdrawalShares = existingShares.add(numShares);
         } else {
-            require(existingShares == 0, "Existing withdraw");
+            require(
+                existingShares == 0,
+                VaultErrors.INITIATED_WITHDRAWAL_INCOMPLETE
+            );
+
             withdrawalShares = numShares;
             withdrawals[msg.sender].round = uint16(currentRound);
         }
@@ -448,10 +467,17 @@ contract RibbonVault is
         uint256 newQueuedWithdrawShares = uint256(
             vaultState.queuedWithdrawShares
         ).add(numShares);
+
         ShareMath.assertUint128(newQueuedWithdrawShares);
         vaultState.queuedWithdrawShares = uint128(newQueuedWithdrawShares);
 
-        _transfer(msg.sender, address(this), numShares);
+        _safeTransferFrom(
+            msg.sender,
+            address(this),
+            Vault.LP_TOKEN_ID,
+            numShares,
+            ""
+        );
     }
 
     /**
@@ -464,9 +490,12 @@ contract RibbonVault is
         uint256 withdrawalRound = withdrawal.round;
 
         // This checks if there is a withdrawal
-        require(withdrawalShares > 0, "Not initiated");
+        require(withdrawalShares > 0, VaultErrors.WITHDRAWAL_NOT_INITIATED);
 
-        require(withdrawalRound < vaultState.round, "Round not closed");
+        require(
+            withdrawalRound < vaultState.round,
+            VaultErrors.VAULT_ROUND_NOT_CLOSED
+        );
 
         // We leave the round number as non-zero to save on gas for subsequent writes
         withdrawals[msg.sender].shares = 0;
@@ -476,19 +505,23 @@ contract RibbonVault is
 
         uint256 withdrawAmount = ShareMath.sharesToAsset(
             withdrawalShares,
-            roundPricePerShare[withdrawalRound],
+            lpTokenPricePerShare[withdrawalRound],
             vaultParams.decimals
         );
 
         emit Withdraw(msg.sender, withdrawAmount, withdrawalShares);
 
-        _burn(address(this), withdrawalShares);
+        _burn(address(this), Vault.LP_TOKEN_ID, withdrawalShares);
 
-        require(withdrawAmount > 0, "!withdrawAmount");
-        transferAsset(msg.sender, withdrawAmount);
+        require(
+            withdrawAmount > 0,
+            VaultErrors.WITHDRAWAL_AMOUNT_EXCEEDS_MINIMUM
+        );
 
-        lastQueuedWithdrawAmount = uint128(
-            uint256(lastQueuedWithdrawAmount).sub(withdrawAmount)
+        _transferAsset(msg.sender, withdrawAmount);
+
+        vaultState.queuedWithdrawals = uint128(
+            uint256(vaultState.queuedWithdrawals).sub(withdrawAmount)
         );
     }
 
@@ -497,7 +530,7 @@ contract RibbonVault is
      * @param numShares is the number of shares to redeem
      */
     function redeem(uint256 numShares) external nonReentrant {
-        require(numShares > 0, "!numShares");
+        require(numShares > 0, VaultErrors.REDEEMED_SHARES_EXCEEDS_MINIMUM);
         _redeem(numShares, false);
     }
 
@@ -518,25 +551,27 @@ contract RibbonVault is
             msg.sender
         ];
 
-        // This handles the null case when depositReceipt.round = 0
-        // Because we start with round = 1 at `initialize`
+        /* This handles the null case when depositReceipt.round = 0 Because we start with round = 1 at `initialize` */
         uint256 currentRound = vaultState.round;
 
         uint256 unredeemedShares = depositReceipt.getSharesFromReceipt(
             currentRound,
-            roundPricePerShare[depositReceipt.round],
+            lpTokenPricePerShare[depositReceipt.round],
             vaultParams.decimals
         );
 
         numShares = isMax ? unredeemedShares : numShares;
+
         if (numShares == 0) {
             return;
         }
-        require(numShares <= unredeemedShares, "Exceeds available");
 
-        // If we have a depositReceipt on the same round, BUT we have some unredeemed shares
-        // we debit from the unredeemedShares, but leave the amount field intact
-        // If the round has past, with no new deposits, we just zero it out for new deposits.
+        require(
+            numShares <= unredeemedShares,
+            VaultErrors.REDEEMED_SHARES_EXCEEDS_BALANCE
+        );
+
+        /* If we have a depositReceipt on the same round, BUT we have some unredeemed shares we debit from the unredeemedShares, but leave the amount field intact If the round has past, with no new deposits, we just zero it out for new deposits. */
         if (depositReceipt.round < currentRound) {
             depositReceipts[msg.sender].amount = 0;
         }
@@ -548,7 +583,72 @@ contract RibbonVault is
 
         emit Redeem(msg.sender, numShares, depositReceipt.round);
 
-        _transfer(address(this), msg.sender, numShares);
+        _safeTransferFrom(
+            address(this),
+            msg.sender,
+            Vault.LP_TOKEN_ID,
+            numShares,
+            ""
+        );
+    }
+
+    /************************************************
+     *  PURCHASE & CLAIM
+     ***********************************************/
+
+    // TODO: `purchaseETH`
+    // function purchaseETH() public {}
+
+    function _openPosition(
+        bytes memory signature,
+        uint64 deadline,
+        uint64 maturity,
+        int128 strike64x64,
+        int128 premium64x64,
+        uint256 contractSize,
+        bool isCall
+    ) internal returns (uint256 liquidityRequired) {
+        {
+            require(
+                contractSize >= vaultParams.minimumContractSize,
+                VaultErrors.CONTRACT_SIZE_EXCEEDS_MINIMUM
+            );
+
+            liquidityRequired = vaultParams.isCall
+                ? contractSize
+                : toBaseDecimals(strike64x64.mulu(contractSize));
+
+            uint256 totalFreeLiquidity = IERC20(vaultParams.asset)
+                .balanceOf(address(this))
+                .sub(vaultState.queuedPayouts)
+                .sub(vaultState.queuedDeposits)
+                .sub(vaultState.queuedWithdrawals);
+
+            require(
+                totalFreeLiquidity >= liquidityRequired,
+                VaultErrors.FREE_LIQUIDTY_EXCEEDED
+            );
+        }
+
+        require(
+            IRegistry(registry).authenticate(
+                signature,
+                deadline,
+                maturity,
+                strike64x64,
+                premium64x64,
+                isCall
+            ),
+            VaultErrors.INVALID_SIGNATURE
+        );
+
+        uint256 premiumAmount = premium64x64.mulu(contractSize);
+
+        IERC20(vaultParams.asset).safeTransferFrom(
+            msg.sender,
+            address(this),
+            premiumAmount
+        );
     }
 
     /************************************************
@@ -556,60 +656,60 @@ contract RibbonVault is
      ***********************************************/
 
     /*
-     * @notice Helper function that helps to save gas for writing values into the roundPricePerShare map.
-     *         Writing `1` into the map makes subsequent writes warm, reducing the gas from 20k to 5k.
-     *         Having 1 initialized beforehand will not be an issue as long as we round down share calculations to 0.
-     * @param numRounds is the number of rounds to initialize in the map
+     * @notice Performs most administrative tasks such as setting next option,
+     * minting new shares, getting vault fees, etc.
      */
-    function initRounds(uint256 numRounds) external nonReentrant {
-        require(numRounds > 0, "!numRounds");
-
-        uint256 _round = vaultState.round;
-        for (uint256 i = 0; i < numRounds; i++) {
-            uint256 index = _round + i;
-            require(roundPricePerShare[index] == 0, "Initialized"); // AVOID OVERWRITING ACTUAL VALUES
-            roundPricePerShare[index] = ShareMath.PLACEHOLDER_UINT;
-        }
-    }
-
-    /*
-     * @notice Helper function that performs most administrative tasks
-     * such as setting next option, minting new shares, getting vault fees, etc.
-     */
-    function rollover() external onlyKeeper nonReentrant {
-        require(block.timestamp >= vaultState.expiry, "!ready");
+    function _rollover() internal {
+        /* After the vaults strategy harvests, the "lockedCollateral" will be returned to the vault. Therefore everything in the vault minus payouts and withdrawal amount is the free liquidity of the next round. */
 
         address recipient = feeRecipient;
-        uint256 lockedBalance;
-        uint256 queuedWithdrawAmount;
+        uint256 queuedWithdrawals;
         uint256 newPricePerShare;
         uint256 mintShares;
         uint256 performanceFeeInAsset;
         uint256 totalVaultFee;
 
         {
-            (
-                lockedBalance,
-                queuedWithdrawAmount,
-                newPricePerShare,
-                mintShares,
-                performanceFeeInAsset,
-                totalVaultFee
-            ) = VaultLifecycle.rollover(
-                vaultState,
-                VaultLifecycle.RolloverParams(
-                    vaultParams.decimals,
-                    IERC20(vaultParams.asset).balanceOf(address(this)),
-                    totalSupply(),
-                    lastQueuedWithdrawAmount,
+            /* Vault fees are calculated with queued withdrawals prior to calculating lockedAmount for current round. */
+            uint256 currentBalance = IERC20(vaultParams.asset).balanceOf(
+                address(this)
+            ) - vaultState.queuedPayouts;
+
+            uint256 tokenSupply = totalSupply(Vault.LP_TOKEN_ID);
+
+            uint256 balanceForVaultFees = VaultLifecycle.getBalanceForVaultFees(
+                currentBalance,
+                tokenSupply,
+                vaultParams.decimals,
+                vaultState.queuedDeposits,
+                vaultState.queuedWithdrawShares,
+                vaultState.queuedWithdrawals
+            );
+
+            (performanceFeeInAsset, , totalVaultFee) = VaultLifecycle
+                .getVaultFees(
+                    balanceForVaultFees,
+                    vaultState.lockedCollateral,
+                    vaultState.queuedDeposits,
                     performanceFee,
                     managementFee
-                )
-            );
+                );
+
+            // Take into account the fee so we can calculate the newPricePerShare
+            currentBalance = currentBalance - totalVaultFee;
+
+            (queuedWithdrawals, newPricePerShare, mintShares) = VaultLifecycle
+                .rollover(
+                    currentBalance,
+                    tokenSupply,
+                    vaultParams.decimals,
+                    vaultState.queuedDeposits,
+                    vaultState.queuedWithdrawShares
+                );
 
             // Finalize the pricePerShare at the end of the round
             uint256 currentRound = vaultState.round;
-            roundPricePerShare[currentRound] = newPricePerShare;
+            lpTokenPricePerShare[currentRound] = newPricePerShare;
 
             emit CollectVaultFees(
                 performanceFeeInAsset,
@@ -618,21 +718,29 @@ contract RibbonVault is
                 recipient
             );
 
-            vaultState.totalPending = 0;
-            vaultState.round = uint16(currentRound + 1);
-            vaultState.expiry = vaultState.expiry + PERIOD;
+            uint256 nextRound = currentRound + 1;
+
+            /* Writing `1` into the map makes subsequent writes warm, reducing the gas from 20k to 5k. Having 1 initialized beforehand will not be an issue as long as we round down share calculations to 0. */
+            if (lpTokenPricePerShare[nextRound] == 0) {
+                lpTokenPricePerShare[nextRound] = ShareMath.PLACEHOLDER_UINT;
+            }
+
+            vaultState.round = uint16(nextRound);
+
+            vaultState.expiry = uint32(
+                VaultLifecycle.getNextFriday(block.timestamp)
+            );
+
+            vaultState.lockedCollateral = 0;
+            vaultState.queuedDeposits = 0;
+            vaultState.queuedWithdrawals = uint128(queuedWithdrawals);
         }
 
-        _mint(address(this), mintShares);
+        _mint(address(this), Vault.LP_TOKEN_ID, mintShares, "");
 
         if (totalVaultFee > 0) {
-            transferAsset(payable(recipient), totalVaultFee);
+            _transferAsset(payable(recipient), totalVaultFee);
         }
-
-        lastQueuedWithdrawAmount = queuedWithdrawAmount;
-
-        ShareMath.assertUint104(lockedBalance);
-        vaultState.lockedAmount = uint104(lockedBalance);
     }
 
     /************************************************
@@ -640,122 +748,73 @@ contract RibbonVault is
      ***********************************************/
 
     /**
-     * @notice Returns the asset balance held on the vault for the account
-     * @param account is the address to lookup balance for
-     * @return the amount of `asset` custodied by the vault for the user
-     */
-    function accountVaultBalance(address account)
-        external
-        view
-        returns (uint256)
-    {
-        uint256 _decimals = vaultParams.decimals;
-        uint256 assetPerShare = ShareMath.pricePerShare(
-            totalSupply(),
-            totalBalance(),
-            vaultState.totalPending,
-            _decimals
-        );
-        return
-            ShareMath.sharesToAsset(shares(account), assetPerShare, _decimals);
-    }
-
-    /**
-     * @notice Getter for returning the account's share balance including unredeemed shares
-     * @param account is the account to lookup share balance for
-     * @return the share balance
-     */
-    function shares(address account) public view returns (uint256) {
-        (uint256 heldByAccount, uint256 heldByVault) = shareBalances(account);
-        return heldByAccount.add(heldByVault);
-    }
-
-    /**
-     * @notice Getter for returning the account's share balance split between account and vault holdings
-     * @param account is the account to lookup share balance for
-     * @return heldByAccount is the shares held by account
-     * @return heldByVault is the shares held on the vault (unredeemedShares)
-     */
-    function shareBalances(address account)
-        public
-        view
-        returns (uint256 heldByAccount, uint256 heldByVault)
-    {
-        Vault.DepositReceipt memory depositReceipt = depositReceipts[account];
-
-        if (depositReceipt.round < ShareMath.PLACEHOLDER_UINT) {
-            return (balanceOf(account), 0);
-        }
-
-        uint256 unredeemedShares = depositReceipt.getSharesFromReceipt(
-            vaultState.round,
-            roundPricePerShare[depositReceipt.round],
-            vaultParams.decimals
-        );
-
-        return (balanceOf(account), unredeemedShares);
-    }
-
-    /**
-     * @notice The price of a unit of share denominated in the `asset`
-     */
-    function pricePerShare() external view returns (uint256) {
-        return
-            ShareMath.pricePerShare(
-                totalSupply(),
-                totalBalance(),
-                vaultState.totalPending,
-                vaultParams.decimals
-            );
-    }
-
-    /**
      * @notice Returns the vault's total balance, including the amounts locked into a short position
      * @return total balance of the vault, including the amounts locked in third party protocols
      */
     function totalBalance() public view returns (uint256) {
+        /* The total balance should include new deposits, premiums paid, free/locked liquidity. It should not include the payout, and withdrawal amounts. */
         return
-            uint256(vaultState.lockedAmount).add(
-                IERC20(vaultParams.asset).balanceOf(address(this))
-            );
-    }
-
-    /**
-     * @notice Returns the token decimals
-     */
-    function decimals() public view override returns (uint8) {
-        return vaultParams.decimals;
-    }
-
-    function cap() external view returns (uint256) {
-        return vaultParams.cap;
-    }
-
-    function totalPending() external view returns (uint256) {
-        return vaultState.totalPending;
-    }
-
-    function nextRoundReadyAt() external view returns (uint32) {
-        return vaultState.expiry;
+            IERC20(vaultParams.asset)
+                .balanceOf(address(this))
+                .add(vaultState.lockedCollateral)
+                .sub(vaultState.queuedPayouts)
+                .sub(vaultState.queuedWithdrawals);
     }
 
     /************************************************
      *  HELPERS
      ***********************************************/
 
+    function toBaseDecimals(uint256 value) internal view returns (uint256) {
+        int128 value64x64 = ABDKMath64x64.divu(
+            value,
+            10**vaultParams.underlyingDecimals
+        );
+
+        return value64x64.mulu(10**vaultParams.assetDecimals);
+    }
+
     /**
      * @notice Helper function to make either an ETH transfer or ERC20 transfer
      * @param recipient is the receiving address
      * @param amount is the transfer amount
      */
-    function transferAsset(address recipient, uint256 amount) internal {
+    function _transferAsset(address recipient, uint256 amount) internal {
         address asset = vaultParams.asset;
+
         if (asset == WETH) {
             IWETH(WETH).withdraw(amount);
             (bool success, ) = recipient.call{value: amount}("");
-            require(success, "Transfer failed");
+            require(success, VaultErrors.TRANSFER_FAILED);
             return;
         }
+
         IERC20(asset).safeTransfer(recipient, amount);
+    }
+
+    /**
+     * @dev See {IERC1155Receiver-onERC1155Received}.
+     */
+    function onERC1155Received(
+        address,
+        address,
+        uint256,
+        uint256,
+        bytes memory
+    ) public virtual returns (bytes4) {
+        return this.onERC1155Received.selector;
+    }
+
+    /**
+     * @dev See {IERC1155Receiver-onERC1155BatchReceived}.
+     */
+    function onERC1155BatchReceived(
+        address,
+        address,
+        uint256[] memory,
+        uint256[] memory,
+        bytes memory
+    ) public virtual returns (bytes4) {
+        return this.onERC1155BatchReceived.selector;
     }
 }

@@ -5,6 +5,14 @@
     "moduleResolution": "node",
     "resolveJsonModule": true
   },
-  "include": ["./scripts", "./test", "./types"],
+  "include": [
+    "./scripts",
+    "./test",
+    "./types",
+    "archive/v0/RibbonVault.test.ts",
+    "archive/v0/ThetaDecay.test.ts",
+    "test/ThetaDecayPremia.test.ts",
+    "BaseVault.test copy.ts"
+  ],
   "files": ["./hardhat.config.ts"]
 }

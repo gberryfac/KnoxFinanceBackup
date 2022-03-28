@@ -1,18 +1,21 @@
+import { HardhatUserConfig } from "hardhat/types";
+import "hardhat-deploy";
 import "@nomiclabs/hardhat-ethers";
 import "@nomiclabs/hardhat-waffle";
 import "@typechain/hardhat";
 import "solidity-coverage";
 import "hardhat-contract-sizer";
-
-import { BLOCK_NUMBER } from "./constants/constants";
-import { TEST_URI } from "./scripts/helpers/getDefaultEthersProvider";
+// import "hardhat-gas-reporter";
+import "hardhat-tracer";
 
 require("dotenv").config();
+
+import { TEST_URI, BLOCK_NUMBER } from "./constants";
 
 // Defaults to CHAINID=1 so things will run with mainnet fork if not specified
 const CHAINID = process.env.CHAINID ? Number(process.env.CHAINID) : 1;
 
-export default {
+const config: HardhatUserConfig = {
   solidity: {
     compilers: [
       {
@@ -45,7 +48,6 @@ export default {
       forking: {
         url: TEST_URI[CHAINID],
         blockNumber: BLOCK_NUMBER[CHAINID],
-        gasLimit: 8e6,
       },
     },
     mainnet: {
@@ -54,6 +56,23 @@ export default {
       accounts: {
         mnemonic: process.env.MAINNET_MNEMONIC,
       },
+    },
+  },
+  namedAccounts: {
+    deployer: {
+      default: 0,
+    },
+    owner: {
+      default: 0,
+    },
+    keeper: {
+      default: 0,
+    },
+    admin: {
+      default: 0,
+    },
+    feeRecipient: {
+      default: 0,
     },
   },
   mocha: {
@@ -65,3 +84,5 @@ export default {
     alwaysGenerateOverloads: false,
   },
 };
+
+export default config;
