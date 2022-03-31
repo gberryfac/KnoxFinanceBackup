@@ -3,22 +3,54 @@
 
 pragma solidity ^0.8.0;
 
-import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/introspection/ERC165Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC1155/ERC1155Upgradeable.sol";
 
-import "./IKnoxToken.sol";
+import "./libraries/Errors.sol";
+
+import "./interfaces/IKnoxToken.sol";
+import "./interfaces/IVault.sol";
+
+import "hardhat/console.sol";
 
 contract KnoxToken is Initializable, ERC165Upgradeable, ERC1155Upgradeable {
+    address public immutable vault;
+
     mapping(uint256 => uint256) private _totalSupply;
 
-    function __KnoxToken_init(string memory _tokenName)
-        internal
-        onlyInitializing
-    {
+    constructor(address _vault) {
+        vault = _vault;
+    }
+
+    function initialize(string memory _tokenName) external initializer {
         __Context_init();
         __ERC165_init();
         __ERC1155_init(_tokenName);
+    }
+
+    /**
+     * @dev Only pool can call functions marked by this modifier.
+     **/
+    modifier onlyVault() {
+        require(_msgSender() == address(vault), Errors.CALLER_MUST_BE_VAULT);
+        _;
+    }
+
+    function mint(
+        address to,
+        uint256 id,
+        uint256 amount,
+        bytes memory data
+    ) external onlyVault {
+        _mint(to, id, amount, data);
+    }
+
+    function burn(
+        address from,
+        uint256 id,
+        uint256 amount
+    ) external onlyVault {
+        _burn(from, id, amount);
     }
 
     /**

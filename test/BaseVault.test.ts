@@ -23,6 +23,7 @@ import {
   WETH_DECIMALS,
   DAI_DECIMALS,
   DAI_ADDRESS,
+  ADDRESS_ONE,
 } from "../constants";
 
 import { MockRegistry__factory } from "../types";
@@ -140,7 +141,8 @@ function behavesLikeRibbonOptionsVault(params: {
     keeper: string,
     user: string,
     feeRecipient: string,
-    whale = params.whale;
+    whale = params.whale,
+    knoxTokenAddress: string;
 
   // Signers
   let adminSigner: SignerWithAddress,
@@ -167,11 +169,13 @@ function behavesLikeRibbonOptionsVault(params: {
 
   // Contracts
   let vaultLifecycleLib: Contract;
+  let vaultLogicLib: Contract;
   let vaultDisplayLib: Contract;
   let vaultContract: Contract;
   let mockRegistry: Contract;
   let assetContract: Contract;
   let mockPremiaPool: Contract;
+  let knoxTokenContract: Contract;
 
   describe.only(`${params.name}`, () => {
     let initSnapshotId: string;
@@ -218,9 +222,14 @@ function behavesLikeRibbonOptionsVault(params: {
       const VaultLifecycle = await ethers.getContractFactory("VaultLifecycle");
       vaultLifecycleLib = await VaultLifecycle.deploy();
 
+      const VaultLogic = await ethers.getContractFactory("VaultLogic");
+      vaultLogicLib = await VaultLogic.deploy();
+
       mockRegistry = await new MockRegistry__factory(adminSigner).deploy(true);
 
       assetContract = await getContractAt("IAsset", depositAsset);
+
+      whaleSigner = await utils.impersonateWhale(whale, "1000");
 
       const initializeArgs = [
         [owner, keeper, feeRecipient, managementFee, performanceFee, tokenName],
@@ -237,8 +246,6 @@ function behavesLikeRibbonOptionsVault(params: {
         ],
       ];
 
-      whaleSigner = await utils.impersonateWhale(whale, "1000");
-
       vaultContract = (
         await utils.deployProxy(
           "ThetaVault",
@@ -248,10 +255,27 @@ function behavesLikeRibbonOptionsVault(params: {
           {
             libraries: {
               VaultLifecycle: vaultLifecycleLib.address,
+              VaultLogic: vaultLogicLib.address,
             },
           }
         )
       ).connect(userSigner);
+
+      knoxTokenContract = (
+        await utils.deployProxy(
+          "KnoxToken",
+          adminSigner,
+          [tokenName],
+          [vaultContract.address],
+          {}
+        )
+      ).connect(userSigner);
+
+      knoxTokenAddress = knoxTokenContract.address;
+
+      await vaultContract
+        .connect(ownerSigner)
+        .setTokenAddress(knoxTokenAddress);
 
       if (depositAsset === WETH_ADDRESS[chainId]) {
         await assetContract
@@ -284,6 +308,7 @@ function behavesLikeRibbonOptionsVault(params: {
         const BaseVault = await ethers.getContractFactory("BaseVault", {
           libraries: {
             VaultLifecycle: vaultLifecycleLib.address,
+            VaultLogic: vaultLogicLib.address,
           },
         });
 
@@ -551,7 +576,7 @@ function behavesLikeRibbonOptionsVault(params: {
 
     describe("#uri", () => {
       it("returns the name", async function () {
-        assert.equal(await vaultContract.uri(LP_TOKEN_ID), tokenName);
+        assert.equal(await knoxTokenContract.uri(LP_TOKEN_ID), tokenName);
       });
     });
 
@@ -703,6 +728,7 @@ function behavesLikeRibbonOptionsVault(params: {
             round,
             vaultContract.address,
             user,
+            knoxTokenAddress,
             userDepositReceipt
           ),
           depositAmount
@@ -722,12 +748,13 @@ function behavesLikeRibbonOptionsVault(params: {
             round,
             vaultContract.address,
             user,
+            knoxTokenAddress,
             userDepositReceipt
           ),
           depositAmount
         );
 
-        await vaultContract.safeTransferFrom(
+        await knoxTokenContract.safeTransferFrom(
           user,
           owner,
           LP_TOKEN_ID,
@@ -744,6 +771,7 @@ function behavesLikeRibbonOptionsVault(params: {
             round,
             vaultContract.address,
             user,
+            knoxTokenAddress,
             userDepositReceipt
           ),
           depositAmount.sub(redeemAmount)
@@ -755,6 +783,7 @@ function behavesLikeRibbonOptionsVault(params: {
             round,
             vaultContract.address,
             owner,
+            knoxTokenAddress,
             ownerDepositReceipt
           ),
           redeemAmount
@@ -788,6 +817,7 @@ function behavesLikeRibbonOptionsVault(params: {
             round,
             vaultContract.address,
             user,
+            knoxTokenAddress,
             userDepositReceipt
           ),
           depositAmount
@@ -804,6 +834,7 @@ function behavesLikeRibbonOptionsVault(params: {
             round,
             vaultContract.address,
             user,
+            knoxTokenAddress,
             userDepositReceipt
           ),
           depositAmount
@@ -841,6 +872,7 @@ function behavesLikeRibbonOptionsVault(params: {
             round,
             vaultContract.address,
             user,
+            knoxTokenAddress,
             userDepositReceipt
           );
 
@@ -857,6 +889,7 @@ function behavesLikeRibbonOptionsVault(params: {
             round,
             vaultContract.address,
             user,
+            knoxTokenAddress,
             userDepositReceipt
           );
 
@@ -868,9 +901,10 @@ function behavesLikeRibbonOptionsVault(params: {
     describe("#accountVaultBalance", () => {
       time.revertToSnapshotAfterEach();
 
-      it("returns a lesser underlyingAsset amount for user", async function () {
-        assert.isFalse(true);
-      });
+      // TODO: Finish test
+      // it("returns a lesser underlyingAsset amount for user", async function () {
+      //   assert.isFalse(true);
+      // });
     });
 
     describe("#withdrawInstantly", () => {
@@ -934,50 +968,51 @@ function behavesLikeRibbonOptionsVault(params: {
         ).to.be.revertedWith("7");
       });
 
-      it("withdraws the amount in deposit receipt", async function () {
-        assert.isFalse(true);
+      // TODO: finish test
+      // it("withdraws the amount in deposit receipt", async function () {
+      //   assert.isFalse(true);
 
-        // await assetContract
-        //   .connect(userSigner)
-        //   .approve(vaultContract.address, depositAmount);
-        // await vaultContract.deposit(depositAmount);
+      // await assetContract
+      //   .connect(userSigner)
+      //   .approve(vaultContract.address, depositAmount);
+      // await vaultContract.deposit(depositAmount);
 
-        // let startBalance: BigNumber;
-        // let withdrawAmount: BigNumber;
-        // if (underlyingAsset === WETH_ADDRESS[chainId]) {
-        //   startBalance = await provider.getBalance(user);
-        // } else {
-        //   startBalance = await assetContract.balanceOf(user);
-        // }
+      // let startBalance: BigNumber;
+      // let withdrawAmount: BigNumber;
+      // if (underlyingAsset === WETH_ADDRESS[chainId]) {
+      //   startBalance = await provider.getBalance(user);
+      // } else {
+      //   startBalance = await assetContract.balanceOf(user);
+      // }
 
-        // const tx = await vaultContract.withdrawInstantly(depositAmount, { gasPrice });
-        // const receipt = await tx.wait();
+      // const tx = await vaultContract.withdrawInstantly(depositAmount, { gasPrice });
+      // const receipt = await tx.wait();
 
-        // if (underlyingAsset === WETH_ADDRESS[chainId]) {
-        //   const endBalance = await provider.getBalance(user);
-        //   withdrawAmount = endBalance
-        //     .sub(startBalance)
-        //     .add(receipt.gasUsed.mul(gasPrice));
-        // } else {
-        //   const endBalance = await assetContract.balanceOf(user);
-        //   withdrawAmount = endBalance.sub(startBalance);
-        // }
-        // assert.bnEqual(withdrawAmount, depositAmount);
+      // if (underlyingAsset === WETH_ADDRESS[chainId]) {
+      //   const endBalance = await provider.getBalance(user);
+      //   withdrawAmount = endBalance
+      //     .sub(startBalance)
+      //     .add(receipt.gasUsed.mul(gasPrice));
+      // } else {
+      //   const endBalance = await assetContract.balanceOf(user);
+      //   withdrawAmount = endBalance.sub(startBalance);
+      // }
+      // assert.bnEqual(withdrawAmount, depositAmount);
 
-        // await expect(tx)
-        //   .to.emit(vaultContract, "InstantWithdraw")
-        //   .withArgs(user, depositAmount, 1);
+      // await expect(tx)
+      //   .to.emit(vaultContract, "InstantWithdraw")
+      //   .withArgs(user, depositAmount, 1);
 
-        // const { round, amount } = await vaultContract.depositReceipts(user);
-        // assert.equal(round, 1);
-        // assert.bnEqual(amount, BigNumber.from(0));
+      // const { round, amount } = await vaultContract.depositReceipts(user);
+      // assert.equal(round, 1);
+      // assert.bnEqual(amount, BigNumber.from(0));
 
-        // // Should decrement the pending amounts
-        // assert.bnEqual(
-        //   await vaultDisplayLib.queuedDeposits(vaultContract.address),
-        //   BigNumber.from(0)
-        // );
-      });
+      // // Should decrement the pending amounts
+      // assert.bnEqual(
+      //   await vaultDisplayLib.queuedDeposits(vaultContract.address),
+      //   BigNumber.from(0)
+      // );
+      // });
     });
 
     // Only apply to when assets is WETH
@@ -1006,11 +1041,11 @@ function behavesLikeRibbonOptionsVault(params: {
 
           // Unchanged for share balance and totalSupply
           assert.bnEqual(
-            await vaultContract.totalSupply(LP_TOKEN_ID),
+            await knoxTokenContract.totalSupply(LP_TOKEN_ID),
             BigNumber.from(0)
           );
           assert.bnEqual(
-            await vaultContract.balanceOf(user, LP_TOKEN_ID),
+            await knoxTokenContract.balanceOf(user, LP_TOKEN_ID),
             BigNumber.from(0)
           );
           await expect(tx)
@@ -1063,7 +1098,7 @@ function behavesLikeRibbonOptionsVault(params: {
             .depositETH({ value: parseEther("1") });
 
           assert.isTrue(
-            (await vaultContract.balanceOf(user, LP_TOKEN_ID)).isZero()
+            (await knoxTokenContract.balanceOf(user, LP_TOKEN_ID)).isZero()
           );
         });
 
@@ -1102,9 +1137,11 @@ function behavesLikeRibbonOptionsVault(params: {
           await assetContract.balanceOf(user),
           startBalance.sub(depositAmount)
         );
-        assert.isTrue((await vaultContract.totalSupply(LP_TOKEN_ID)).isZero());
         assert.isTrue(
-          (await vaultContract.balanceOf(user, LP_TOKEN_ID)).isZero()
+          (await knoxTokenContract.totalSupply(LP_TOKEN_ID)).isZero()
+        );
+        assert.isTrue(
+          (await knoxTokenContract.balanceOf(user, LP_TOKEN_ID)).isZero()
         );
         await expect(res)
           .to.emit(vaultContract, "Deposit")
@@ -1135,9 +1172,11 @@ function behavesLikeRibbonOptionsVault(params: {
           await assetContract.balanceOf(user),
           startBalance.sub(totalDepositAmount)
         );
-        assert.isTrue((await vaultContract.totalSupply(LP_TOKEN_ID)).isZero());
         assert.isTrue(
-          (await vaultContract.balanceOf(user, LP_TOKEN_ID)).isZero()
+          (await knoxTokenContract.totalSupply(LP_TOKEN_ID)).isZero()
+        );
+        assert.isTrue(
+          (await knoxTokenContract.balanceOf(user, LP_TOKEN_ID)).isZero()
         );
         await expect(tx)
           .to.emit(vaultContract, "Deposit")
@@ -1203,7 +1242,7 @@ function behavesLikeRibbonOptionsVault(params: {
         // user needs to get back exactly 1 ether
         // even though the total has been incremented
         assert.isTrue(
-          (await vaultContract.balanceOf(user, LP_TOKEN_ID)).isZero()
+          (await knoxTokenContract.balanceOf(user, LP_TOKEN_ID)).isZero()
         );
       });
 
@@ -1257,7 +1296,7 @@ function behavesLikeRibbonOptionsVault(params: {
 
         // vaultContract will still hold the vaultContract shares
         assert.bnEqual(
-          await vaultContract.balanceOf(vaultContract.address, LP_TOKEN_ID),
+          await knoxTokenContract.balanceOf(vaultContract.address, LP_TOKEN_ID),
           params.depositAmount
         );
 
@@ -1295,9 +1334,11 @@ function behavesLikeRibbonOptionsVault(params: {
           startBalance.sub(depositAmount)
         );
 
-        assert.isTrue((await vaultContract.totalSupply(LP_TOKEN_ID)).isZero());
         assert.isTrue(
-          (await vaultContract.balanceOf(user, LP_TOKEN_ID)).isZero()
+          (await knoxTokenContract.totalSupply(LP_TOKEN_ID)).isZero()
+        );
+        assert.isTrue(
+          (await knoxTokenContract.balanceOf(user, LP_TOKEN_ID)).isZero()
         );
 
         await expect(res)
@@ -1336,9 +1377,11 @@ function behavesLikeRibbonOptionsVault(params: {
           await assetContract.balanceOf(user),
           startBalance.sub(totalDepositAmount)
         );
-        assert.isTrue((await vaultContract.totalSupply(LP_TOKEN_ID)).isZero());
         assert.isTrue(
-          (await vaultContract.balanceOf(creditor, LP_TOKEN_ID)).isZero()
+          (await knoxTokenContract.totalSupply(LP_TOKEN_ID)).isZero()
+        );
+        assert.isTrue(
+          (await knoxTokenContract.balanceOf(creditor, LP_TOKEN_ID)).isZero()
         );
         await expect(tx)
           .to.emit(vaultContract, "Deposit")
@@ -1401,7 +1444,7 @@ function behavesLikeRibbonOptionsVault(params: {
         // user needs to get back exactly 1 ether
         // even though the total has been incremented
         assert.isTrue(
-          (await vaultContract.balanceOf(creditor, LP_TOKEN_ID)).isZero()
+          (await knoxTokenContract.balanceOf(creditor, LP_TOKEN_ID)).isZero()
         );
       });
 
@@ -1458,7 +1501,7 @@ function behavesLikeRibbonOptionsVault(params: {
 
         // vaultContract shares will not change until next rollover
         assert.bnEqual(
-          await vaultContract.balanceOf(vaultContract.address, LP_TOKEN_ID),
+          await knoxTokenContract.balanceOf(vaultContract.address, LP_TOKEN_ID),
           params.depositAmount
         );
 
@@ -1478,12 +1521,14 @@ function behavesLikeRibbonOptionsVault(params: {
       time.revertToSnapshotAfterEach(async () => {});
 
       it("reverts when user initiates withdraws without any deposit", async function () {
+        await knoxTokenContract.setApprovalForAll(vaultContract.address, true);
         await expect(
           vaultContract.initiateWithdraw(depositAmount)
         ).to.be.revertedWith("ERC1155: insufficient balance for transfer");
       });
 
       it("reverts when passed 0 shares", async function () {
+        await knoxTokenContract.setApprovalForAll(vaultContract.address, true);
         await expect(vaultContract.initiateWithdraw(0)).to.be.revertedWith(
           "15"
         );
@@ -1500,6 +1545,8 @@ function behavesLikeRibbonOptionsVault(params: {
 
         await time.increaseTo(expiry);
         await vaultContract.connect(keeperSigner).harvest();
+
+        await knoxTokenContract.setApprovalForAll(vaultContract.address, true);
 
         await expect(
           vaultContract.initiateWithdraw(depositAmount.add(1))
@@ -1521,6 +1568,8 @@ function behavesLikeRibbonOptionsVault(params: {
         // Move 1 share into account
         await vaultContract.redeem(1);
 
+        await knoxTokenContract.setApprovalForAll(vaultContract.address, true);
+
         await expect(
           vaultContract.initiateWithdraw(depositAmount.add(1))
         ).to.be.revertedWith("ERC1155: insufficient balance for transfer");
@@ -1538,6 +1587,7 @@ function behavesLikeRibbonOptionsVault(params: {
         await time.increaseTo(expiry);
         await vaultContract.connect(keeperSigner).harvest();
 
+        await knoxTokenContract.setApprovalForAll(vaultContract.address, true);
         await vaultContract.initiateWithdraw(depositAmount.div(2));
 
         vaultState = await vaultContract.vaultState();
@@ -1563,6 +1613,7 @@ function behavesLikeRibbonOptionsVault(params: {
         await time.increaseTo(expiry);
         await vaultContract.connect(keeperSigner).harvest();
 
+        await knoxTokenContract.setApprovalForAll(vaultContract.address, true);
         const tx = await vaultContract.initiateWithdraw(depositAmount);
 
         await expect(tx)
@@ -1570,9 +1621,9 @@ function behavesLikeRibbonOptionsVault(params: {
           .withArgs(user, depositAmount, 2);
 
         await expect(tx)
-          .to.emit(vaultContract, "TransferSingle")
+          .to.emit(knoxTokenContract, "TransferSingle")
           .withArgs(
-            user,
+            vaultContract.address,
             vaultContract.address,
             user,
             LP_TOKEN_ID,
@@ -1598,13 +1649,14 @@ function behavesLikeRibbonOptionsVault(params: {
 
         await vaultContract.redeem(depositAmount.div(2));
 
+        await knoxTokenContract.setApprovalForAll(vaultContract.address, true);
         const tx = await vaultContract.initiateWithdraw(depositAmount);
 
         // First we redeem the leftover amount
         await expect(tx)
-          .to.emit(vaultContract, "TransferSingle")
+          .to.emit(knoxTokenContract, "TransferSingle")
           .withArgs(
-            user,
+            vaultContract.address,
             vaultContract.address,
             user,
             LP_TOKEN_ID,
@@ -1617,9 +1669,9 @@ function behavesLikeRibbonOptionsVault(params: {
 
         // Then we debit the shares from the user
         await expect(tx)
-          .to.emit(vaultContract, "TransferSingle")
+          .to.emit(knoxTokenContract, "TransferSingle")
           .withArgs(
-            user,
+            vaultContract.address,
             user,
             vaultContract.address,
             LP_TOKEN_ID,
@@ -1627,11 +1679,11 @@ function behavesLikeRibbonOptionsVault(params: {
           );
 
         assert.bnEqual(
-          await vaultContract.balanceOf(user, LP_TOKEN_ID),
+          await knoxTokenContract.balanceOf(user, LP_TOKEN_ID),
           BigNumber.from(0)
         );
         assert.bnEqual(
-          await vaultContract.balanceOf(vaultContract.address, LP_TOKEN_ID),
+          await knoxTokenContract.balanceOf(vaultContract.address, LP_TOKEN_ID),
           depositAmount
         );
 
@@ -1652,21 +1704,22 @@ function behavesLikeRibbonOptionsVault(params: {
         await time.increaseTo(expiry);
         await vaultContract.connect(keeperSigner).harvest();
 
+        await knoxTokenContract.setApprovalForAll(vaultContract.address, true);
         const tx1 = await vaultContract.initiateWithdraw(depositAmount.div(2));
         // We redeem the full amount on the first initiateWithdraw
         await expect(tx1)
-          .to.emit(vaultContract, "TransferSingle")
+          .to.emit(knoxTokenContract, "TransferSingle")
           .withArgs(
-            user,
+            vaultContract.address,
             vaultContract.address,
             user,
             LP_TOKEN_ID,
             depositAmount
           );
         await expect(tx1)
-          .to.emit(vaultContract, "TransferSingle")
+          .to.emit(knoxTokenContract, "TransferSingle")
           .withArgs(
-            user,
+            vaultContract.address,
             user,
             vaultContract.address,
             LP_TOKEN_ID,
@@ -1675,9 +1728,9 @@ function behavesLikeRibbonOptionsVault(params: {
 
         const tx2 = await vaultContract.initiateWithdraw(depositAmount.div(2));
         await expect(tx2)
-          .to.emit(vaultContract, "TransferSingle")
+          .to.emit(knoxTokenContract, "TransferSingle")
           .withArgs(
-            user,
+            vaultContract.address,
             user,
             vaultContract.address,
             LP_TOKEN_ID,
@@ -1701,6 +1754,7 @@ function behavesLikeRibbonOptionsVault(params: {
         await time.increaseTo(expiry);
         await vaultContract.connect(keeperSigner).harvest();
 
+        await knoxTokenContract.setApprovalForAll(vaultContract.address, true);
         await vaultContract.initiateWithdraw(depositAmount.div(2));
 
         await expect(
@@ -1748,6 +1802,7 @@ function behavesLikeRibbonOptionsVault(params: {
         await time.increaseTo(expiry);
         await vaultContract.connect(keeperSigner).harvest();
 
+        await knoxTokenContract.setApprovalForAll(vaultContract.address, true);
         await vaultContract.initiateWithdraw(depositAmount);
       });
 
@@ -1772,84 +1827,85 @@ function behavesLikeRibbonOptionsVault(params: {
         await expect(vaultContract.completeWithdraw()).to.be.revertedWith("22");
       });
 
-      it("completes the withdrawal", async function () {
-        assert.isTrue(false);
-        //   const firstStrikePrice = firstOptionStrike;
-        //   const settlePriceITM = isCall
-        //     ? firstStrikePrice.sub(100000000)
-        //     : firstStrikePrice.add(100000000);
-        //   await rollToSecondOption(settlePriceITM);
-        //   const pricePerShare = await vaultContract.roundPricePerShare(2);
-        //   const withdrawAmount = depositAmount
-        //     .mul(pricePerShare)
-        //     .div(
-        //       BigNumber.from(10).pow(
-        //         await vaultDisplayLib.decimals(vaultContract.address)
-        //       )
-        //     );
-        //   const lastQueuedWithdrawAmount = await vaultContract.lastQueuedWithdrawAmount();
-        //   let beforeBalance: BigNumber;
-        //   if (underlyingAsset === WETH_ADDRESS[chainId]) {
-        //     beforeBalance = await provider.getBalance(user);
-        //   } else {
-        //     beforeBalance = await assetContract.balanceOf(user);
-        //   }
-        //   const { queuedWithdrawShares: startQueuedShares } =
-        //     await vaultContract.vaultState();
-        //   const tx = await vaultContract.completeWithdraw({ gasPrice });
-        //   const receipt = await tx.wait();
+      // TODO: Write Test
+      // it("completes the withdrawal", async function () {
+      //   assert.isTrue(false);
+      //   const firstStrikePrice = firstOptionStrike;
+      //   const settlePriceITM = isCall
+      //     ? firstStrikePrice.sub(100000000)
+      //     : firstStrikePrice.add(100000000);
+      //   await rollToSecondOption(settlePriceITM);
+      //   const pricePerShare = await vaultContract.roundPricePerShare(2);
+      //   const withdrawAmount = depositAmount
+      //     .mul(pricePerShare)
+      //     .div(
+      //       BigNumber.from(10).pow(
+      //         await vaultDisplayLib.decimals(vaultContract.address)
+      //       )
+      //     );
+      //   const lastQueuedWithdrawAmount = await vaultContract.lastQueuedWithdrawAmount();
+      //   let beforeBalance: BigNumber;
+      //   if (underlyingAsset === WETH_ADDRESS[chainId]) {
+      //     beforeBalance = await provider.getBalance(user);
+      //   } else {
+      //     beforeBalance = await assetContract.balanceOf(user);
+      //   }
+      //   const { queuedWithdrawShares: startQueuedShares } =
+      //     await vaultContract.vaultState();
+      //   const tx = await vaultContract.completeWithdraw({ gasPrice });
+      //   const receipt = await tx.wait();
 
-        //   const gasFee = receipt.gasUsed.mul(gasPrice);
-        //   await expect(tx)
-        //     .to.emit(vaultContract, "Withdraw")
-        //     .withArgs(user, withdrawAmount.toString(), depositAmount);
-        //   if (underlyingAsset !== WETH_ADDRESS[chainId]) {
-        //     const collateralERC20 = await getContractAt("IERC20", underlyingAsset);
-        //     await expect(tx)
-        //       .to.emit(collateralERC20, "Transfer")
-        //       .withArgs(vaultContract.address, user, withdrawAmount);
-        //   }
-        //   const { shares, round } = await vaultContract.withdrawals(user);
-        //   assert.equal(shares, 0);
-        // assert.equal(round, 2);
-        // const { queuedWithdrawShares: endQueuedShares } =
-        //   await vaultContract.vaultState();
-        // assert.bnEqual(endQueuedShares, BigNumber.from(0));
-        // assert.bnEqual(
-        //   await vaultContract.lastQueuedWithdrawAmount(),
-        //   lastQueuedWithdrawAmount.sub(withdrawAmount)
-        // );
-        // assert.bnEqual(startQueuedShares.sub(endQueuedShares), depositAmount);
-        // let actualWithdrawAmount: BigNumber;
-        // if (underlyingAsset === WETH_ADDRESS[chainId]) {
-        //   const afterBalance = await provider.getBalance(user);
-        //   actualWithdrawAmount = afterBalance.sub(beforeBalance).add(gasFee);
-        // } else {
-        //   const afterBalance = await assetContract.balanceOf(user);
-        //   actualWithdrawAmount = afterBalance.sub(beforeBalance);
-        // }
-        // // Should be less because the pps is down
-        // assert.bnLt(actualWithdrawAmount, depositAmount);
-        // assert.bnEqual(actualWithdrawAmount, withdrawAmount);
-        // });
+      //   const gasFee = receipt.gasUsed.mul(gasPrice);
+      //   await expect(tx)
+      //     .to.emit(vaultContract, "Withdraw")
+      //     .withArgs(user, withdrawAmount.toString(), depositAmount);
+      //   if (underlyingAsset !== WETH_ADDRESS[chainId]) {
+      //     const collateralERC20 = await getContractAt("IERC20", underlyingAsset);
+      //     await expect(tx)
+      //       .to.emit(collateralERC20, "Transfer")
+      //       .withArgs(vaultContract.address, user, withdrawAmount);
+      //   }
+      //   const { shares, round } = await vaultContract.withdrawals(user);
+      //   assert.equal(shares, 0);
+      // assert.equal(round, 2);
+      // const { queuedWithdrawShares: endQueuedShares } =
+      //   await vaultContract.vaultState();
+      // assert.bnEqual(endQueuedShares, BigNumber.from(0));
+      // assert.bnEqual(
+      //   await vaultContract.lastQueuedWithdrawAmount(),
+      //   lastQueuedWithdrawAmount.sub(withdrawAmount)
+      // );
+      // assert.bnEqual(startQueuedShares.sub(endQueuedShares), depositAmount);
+      // let actualWithdrawAmount: BigNumber;
+      // if (underlyingAsset === WETH_ADDRESS[chainId]) {
+      //   const afterBalance = await provider.getBalance(user);
+      //   actualWithdrawAmount = afterBalance.sub(beforeBalance).add(gasFee);
+      // } else {
+      //   const afterBalance = await assetContract.balanceOf(user);
+      //   actualWithdrawAmount = afterBalance.sub(beforeBalance);
+      // }
+      // // Should be less because the pps is down
+      // assert.bnLt(actualWithdrawAmount, depositAmount);
+      // assert.bnEqual(actualWithdrawAmount, withdrawAmount);
+      // });
 
-        // it("fits gas budget [ @skip-on-coverage ]", async function () {
-        //   const vaultParams = await vaultContract.vaultParams();
-        //   const expiry = vaultParams.expiry;
+      // it("fits gas budget [ @skip-on-coverage ]", async function () {
+      //   const vaultParams = await vaultContract.vaultParams();
+      //   const expiry = vaultParams.expiry;
 
-        //   await time.increaseTo(expiry);
-        //   await vaultContract.connect(keeperSigner).harvest();
+      //   await time.increaseTo(expiry);
+      //   await vaultContract.connect(keeperSigner).harvest();
 
-        //   const tx = await vaultContract.completeWithdraw({ gasPrice });
-        //   const receipt = await tx.wait();
+      //   const tx = await vaultContract.completeWithdraw({ gasPrice });
+      //   const receipt = await tx.wait();
 
-        //   assert.isAtMost(receipt.gasUsed.toNumber(), 100342);
-        //   // console.log(
-        //   //   params.name,
-        //   //   "completeWithdraw",
-        //   //   receipt.gasUsed.toNumber()
-        //   // );
-      });
+      //   assert.isAtMost(receipt.gasUsed.toNumber(), 100342);
+      //   // console.log(
+      //   //   params.name,
+      //   //   "completeWithdraw",
+      //   //   receipt.gasUsed.toNumber()
+      //   // );
+      // });
     });
 
     describe("#maxRedeem", () => {
@@ -1876,11 +1932,11 @@ function behavesLikeRibbonOptionsVault(params: {
         );
 
         assert.bnEqual(
-          await vaultContract.balanceOf(user, LP_TOKEN_ID),
+          await knoxTokenContract.balanceOf(user, LP_TOKEN_ID),
           depositAmount
         );
         assert.bnEqual(
-          await vaultContract.balanceOf(vaultContract.address, LP_TOKEN_ID),
+          await knoxTokenContract.balanceOf(vaultContract.address, LP_TOKEN_ID),
           BigNumber.from(0)
         );
 
@@ -1917,11 +1973,11 @@ function behavesLikeRibbonOptionsVault(params: {
         );
 
         assert.bnEqual(
-          await vaultContract.balanceOf(user, LP_TOKEN_ID),
+          await knoxTokenContract.balanceOf(user, LP_TOKEN_ID),
           depositAmount
         );
         assert.bnEqual(
-          await vaultContract.balanceOf(vaultContract.address, LP_TOKEN_ID),
+          await knoxTokenContract.balanceOf(vaultContract.address, LP_TOKEN_ID),
           BigNumber.from(0)
         );
 
@@ -1934,18 +1990,18 @@ function behavesLikeRibbonOptionsVault(params: {
 
         let res = await vaultContract.maxRedeem();
 
-        await expect(res).to.not.emit(vaultContract, "TransferSingle");
+        await expect(res).to.not.emit(knoxTokenContract, "TransferSingle");
 
         assert.bnEqual(
           await assetContract.balanceOf(vaultContract.address),
           depositAmount
         );
         assert.bnEqual(
-          await vaultContract.balanceOf(user, LP_TOKEN_ID),
+          await knoxTokenContract.balanceOf(user, LP_TOKEN_ID),
           depositAmount
         );
         assert.bnEqual(
-          await vaultContract.balanceOf(vaultContract.address, LP_TOKEN_ID),
+          await knoxTokenContract.balanceOf(vaultContract.address, LP_TOKEN_ID),
           BigNumber.from(0)
         );
       });

@@ -8,22 +8,21 @@ import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "abdk-libraries-solidity/ABDKMath64x64.sol";
 
+import "./../interfaces/IKnoxToken.sol";
 import "./../interfaces/IRegistry.sol";
 import "./../interfaces/IWETH.sol";
+
 import "./../libraries/ShareMath.sol";
 import "./../libraries/Vault.sol";
-import "./../libraries/VaultErrors.sol";
+import "./../libraries/Errors.sol";
 import "./../libraries/VaultLifecycle.sol";
+import "./../libraries/VaultLogic.sol";
 
 import "../KnoxToken.sol";
 
 import "hardhat/console.sol";
 
-contract BaseVault is
-    KnoxToken,
-    OwnableUpgradeable,
-    ReentrancyGuardUpgradeable
-{
+contract BaseVault is OwnableUpgradeable, ReentrancyGuardUpgradeable {
     using SafeERC20 for IERC20;
     using SafeMath for uint256;
     using ShareMath for Vault.DepositReceipt;
@@ -77,6 +76,7 @@ contract BaseVault is
 
     address public immutable WETH;
     address public immutable registry;
+    address public token;
 
     // Number of weeks per year = 52.142857 weeks * FEE_MULTIPLIER = 52142857
     // Dividing by weeks per year requires doing num.mul(FEE_MULTIPLIER).div(WEEKS_PER_YEAR)
@@ -147,8 +147,8 @@ contract BaseVault is
      * @param _weth is the Wrapped Ether contract
      */
     constructor(address _weth, address _registry) {
-        require(_weth != address(0), VaultErrors.ADDRESS_NOT_PROVIDED);
-        require(_registry != address(0), VaultErrors.ADDRESS_NOT_PROVIDED);
+        require(_weth != address(0), Errors.ADDRESS_NOT_PROVIDED);
+        require(_registry != address(0), Errors.ADDRESS_NOT_PROVIDED);
 
         WETH = _weth;
         registry = _registry;
@@ -172,9 +172,6 @@ contract BaseVault is
         );
 
         __ReentrancyGuard_init();
-
-        __KnoxToken_init(_initParams._tokenName);
-
         __Ownable_init();
         transferOwnership(_initParams._owner);
 
@@ -200,7 +197,7 @@ contract BaseVault is
      * @dev Throws if called by any account other than the keeper.
      */
     modifier onlyKeeper() {
-        require(msg.sender == keeper, VaultErrors.ADDRESS_NOT_KEEPER);
+        require(msg.sender == keeper, Errors.ADDRESS_NOT_KEEPER);
         _;
     }
 
@@ -213,7 +210,7 @@ contract BaseVault is
      * @param newKeeper is the address of the new keeper
      */
     function setNewKeeper(address newKeeper) external onlyOwner {
-        require(newKeeper != address(0), VaultErrors.ADDRESS_NOT_PROVIDED);
+        require(newKeeper != address(0), Errors.ADDRESS_NOT_PROVIDED);
         keeper = newKeeper;
     }
 
@@ -222,14 +219,8 @@ contract BaseVault is
      * @param newFeeRecipient is the address of the new fee recipient
      */
     function setFeeRecipient(address newFeeRecipient) external onlyOwner {
-        require(
-            newFeeRecipient != address(0),
-            VaultErrors.ADDRESS_NOT_PROVIDED
-        );
-        require(
-            newFeeRecipient != feeRecipient,
-            VaultErrors.NEW_ADDRESS_EQUALS_OLD
-        );
+        require(newFeeRecipient != address(0), Errors.ADDRESS_NOT_PROVIDED);
+        require(newFeeRecipient != feeRecipient, Errors.NEW_ADDRESS_EQUALS_OLD);
         feeRecipient = newFeeRecipient;
     }
 
@@ -240,7 +231,7 @@ contract BaseVault is
     function setManagementFee(uint256 newManagementFee) external onlyOwner {
         require(
             newManagementFee < 100 * Vault.FEE_MULTIPLIER,
-            VaultErrors.INVALID_FEE_AMOUNT
+            Errors.INVALID_FEE_AMOUNT
         );
 
         // We are dividing annualized management fee by num weeks in a year
@@ -260,7 +251,7 @@ contract BaseVault is
     function setPerformanceFee(uint256 newPerformanceFee) external onlyOwner {
         require(
             newPerformanceFee < 100 * Vault.FEE_MULTIPLIER,
-            VaultErrors.INVALID_FEE_AMOUNT
+            Errors.INVALID_FEE_AMOUNT
         );
 
         emit PerformanceFeeSet(performanceFee, newPerformanceFee);
@@ -273,10 +264,20 @@ contract BaseVault is
      * @param newCap is the new cap for deposits
      */
     function setCap(uint256 newCap) external onlyOwner {
-        require(newCap > 0, VaultErrors.VALUE_EXCEEDS_MINIMUM);
+        require(newCap > 0, Errors.VALUE_EXCEEDS_MINIMUM);
         ShareMath.assertUint104(newCap);
         emit CapSet(vaultParams.cap, newCap);
         vaultParams.cap = uint104(newCap);
+    }
+
+    /**
+     * @notice
+     * @param
+     */
+    function setTokenAddress(address newTokenAddress) external onlyOwner {
+        require(newTokenAddress != address(0), Errors.ADDRESS_NOT_PROVIDED);
+        require(newTokenAddress != token, Errors.NEW_ADDRESS_EQUALS_OLD);
+        token = newTokenAddress;
     }
 
     // function setRegistry() external onlyOwner {}
@@ -290,8 +291,8 @@ contract BaseVault is
      * @notice Deposits ETH into the contract and mint vault shares. Reverts if the asset is not WETH.
      */
     function depositETH() external payable nonReentrant {
-        require(vaultParams.asset == WETH, VaultErrors.INVALID_ASSET_ADDRESS);
-        require(msg.value > 0, VaultErrors.VALUE_EXCEEDS_MINIMUM);
+        require(vaultParams.asset == WETH, Errors.INVALID_ASSET_ADDRESS);
+        require(msg.value > 0, Errors.VALUE_EXCEEDS_MINIMUM);
 
         _depositFor(msg.value, msg.sender);
 
@@ -303,7 +304,7 @@ contract BaseVault is
      * @param amount is the amount of `asset` to deposit
      */
     function deposit(uint256 amount) external nonReentrant {
-        require(amount > 0, VaultErrors.VALUE_EXCEEDS_MINIMUM);
+        require(amount > 0, Errors.VALUE_EXCEEDS_MINIMUM);
 
         _depositFor(amount, msg.sender);
 
@@ -325,8 +326,8 @@ contract BaseVault is
         external
         nonReentrant
     {
-        require(amount > 0, VaultErrors.VALUE_EXCEEDS_MINIMUM);
-        require(creditor != address(0), VaultErrors.ADDRESS_NOT_PROVIDED);
+        require(amount > 0, Errors.VALUE_EXCEEDS_MINIMUM);
+        require(creditor != address(0), Errors.ADDRESS_NOT_PROVIDED);
 
         _depositFor(amount, creditor);
 
@@ -349,11 +350,11 @@ contract BaseVault is
 
         require(
             totalWithDepositedAmount <= vaultParams.cap,
-            VaultErrors.VAULT_CAP_EXCEEDED
+            Errors.VAULT_CAP_EXCEEDED
         );
         require(
             totalWithDepositedAmount >= vaultParams.minimumSupply,
-            VaultErrors.DEPOSIT_MINIMUM_NOT_MET
+            Errors.DEPOSIT_MINIMUM_NOT_MET
         );
 
         emit Deposit(creditor, amount, currentRound);
@@ -401,17 +402,17 @@ contract BaseVault is
         ];
 
         uint256 currentRound = vaultState.round;
-        require(amount > 0, VaultErrors.VALUE_EXCEEDS_MINIMUM);
+        require(amount > 0, Errors.VALUE_EXCEEDS_MINIMUM);
 
         require(
             depositReceipt.round == currentRound,
-            VaultErrors.INSTANT_WITHDRAWAL_ROUND_ENDED
+            Errors.INSTANT_WITHDRAWAL_ROUND_ENDED
         );
 
         uint256 receiptAmount = depositReceipt.amount;
         require(
             receiptAmount >= amount,
-            VaultErrors.WITHDRAWAL_AMOUNT_EXCEEDS_BALANCE
+            Errors.WITHDRAWAL_AMOUNT_EXCEEDS_BALANCE
         );
 
         // Subtraction underflow checks already ensure it is smaller than uint104
@@ -422,7 +423,7 @@ contract BaseVault is
 
         emit InstantWithdraw(msg.sender, amount, currentRound);
 
-        _transferAsset(msg.sender, amount);
+        VaultLogic.transferAsset(msg.sender, vaultParams.asset, WETH, amount);
     }
 
     /**
@@ -430,7 +431,7 @@ contract BaseVault is
      * @param numShares is the number of shares to withdraw
      */
     function initiateWithdraw(uint256 numShares) external nonReentrant {
-        require(numShares > 0, VaultErrors.VALUE_EXCEEDS_MINIMUM);
+        require(numShares > 0, Errors.VALUE_EXCEEDS_MINIMUM);
 
         /* We do a max redeem before initiating a withdrawal. But we check if they must first have unredeemed shares */
         if (
@@ -454,7 +455,7 @@ contract BaseVault is
         } else {
             require(
                 existingShares == 0,
-                VaultErrors.INITIATED_WITHDRAWAL_INCOMPLETE
+                Errors.INITIATED_WITHDRAWAL_INCOMPLETE
             );
 
             withdrawalShares = numShares;
@@ -471,7 +472,8 @@ contract BaseVault is
         ShareMath.assertUint128(newQueuedWithdrawShares);
         vaultState.queuedWithdrawShares = uint128(newQueuedWithdrawShares);
 
-        _safeTransferFrom(
+        // an setApprovalForAll() by the msg.sender is required beforehand
+        IKnoxToken(token).safeTransferFrom(
             msg.sender,
             address(this),
             Vault.LP_TOKEN_ID,
@@ -490,11 +492,11 @@ contract BaseVault is
         uint256 withdrawalRound = withdrawal.round;
 
         // This checks if there is a withdrawal
-        require(withdrawalShares > 0, VaultErrors.WITHDRAWAL_NOT_INITIATED);
+        require(withdrawalShares > 0, Errors.WITHDRAWAL_NOT_INITIATED);
 
         require(
             withdrawalRound < vaultState.round,
-            VaultErrors.VAULT_ROUND_NOT_CLOSED
+            Errors.VAULT_ROUND_NOT_CLOSED
         );
 
         // We leave the round number as non-zero to save on gas for subsequent writes
@@ -511,14 +513,20 @@ contract BaseVault is
 
         emit Withdraw(msg.sender, withdrawAmount, withdrawalShares);
 
-        _burn(address(this), Vault.LP_TOKEN_ID, withdrawalShares);
-
-        require(
-            withdrawAmount > 0,
-            VaultErrors.WITHDRAWAL_AMOUNT_EXCEEDS_MINIMUM
+        IKnoxToken(token).burn(
+            address(this),
+            Vault.LP_TOKEN_ID,
+            withdrawalShares
         );
 
-        _transferAsset(msg.sender, withdrawAmount);
+        require(withdrawAmount > 0, Errors.WITHDRAWAL_AMOUNT_EXCEEDS_MINIMUM);
+
+        VaultLogic.transferAsset(
+            msg.sender,
+            vaultParams.asset,
+            WETH,
+            withdrawAmount
+        );
 
         vaultState.queuedWithdrawals = uint128(
             uint256(vaultState.queuedWithdrawals).sub(withdrawAmount)
@@ -530,7 +538,7 @@ contract BaseVault is
      * @param numShares is the number of shares to redeem
      */
     function redeem(uint256 numShares) external nonReentrant {
-        require(numShares > 0, VaultErrors.REDEEMED_SHARES_EXCEEDS_MINIMUM);
+        require(numShares > 0, Errors.REDEEMED_SHARES_EXCEEDS_MINIMUM);
         _redeem(numShares, false);
     }
 
@@ -568,7 +576,7 @@ contract BaseVault is
 
         require(
             numShares <= unredeemedShares,
-            VaultErrors.REDEEMED_SHARES_EXCEEDS_BALANCE
+            Errors.REDEEMED_SHARES_EXCEEDS_BALANCE
         );
 
         /* If we have a depositReceipt on the same round, BUT we have some unredeemed shares we debit from the unredeemedShares, but leave the amount field intact If the round has past, with no new deposits, we just zero it out for new deposits. */
@@ -583,7 +591,7 @@ contract BaseVault is
 
         emit Redeem(msg.sender, numShares, depositReceipt.round);
 
-        _safeTransferFrom(
+        IKnoxToken(token).safeTransferFrom(
             address(this),
             msg.sender,
             Vault.LP_TOKEN_ID,
@@ -611,12 +619,14 @@ contract BaseVault is
         {
             require(
                 contractSize >= vaultParams.minimumContractSize,
-                VaultErrors.CONTRACT_SIZE_EXCEEDS_MINIMUM
+                Errors.CONTRACT_SIZE_EXCEEDS_MINIMUM
             );
+
+            uint256 value = strike64x64.mulu(contractSize);
 
             liquidityRequired = vaultParams.isCall
                 ? contractSize
-                : toBaseDecimals(strike64x64.mulu(contractSize));
+                : VaultLogic.toBaseDecimals(value, vaultParams);
 
             uint256 totalFreeLiquidity = IERC20(vaultParams.asset)
                 .balanceOf(address(this))
@@ -626,7 +636,7 @@ contract BaseVault is
 
             require(
                 totalFreeLiquidity >= liquidityRequired,
-                VaultErrors.FREE_LIQUIDTY_EXCEEDED
+                Errors.FREE_LIQUIDTY_EXCEEDED
             );
         }
 
@@ -639,7 +649,7 @@ contract BaseVault is
                 premium64x64,
                 isCall
             ),
-            VaultErrors.INVALID_SIGNATURE
+            Errors.INVALID_SIGNATURE
         );
 
         uint256 premiumAmount = premium64x64.mulu(contractSize);
@@ -675,7 +685,9 @@ contract BaseVault is
                 address(this)
             ) - vaultState.queuedPayouts;
 
-            uint256 tokenSupply = totalSupply(Vault.LP_TOKEN_ID);
+            uint256 tokenSupply = IKnoxToken(token).totalSupply(
+                Vault.LP_TOKEN_ID
+            );
 
             uint256 balanceForVaultFees = VaultLifecycle.getBalanceForVaultFees(
                 currentBalance,
@@ -736,10 +748,20 @@ contract BaseVault is
             vaultState.queuedWithdrawals = uint128(queuedWithdrawals);
         }
 
-        _mint(address(this), Vault.LP_TOKEN_ID, mintShares, "");
+        IKnoxToken(token).mint(
+            address(this),
+            Vault.LP_TOKEN_ID,
+            mintShares,
+            ""
+        );
 
         if (totalVaultFee > 0) {
-            _transferAsset(payable(recipient), totalVaultFee);
+            VaultLogic.transferAsset(
+                payable(recipient),
+                vaultParams.asset,
+                WETH,
+                totalVaultFee
+            );
         }
     }
 
@@ -765,32 +787,32 @@ contract BaseVault is
      *  HELPERS
      ***********************************************/
 
-    function toBaseDecimals(uint256 value) internal view returns (uint256) {
-        int128 value64x64 = ABDKMath64x64.divu(
-            value,
-            10**vaultParams.underlyingDecimals
-        );
+    // function toBaseDecimals(uint256 value) internal view returns (uint256) {
+    //     int128 value64x64 = ABDKMath64x64.divu(
+    //         value,
+    //         10**vaultParams.underlyingDecimals
+    //     );
 
-        return value64x64.mulu(10**vaultParams.assetDecimals);
-    }
+    //     return value64x64.mulu(10**vaultParams.assetDecimals);
+    // }
 
-    /**
-     * @notice Helper function to make either an ETH transfer or ERC20 transfer
-     * @param recipient is the receiving address
-     * @param amount is the transfer amount
-     */
-    function _transferAsset(address recipient, uint256 amount) internal {
-        address asset = vaultParams.asset;
+    // /**
+    //  * @notice Helper function to make either an ETH transfer or ERC20 transfer
+    //  * @param recipient is the receiving address
+    //  * @param amount is the transfer amount
+    //  */
+    // function transferAsset(address recipient, uint256 amount) internal {
+    //     address asset = vaultParams.asset;
 
-        if (asset == WETH) {
-            IWETH(WETH).withdraw(amount);
-            (bool success, ) = recipient.call{value: amount}("");
-            require(success, VaultErrors.TRANSFER_FAILED);
-            return;
-        }
+    //     if (asset == WETH) {
+    //         IWETH(WETH).withdraw(amount);
+    //         (bool success, ) = recipient.call{value: amount}("");
+    //         require(success, Errors.TRANSFER_FAILED);
+    //         return;
+    //     }
 
-        IERC20(asset).safeTransfer(recipient, amount);
-    }
+    //     IERC20(asset).safeTransfer(recipient, amount);
+    // }
 
     /**
      * @dev See {IERC1155Receiver-onERC1155Received}.
