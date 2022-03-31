@@ -119,6 +119,7 @@ function behavesLikeRibbonOptionsVault(params: {
 
   // Contracts
   let vaultLifecycleLib: Contract;
+  let vaultLogicLib: Contract;
   let vaultContract: Contract;
   let mockRegistry: Contract;
   let mockPremiaPool: Contract;
@@ -167,6 +168,9 @@ function behavesLikeRibbonOptionsVault(params: {
       const VaultLifecycle = await ethers.getContractFactory("VaultLifecycle");
       vaultLifecycleLib = await VaultLifecycle.deploy();
 
+      const VaultLogic = await ethers.getContractFactory("VaultLogic");
+      vaultLogicLib = await VaultLogic.deploy();
+
       mockRegistry = await new MockRegistry__factory(adminSigner).deploy(true);
 
       const initializeArgs = [
@@ -195,6 +199,7 @@ function behavesLikeRibbonOptionsVault(params: {
           {
             libraries: {
               VaultLifecycle: vaultLifecycleLib.address,
+              VaultLogic: vaultLogicLib.address,
             },
           }
         )
@@ -217,12 +222,6 @@ function behavesLikeRibbonOptionsVault(params: {
 
     after(async () => {
       await time.revertToSnapShot(initSnapshotId);
-    });
-
-    describe("#initialize", () => {
-      time.revertToSnapshotAfterEach(async function () {});
-
-      // it("initializes with correct values", async function () {});
     });
 
     describe("#purchase", () => {

@@ -1,5 +1,5 @@
 import { ethers, network } from "hardhat";
-import { Contract } from "ethers";
+import { Contract, ContractFactory } from "ethers";
 
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 
@@ -16,10 +16,12 @@ export async function deployProxy(
     "AdminUpgradeabilityProxy",
     adminSigner
   );
+
   const LogicContract = await ethers.getContractFactory(
     logicContractName,
     factoryOptions || {}
   );
+
   const logic = await LogicContract.deploy(...logicDeployParams);
 
   const initBytes = LogicContract.interface.encodeFunctionData(
@@ -32,6 +34,51 @@ export async function deployProxy(
     await adminSigner.getAddress(),
     initBytes
   );
+
+  return await ethers.getContractAt(logicContractName, proxy.address);
+}
+
+export async function deployLogicContract(
+  logicContractName: string,
+  adminSigner: SignerWithAddress,
+  logicDeployParams = [],
+  factoryOptions = {}
+) {
+  const AdminUpgradeabilityProxy = await ethers.getContractFactory(
+    "AdminUpgradeabilityProxy",
+    adminSigner
+  );
+  const LogicContract = await ethers.getContractFactory(
+    logicContractName,
+    factoryOptions || {}
+  );
+
+  return {
+    AdminUpgradeabilityProxyFactory: AdminUpgradeabilityProxy,
+    LogicContracFactory: LogicContract,
+    LogicContractInstance: await LogicContract.deploy(...logicDeployParams),
+  };
+}
+
+export async function initializeProxy(
+  logicContractName: string,
+  logicContractAddress: string,
+  adminSigner: SignerWithAddress,
+  initializeArgs: any[], // eslint-disable-line @typescript-eslint/no-explicit-any
+  LogicContracFactory: ContractFactory,
+  AdminUpgradeabilityProxyFactory: ContractFactory
+) {
+  const initBytes = LogicContracFactory.interface.encodeFunctionData(
+    "initialize",
+    initializeArgs
+  );
+
+  const proxy = await AdminUpgradeabilityProxyFactory.deploy(
+    logicContractAddress,
+    await adminSigner.getAddress(),
+    initBytes
+  );
+
   return await ethers.getContractAt(logicContractName, proxy.address);
 }
 
