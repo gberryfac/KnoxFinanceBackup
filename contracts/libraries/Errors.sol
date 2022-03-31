@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-library VaultErrors {
+library Errors {
     // @notice address provided cannot be 0x0
     string internal constant ADDRESS_NOT_PROVIDED = "0";
     // @notice address provided is not assigned keeper role
@@ -48,6 +48,8 @@ library VaultErrors {
     string internal constant WITHDRAWAL_AMOUNT_EXCEEDS_MINIMUM = "21";
     // @notice withdrawal has not been initiated
     string internal constant WITHDRAWAL_NOT_INITIATED = "22";
-    // @notice withdrawal has not been initiated
+    // @notice a claim for the provided longTokenID does not exist
     string internal constant CLAIM_NOT_FOUND = "23";
+    // @notice withdrawal has not been initiated
+    string internal constant CALLER_MUST_BE_VAULT = "24";
 }

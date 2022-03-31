@@ -5,7 +5,7 @@ import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 
 import "./ShareMath.sol";
 import "./Vault.sol";
-import "./VaultErrors.sol";
+import "./Errors.sol";
 
 import "hardhat/console.sol";
 
@@ -45,38 +45,29 @@ library VaultLifecycle {
         string calldata tokenName,
         Vault.VaultParams calldata _vaultParams
     ) external pure {
-        require(owner != address(0), VaultErrors.ADDRESS_NOT_PROVIDED);
-        require(keeper != address(0), VaultErrors.ADDRESS_NOT_PROVIDED);
-        require(feeRecipient != address(0), VaultErrors.ADDRESS_NOT_PROVIDED);
+        require(owner != address(0), Errors.ADDRESS_NOT_PROVIDED);
+        require(keeper != address(0), Errors.ADDRESS_NOT_PROVIDED);
+        require(feeRecipient != address(0), Errors.ADDRESS_NOT_PROVIDED);
         require(
             performanceFee < 100 * Vault.FEE_MULTIPLIER,
-            VaultErrors.INVALID_FEE_AMOUNT
+            Errors.INVALID_FEE_AMOUNT
         );
         require(
             managementFee < 100 * Vault.FEE_MULTIPLIER,
-            VaultErrors.INVALID_FEE_AMOUNT
+            Errors.INVALID_FEE_AMOUNT
         );
-        require(
-            bytes(tokenName).length > 0,
-            VaultErrors.VAULT_TOKEN_NAME_INVALID
-        );
+        require(bytes(tokenName).length > 0, Errors.VAULT_TOKEN_NAME_INVALID);
 
-        require(
-            _vaultParams.asset != address(0),
-            VaultErrors.ADDRESS_NOT_PROVIDED
-        );
-        require(
-            _vaultParams.underlying != address(0),
-            VaultErrors.ADDRESS_NOT_PROVIDED
-        );
-        require(
-            _vaultParams.minimumSupply > 0,
-            VaultErrors.VALUE_EXCEEDS_MINIMUM
-        );
-        require(_vaultParams.cap > 0, VaultErrors.VALUE_EXCEEDS_MINIMUM);
+        require(_vaultParams.asset != address(0), Errors.ADDRESS_NOT_PROVIDED);
+        // require(
+        //     _vaultParams.underlying != address(0),
+        //     Errors.ADDRESS_NOT_PROVIDED
+        // );
+        require(_vaultParams.minimumSupply > 0, Errors.VALUE_EXCEEDS_MINIMUM);
+        require(_vaultParams.cap > 0, Errors.VALUE_EXCEEDS_MINIMUM);
         require(
             _vaultParams.cap > _vaultParams.minimumSupply,
-            VaultErrors.VAULT_CAP_TOO_LOW
+            Errors.VAULT_CAP_TOO_LOW
         );
     }
 
