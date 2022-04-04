@@ -4,15 +4,14 @@ import { BigNumber, Contract } from "ethers";
 const { getContractAt } = ethers;
 const { parseUnits, parseEther } = ethers.utils;
 
-import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
-
 import * as utils from "./utils";
+import * as types from "./types";
 
 import { TEST_URI, BLOCK_NUMBER, WETH_ADDRESS } from "../../constants";
 
 const chainId = network.config.chainId;
 
-export async function getSignersandAddresses() {
+export async function getSigners(): Promise<types.Signers> {
   const [
     adminSigner,
     userSigner,
@@ -29,39 +28,32 @@ export async function getSignersandAddresses() {
     feeRecipient: feeRecipientSigner,
   };
 
+  return signers as types.Signers;
+}
+
+export async function getAddresses(
+  signers: types.Signers
+): Promise<types.Addresses> {
   const addresses = {
-    admin: adminSigner.address,
-    user: userSigner.address,
-    owner: ownerSigner.address,
-    keeper: keeperSigner.address,
-    feeRecipient: feeRecipientSigner.address,
+    admin: signers.admin.address,
+    user: signers.user.address,
+    owner: signers.owner.address,
+    keeper: signers.keeper.address,
+    feeRecipient: signers.feeRecipient.address,
   };
 
-  return [signers, addresses];
+  return addresses;
 }
 
 export async function impersonateWhale(
   whale: string,
   depositAsset: string,
   depositAssetDecimals: number,
-  signers: {
-    admin: SignerWithAddress;
-    user: SignerWithAddress;
-    owner: SignerWithAddress;
-    keeper: SignerWithAddress;
-    feeRecipient: SignerWithAddress;
-    whale: SignerWithAddress;
-  },
-  addresses: {
-    admin: string;
-    user: string;
-    owner: string;
-    keeper: string;
-    feeRecipient: string;
-    whale: string;
-  }
-) {
+  signers: types.Signers,
+  addresses: types.Addresses
+): Promise<[types.Signers, types.Addresses, Contract]> {
   addresses["whale"] = whale;
+
   const whaleSigner = await utils.impersonateWhale(addresses.whale, "1000");
   signers["whale"] = whaleSigner;
 
@@ -106,36 +98,9 @@ export async function getThetaVaultFixture(
   managementFee: BigNumber,
   performanceFee: BigNumber,
   isCall: boolean,
-  signers: {
-    admin: SignerWithAddress;
-    user: SignerWithAddress;
-    owner: SignerWithAddress;
-    keeper: SignerWithAddress;
-    feeRecipient: SignerWithAddress;
-    whale: SignerWithAddress;
-  },
-  addresses: {
-    admin: string;
-    user: string;
-    owner: string;
-    keeper: string;
-    feeRecipient: string;
-    whale: string;
-  }
-) {
-  // Reset block
-  await network.provider.request({
-    method: "hardhat_reset",
-    params: [
-      {
-        forking: {
-          jsonRpcUrl: TEST_URI[chainId],
-          blockNumber: BLOCK_NUMBER[chainId],
-        },
-      },
-    ],
-  });
-
+  signers: types.Signers,
+  addresses: types.Addresses
+): Promise<[Contract, Contract]> {
   const assetContract = await getContractAt("IAsset", depositAsset);
 
   const initializeArgs = [
@@ -163,7 +128,7 @@ export async function getThetaVaultFixture(
   const vaultContract = (
     await utils.deployProxy(
       "ThetaVault",
-      signers[0],
+      signers.admin,
       initializeArgs,
       [poolContract.address, WETH_ADDRESS[chainId], registryContact.address],
       {
@@ -173,19 +138,21 @@ export async function getThetaVaultFixture(
         },
       }
     )
-  ).connect(signers[4]);
+  ).connect(signers.user);
 
   const knoxTokenContract = (
     await utils.deployProxy(
       "KnoxToken",
-      signers[0],
+      signers.admin,
       [tokenName],
       [vaultContract.address],
       {}
     )
-  ).connect(signers[4]);
+  ).connect(signers.user);
 
   const knoxTokenAddress = knoxTokenContract.address;
 
-  await vaultContract.connect(signers[1]).setTokenAddress(knoxTokenAddress);
+  await vaultContract.connect(signers.owner).setTokenAddress(knoxTokenAddress);
+
+  return [vaultContract, knoxTokenContract];
 }
