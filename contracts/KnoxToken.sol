@@ -9,7 +9,6 @@ import "@openzeppelin/contracts-upgradeable/token/ERC1155/ERC1155Upgradeable.sol
 import "./libraries/Errors.sol";
 
 import "./interfaces/IKnoxToken.sol";
-import "./interfaces/IVault.sol";
 
 import "hardhat/console.sol";
 
