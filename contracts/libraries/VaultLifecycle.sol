@@ -59,6 +59,9 @@ library VaultLifecycle {
         require(bytes(tokenName).length > 0, Errors.VAULT_TOKEN_NAME_INVALID);
 
         require(_vaultParams.asset != address(0), Errors.ADDRESS_NOT_PROVIDED);
+
+        // TODO: VERIFY assetDecimals, underlyingDecimals, minimumContractSize
+
         // require(
         //     _vaultParams.underlying != address(0),
         //     Errors.ADDRESS_NOT_PROVIDED
