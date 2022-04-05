@@ -9,6 +9,9 @@ import { fixedFromFloat } from "@premia/utils";
 
 import * as time from "./helpers/time";
 import * as utils from "./helpers/utils";
+import * as fixtures from "./helpers/fixtures";
+import * as types from "./helpers/types";
+
 import { assert } from "./helpers/assertions";
 
 import {
@@ -86,21 +89,11 @@ function behavesLikeRibbonOptionsVault(params: {
   performanceFee: BigNumber;
   isCall: boolean;
 }) {
-  // Addresses
-  let admin: string,
-    owner: string,
-    keeper: string,
-    user: string,
-    feeRecipient: string,
-    whale = params.whale;
+  let signers: types.Signers;
+  let addresses: types.Addresses;
+  let knoxTokenAddress: string;
 
-  // Signers
-  let adminSigner: SignerWithAddress,
-    whaleSigner: SignerWithAddress,
-    userSigner: SignerWithAddress,
-    ownerSigner: SignerWithAddress,
-    keeperSigner: SignerWithAddress,
-    feeRecipientSigner: SignerWithAddress;
+  let whale = params.whale;
 
   // Parameters
   let pool = params.pool;
@@ -118,12 +111,13 @@ function behavesLikeRibbonOptionsVault(params: {
   let isCall = params.isCall;
 
   // Contracts
-  let vaultLifecycleLib: Contract;
-  let vaultLogicLib: Contract;
   let vaultContract: Contract;
   let mockRegistry: Contract;
   let mockPremiaPool: Contract;
   let assetContract: Contract;
+  let vaultLifecycleLibrary: Contract;
+  let vaultLogicLibrary: Contract;
+  let knoxTokenContract: Contract;
 
   describe.only(`${params.tokenName}`, () => {
     let initSnapshotId: string;
@@ -143,17 +137,10 @@ function behavesLikeRibbonOptionsVault(params: {
       });
 
       initSnapshotId = await time.takeSnapshot();
-
       block = await provider.getBlock(await provider.getBlockNumber());
 
-      [adminSigner, userSigner, ownerSigner, keeperSigner, feeRecipientSigner] =
-        await ethers.getSigners();
-
-      admin = adminSigner.address;
-      user = userSigner.address;
-      owner = ownerSigner.address;
-      keeper = keeperSigner.address;
-      feeRecipient = feeRecipientSigner.address;
+      signers = await fixtures.getSigners();
+      addresses = await fixtures.getAddresses(signers);
 
       assetContract = await getContractAt("IAsset", depositAsset);
 
@@ -166,58 +153,44 @@ function behavesLikeRibbonOptionsVault(params: {
       );
 
       const VaultLifecycle = await ethers.getContractFactory("VaultLifecycle");
-      vaultLifecycleLib = await VaultLifecycle.deploy();
+      vaultLifecycleLibrary = await VaultLifecycle.deploy();
 
       const VaultLogic = await ethers.getContractFactory("VaultLogic");
-      vaultLogicLib = await VaultLogic.deploy();
+      vaultLogicLibrary = await VaultLogic.deploy();
 
-      mockRegistry = await new MockRegistry__factory(adminSigner).deploy(true);
+      mockRegistry = await new MockRegistry__factory(signers.admin).deploy(
+        true
+      );
 
-      const initializeArgs = [
-        [owner, keeper, feeRecipient, managementFee, performanceFee, tokenName],
-        [
-          isCall,
-          tokenDecimals,
-          depositAssetDecimals,
-          assetContract.address,
-          underlyingAssetDecimals,
-          underlyingAsset,
-          minimumSupply,
-          minimumContractSize,
-          parseUnits("500", tokenDecimals > 18 ? tokenDecimals : 18),
-        ],
-      ];
+      [signers, addresses, assetContract] = await fixtures.impersonateWhale(
+        whale,
+        depositAsset,
+        depositAssetDecimals,
+        signers,
+        addresses
+      );
 
-      whaleSigner = await utils.impersonateWhale(whale, "1000");
+      [vaultContract, knoxTokenContract] = await fixtures.getThetaVaultFixture(
+        mockPremiaPool,
+        vaultLifecycleLibrary,
+        vaultLogicLibrary,
+        mockRegistry,
+        tokenName,
+        tokenDecimals,
+        depositAsset,
+        depositAssetDecimals,
+        underlyingAssetDecimals,
+        underlyingAsset,
+        minimumSupply,
+        minimumContractSize,
+        managementFee,
+        performanceFee,
+        isCall,
+        signers,
+        addresses
+      );
 
-      vaultContract = (
-        await utils.deployProxy(
-          "ThetaVault",
-          adminSigner,
-          initializeArgs,
-          [mockPremiaPool.address, WETH_ADDRESS[chainId], mockRegistry.address],
-          {
-            libraries: {
-              VaultLifecycle: vaultLifecycleLib.address,
-              VaultLogic: vaultLogicLib.address,
-            },
-          }
-        )
-      ).connect(whaleSigner);
-
-      if (depositAsset === WETH_ADDRESS[chainId]) {
-        await assetContract
-          .connect(whaleSigner)
-          .deposit({ value: parseEther("500") });
-
-        await assetContract
-          .connect(whaleSigner)
-          .transfer(admin, parseEther("300"));
-      } else {
-        await assetContract
-          .connect(whaleSigner)
-          .transfer(admin, parseUnits("1000000", depositAssetDecimals));
-      }
+      knoxTokenAddress = knoxTokenContract.address;
     });
 
     after(async () => {
@@ -235,7 +208,7 @@ function behavesLikeRibbonOptionsVault(params: {
 
         // Transfers enough liquidity in vault for transaction
         await assetContract
-          .connect(adminSigner)
+          .connect(signers.admin)
           .transfer(vaultContract.address, liquidity);
 
         let vaultState = await vaultContract.vaultState();
@@ -254,12 +227,12 @@ function behavesLikeRibbonOptionsVault(params: {
           isCall
         );
 
-        const whaleWrappedTokenBalance = await vaultContract.balanceOf(
-          whale,
+        const userWrappedTokenBalance = await knoxTokenContract.balanceOf(
+          addresses.user,
           LONG_TOKEN_ID
         );
 
-        assert.bnEqual(whaleWrappedTokenBalance, size);
+        assert.bnEqual(userWrappedTokenBalance, size);
       });
 
       it("tokenId's are correct", async function () {
@@ -277,7 +250,7 @@ function behavesLikeRibbonOptionsVault(params: {
 
         // transfers enough liquidity in vault for transaction
         await assetContract
-          .connect(adminSigner)
+          .connect(signers.admin)
           .transfer(vaultContract.address, liquidity);
 
         vaultState = await vaultContract.vaultState();
@@ -328,7 +301,7 @@ function behavesLikeRibbonOptionsVault(params: {
 
         await time.increaseTo(expiry);
 
-        await vaultContract.connect(keeperSigner).harvest();
+        await vaultContract.connect(signers.keeper).harvest();
 
         vaultState = await vaultContract.vaultState();
         round = vaultState.round;
@@ -379,7 +352,7 @@ function behavesLikeRibbonOptionsVault(params: {
 
         // transfers enough liquidity in vault for transaction
         await assetContract
-          .connect(adminSigner)
+          .connect(signers.admin)
           .transfer(vaultContract.address, liquidity);
 
         vaultState = await vaultContract.vaultState();
@@ -437,7 +410,7 @@ function behavesLikeRibbonOptionsVault(params: {
         let expiry = vaultState.expiry;
 
         await assetContract
-          .connect(adminSigner)
+          .connect(signers.admin)
           .transfer(vaultContract.address, liquidity);
 
         await vaultContract.purchase(
@@ -460,7 +433,7 @@ function behavesLikeRibbonOptionsVault(params: {
         assert.isTrue(payout.amount.isZero());
 
         let tx = vaultContract.closePosition(
-          whale,
+          addresses.user,
           LONG_TOKEN_ID,
           parseEther("1")
         );
@@ -480,7 +453,7 @@ function behavesLikeRibbonOptionsVault(params: {
         let expiry = vaultState.expiry;
 
         await time.increaseTo(expiry);
-        await vaultContract.connect(keeperSigner).harvest();
+        await vaultContract.connect(signers.keeper).harvest();
 
         vaultState = await vaultContract.vaultState();
         let round = vaultState.round - 1;
@@ -489,10 +462,13 @@ function behavesLikeRibbonOptionsVault(params: {
 
         assert.isFalse(payout.amount.isZero());
 
-        const balance = await vaultContract.balanceOf(whale, LONG_TOKEN_ID);
+        const balance = await knoxTokenContract.balanceOf(
+          addresses.user,
+          LONG_TOKEN_ID
+        );
 
         let tx = vaultContract.closePosition(
-          whale,
+          addresses.user,
           LONG_TOKEN_ID,
           balance.add(parseUnits("10", "wei"))
         );
@@ -502,14 +478,14 @@ function behavesLikeRibbonOptionsVault(params: {
 
       it("reverts if shares exceed users balance", async function () {
         await assetContract
-          .connect(adminSigner)
+          .connect(signers.admin)
           .transfer(vaultContract.address, liquidity);
 
         let vaultState = await vaultContract.vaultState();
         let expiry = vaultState.expiry;
 
         await vaultContract
-          .connect(userSigner)
+          .connect(signers.user2)
           .purchase(BYTES_ZERO, 0, expiry, strike64x64, 0, size, isCall);
 
         await mockPremiaPool.processExpired(
@@ -523,7 +499,7 @@ function behavesLikeRibbonOptionsVault(params: {
         expiry = vaultState.expiry;
 
         await time.increaseTo(expiry);
-        await vaultContract.connect(keeperSigner).harvest();
+        await vaultContract.connect(signers.keeper).harvest();
 
         vaultState = await vaultContract.vaultState();
         let round = vaultState.round - 1;
@@ -532,10 +508,13 @@ function behavesLikeRibbonOptionsVault(params: {
 
         assert.isFalse(payout.amount.isZero());
 
-        const balance = await vaultContract.balanceOf(whale, LONG_TOKEN_ID);
+        const balance = await knoxTokenContract.balanceOf(
+          addresses.user,
+          LONG_TOKEN_ID
+        );
 
         let tx = vaultContract.closePosition(
-          whale,
+          addresses.user,
           LONG_TOKEN_ID,
           balance.add(parseUnits("10", "wei"))
         );
@@ -557,45 +536,45 @@ function behavesLikeRibbonOptionsVault(params: {
         let expiry = vaultState.expiry;
 
         await time.increaseTo(expiry);
-        await vaultContract.connect(keeperSigner).harvest();
+        await vaultContract.connect(signers.keeper).harvest();
 
-        const whaleWrappedTokenBalanceBefore = await vaultContract.balanceOf(
-          whale,
+        const userWrappedTokenBalanceBefore = await knoxTokenContract.balanceOf(
+          addresses.user,
           LONG_TOKEN_ID
         );
 
         const balanceBefore =
           depositAsset === WETH_ADDRESS[chainId]
-            ? await whaleSigner.getBalance()
-            : await assetContract.balanceOf(whale);
+            ? await signers.user.getBalance()
+            : await assetContract.balanceOf(addresses.user);
 
         // Withdraw entire balance
         const tx = await vaultContract.closePosition(
-          whale,
+          addresses.user,
           LONG_TOKEN_ID,
-          whaleWrappedTokenBalanceBefore,
+          userWrappedTokenBalanceBefore,
           { gasPrice }
         );
 
         const receipt = await tx.wait();
         const gasFee = receipt.gasUsed.mul(gasPrice);
 
-        const whaleWrappedTokenBalanceAfter = await vaultContract.balanceOf(
-          whale,
+        const userWrappedTokenBalanceAfter = await knoxTokenContract.balanceOf(
+          addresses.user,
           LONG_TOKEN_ID
         );
 
         const balanceAfter =
           depositAsset === WETH_ADDRESS[chainId]
-            ? await whaleSigner.getBalance()
-            : await assetContract.balanceOf(whale);
+            ? await signers.user.getBalance()
+            : await assetContract.balanceOf(addresses.user);
 
         const amountClaimed =
           depositAsset === WETH_ADDRESS[chainId]
             ? balanceAfter.sub(balanceBefore).add(gasFee) // uses call.value to send ETH
             : balanceAfter.sub(balanceBefore);
 
-        assert.isTrue(whaleWrappedTokenBalanceAfter.isZero());
+        assert.isTrue(userWrappedTokenBalanceAfter.isZero());
 
         // Acceptable precision error is +/- 10 Wei
         assert.bnLte(
@@ -613,61 +592,61 @@ function behavesLikeRibbonOptionsVault(params: {
         let liquidity2 = isCall ? size2 : size2.mul(strike);
 
         await assetContract
-          .connect(adminSigner)
+          .connect(signers.admin)
           .transfer(vaultContract.address, liquidity2);
 
         let vaultState = await vaultContract.vaultState();
         let expiry = vaultState.expiry;
 
         await vaultContract
-          .connect(userSigner)
+          .connect(signers.user2)
           .purchase(BYTES_ZERO, 0, expiry, strike64x64, 0, size2, isCall);
 
-        let userLongHolderBalance = isCall
+        let user2LongHolderBalance = isCall
           ? bnSpot.sub(bnStrike).mul(size2).div(bnSpot)
           : bnStrike.sub(bnSpot).mul(size2);
 
-        let userShortHolderBalance = liquidity2.sub(userLongHolderBalance);
+        let user2ShortHolderBalance = liquidity2.sub(user2LongHolderBalance);
 
-        let whaleLongHolderBalance = longHolderBalance;
-        let whaleShortHolderBalance = shortHolderBalance;
+        let userLongHolderBalance = longHolderBalance;
+        let userShortHolderBalance = shortHolderBalance;
 
         await mockPremiaPool.processExpired(
           vaultContract.address,
-          whaleShortHolderBalance.add(userShortHolderBalance),
-          whaleLongHolderBalance.add(userLongHolderBalance),
+          userShortHolderBalance.add(user2ShortHolderBalance),
+          userLongHolderBalance.add(user2LongHolderBalance),
           isCall
         );
 
         await time.increaseTo(expiry);
 
-        await vaultContract.connect(keeperSigner).harvest();
-
-        const whaleBalanceBefore =
-          depositAsset === WETH_ADDRESS[chainId]
-            ? await whaleSigner.getBalance()
-            : await assetContract.balanceOf(whale);
+        await vaultContract.connect(signers.keeper).harvest();
 
         const userBalanceBefore =
           depositAsset === WETH_ADDRESS[chainId]
-            ? await userSigner.getBalance()
-            : await assetContract.balanceOf(user);
+            ? await signers.user.getBalance()
+            : await assetContract.balanceOf(addresses.user);
 
-        const whaleWrappedTokenBalance = await vaultContract.balanceOf(
-          whale,
+        const user2BalanceBefore =
+          depositAsset === WETH_ADDRESS[chainId]
+            ? await signers.user2.getBalance()
+            : await assetContract.balanceOf(addresses.user2);
+
+        const userWrappedTokenBalance = await knoxTokenContract.balanceOf(
+          addresses.user,
           LONG_TOKEN_ID
         );
 
-        const userWrappedTokenBalance = await vaultContract.balanceOf(
-          user,
+        const user2WrappedTokenBalance = await knoxTokenContract.balanceOf(
+          addresses.user2,
           LONG_TOKEN_ID
         );
 
         // Withdraw entire balance
         let tx1 = await vaultContract.closePosition(
-          whale,
+          addresses.user,
           LONG_TOKEN_ID,
-          whaleWrappedTokenBalance,
+          userWrappedTokenBalance,
           { gasPrice }
         );
 
@@ -675,50 +654,39 @@ function behavesLikeRibbonOptionsVault(params: {
         const gasFee1 = receipt1.gasUsed.mul(gasPrice);
 
         let tx2 = await vaultContract
-          .connect(userSigner)
-          .closePosition(user, LONG_TOKEN_ID, userWrappedTokenBalance, {
-            gasPrice,
-          });
+          .connect(signers.user2)
+          .closePosition(
+            addresses.user2,
+            LONG_TOKEN_ID,
+            user2WrappedTokenBalance,
+            {
+              gasPrice,
+            }
+          );
 
         const receipt2 = await tx2.wait();
         const gasFee2 = receipt2.gasUsed.mul(gasPrice);
 
         assert.isTrue(
-          await (await vaultContract.balanceOf(whale, LONG_TOKEN_ID)).isZero()
+          await (
+            await knoxTokenContract.balanceOf(addresses.user, LONG_TOKEN_ID)
+          ).isZero()
         );
 
         assert.isTrue(
-          await (await vaultContract.balanceOf(user, LONG_TOKEN_ID)).isZero()
-        );
-
-        const whaleBalanceAfter =
-          depositAsset === WETH_ADDRESS[chainId]
-            ? await whaleSigner.getBalance()
-            : await assetContract.balanceOf(whale);
-
-        const whaleAmountClaimed =
-          depositAsset === WETH_ADDRESS[chainId]
-            ? whaleBalanceAfter.sub(whaleBalanceBefore).add(gasFee1) // uses call.value to send ETH
-            : whaleBalanceAfter.sub(whaleBalanceBefore);
-
-        // Acceptable precision error is +/- 10 Wei
-        assert.bnLte(
-          whaleLongHolderBalance,
-          whaleAmountClaimed.add(parseUnits("10", "wei"))
-        );
-        assert.bnGte(
-          whaleLongHolderBalance,
-          whaleAmountClaimed.sub(parseUnits("10", "wei"))
+          await (
+            await knoxTokenContract.balanceOf(addresses.user2, LONG_TOKEN_ID)
+          ).isZero()
         );
 
         const userBalanceAfter =
           depositAsset === WETH_ADDRESS[chainId]
-            ? await userSigner.getBalance()
-            : await assetContract.balanceOf(user);
+            ? await signers.user.getBalance()
+            : await assetContract.balanceOf(addresses.user);
 
         const userAmountClaimed =
           depositAsset === WETH_ADDRESS[chainId]
-            ? userBalanceAfter.sub(userBalanceBefore).add(gasFee2) // uses call.value to send ETH
+            ? userBalanceAfter.sub(userBalanceBefore).add(gasFee1) // uses call.value to send ETH
             : userBalanceAfter.sub(userBalanceBefore);
 
         // Acceptable precision error is +/- 10 Wei
@@ -729,6 +697,26 @@ function behavesLikeRibbonOptionsVault(params: {
         assert.bnGte(
           userLongHolderBalance,
           userAmountClaimed.sub(parseUnits("10", "wei"))
+        );
+
+        const user2BalanceAfter =
+          depositAsset === WETH_ADDRESS[chainId]
+            ? await signers.user2.getBalance()
+            : await assetContract.balanceOf(addresses.user2);
+
+        const user2AmountClaimed =
+          depositAsset === WETH_ADDRESS[chainId]
+            ? user2BalanceAfter.sub(user2BalanceBefore).add(gasFee2) // uses call.value to send ETH
+            : user2BalanceAfter.sub(user2BalanceBefore);
+
+        // Acceptable precision error is +/- 10 Wei
+        assert.bnLte(
+          user2LongHolderBalance,
+          user2AmountClaimed.add(parseUnits("10", "wei"))
+        );
+        assert.bnGte(
+          user2LongHolderBalance,
+          user2AmountClaimed.sub(parseUnits("10", "wei"))
         );
       });
     });
@@ -744,7 +732,7 @@ function behavesLikeRibbonOptionsVault(params: {
         let expiry = vaultState.expiry;
 
         await assetContract
-          .connect(adminSigner)
+          .connect(signers.admin)
           .transfer(vaultContract.address, liquidity);
 
         await vaultContract.purchase(
@@ -760,7 +748,7 @@ function behavesLikeRibbonOptionsVault(params: {
 
       it("reverts if round has not expired", async function () {
         await expect(
-          vaultContract.connect(keeperSigner).harvest()
+          vaultContract.connect(signers.keeper).harvest()
         ).to.be.revertedWith("19");
       });
 
@@ -790,7 +778,7 @@ function behavesLikeRibbonOptionsVault(params: {
 
         await time.increaseTo(expiry);
 
-        await vaultContract.connect(keeperSigner).harvest();
+        await vaultContract.connect(signers.keeper).harvest();
 
         const balanceAfter = await assetContract.balanceOf(
           vaultContract.address
@@ -824,7 +812,7 @@ function behavesLikeRibbonOptionsVault(params: {
 
         await time.increaseTo(expiry);
 
-        await vaultContract.connect(keeperSigner).harvest();
+        await vaultContract.connect(signers.keeper).harvest();
 
         vaultState = await vaultContract.vaultState();
         expiry = vaultState.expiry;
@@ -839,7 +827,7 @@ function behavesLikeRibbonOptionsVault(params: {
         assert.bnEqual(
           pricePerShare0,
           fixedFromFloat(longHolderBalance).div(
-            await vaultContract.totalSupply(longTokenId)
+            await knoxTokenContract.totalSupply(longTokenId)
           )
         );
 
@@ -851,7 +839,7 @@ function behavesLikeRibbonOptionsVault(params: {
         strike64x64 = fixedFromFloat(strike);
 
         await assetContract
-          .connect(adminSigner)
+          .connect(signers.admin)
           .transfer(vaultContract.address, liquidity);
 
         await vaultContract.purchase(
@@ -886,7 +874,7 @@ function behavesLikeRibbonOptionsVault(params: {
 
         await time.increaseTo(expiry);
 
-        await vaultContract.connect(keeperSigner).harvest();
+        await vaultContract.connect(signers.keeper).harvest();
 
         let roundPayout1 = await vaultContract.payouts(round);
         let amount1 = roundPayout1.amount;
@@ -896,7 +884,7 @@ function behavesLikeRibbonOptionsVault(params: {
         assert.bnEqual(
           pricePerShare1,
           fixedFromFloat(longHolderBalance).div(
-            await vaultContract.totalSupply(LONG_TOKEN_ID + round)
+            await knoxTokenContract.totalSupply(LONG_TOKEN_ID + round)
           )
         );
       });

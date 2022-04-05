@@ -15,6 +15,7 @@ export async function getSigners(): Promise<types.Signers> {
   const [
     adminSigner,
     userSigner,
+    user2Signer,
     ownerSigner,
     keeperSigner,
     feeRecipientSigner,
@@ -23,6 +24,7 @@ export async function getSigners(): Promise<types.Signers> {
   const signers = {
     admin: adminSigner,
     user: userSigner,
+    user2: user2Signer,
     owner: ownerSigner,
     keeper: keeperSigner,
     feeRecipient: feeRecipientSigner,
@@ -37,6 +39,7 @@ export async function getAddresses(
   const addresses = {
     admin: signers.admin.address,
     user: signers.user.address,
+    user2: signers.user2.address,
     owner: signers.owner.address,
     keeper: signers.keeper.address,
     feeRecipient: signers.feeRecipient.address,
@@ -54,7 +57,7 @@ export async function impersonateWhale(
 ): Promise<[types.Signers, types.Addresses, Contract]> {
   addresses["whale"] = whale;
 
-  const whaleSigner = await utils.impersonateWhale(addresses.whale, "1000");
+  const whaleSigner = await utils.impersonateWhale(addresses.whale, "1500");
   signers["whale"] = whaleSigner;
 
   const assetContract = await getContractAt("IAsset", depositAsset);
@@ -62,21 +65,27 @@ export async function impersonateWhale(
   if (depositAsset === WETH_ADDRESS[chainId]) {
     await assetContract
       .connect(signers.whale)
-      .deposit({ value: parseEther("750") });
+      .deposit({ value: parseEther("700") });
 
     await assetContract
       .connect(signers.whale)
-      .transfer(addresses.admin, parseEther("300"));
+      .transfer(addresses.admin, parseEther("100"));
     await assetContract
       .connect(signers.whale)
-      .transfer(addresses.user, parseEther("300"));
+      .transfer(addresses.user, parseEther("200"));
+    await assetContract
+      .connect(signers.whale)
+      .transfer(addresses.user2, parseEther("200"));
   } else {
     await assetContract
       .connect(signers.whale)
-      .transfer(addresses.admin, parseUnits("10000000", depositAssetDecimals));
+      .transfer(addresses.admin, parseUnits("1000000", depositAssetDecimals));
     await assetContract
       .connect(signers.whale)
-      .transfer(addresses.user, parseUnits("10000000", depositAssetDecimals));
+      .transfer(addresses.user, parseUnits("1000000", depositAssetDecimals));
+    await assetContract
+      .connect(signers.whale)
+      .transfer(addresses.user2, parseUnits("1000000", depositAssetDecimals));
   }
 
   return [signers, addresses, assetContract];

@@ -107,7 +107,6 @@ contract ThetaVault is BaseVault {
         uint256 amount = ABDKMath64x64.mulu(payout.pricePerShare, shares);
 
         require(payout.amount > 0, Errors.CLAIM_NOT_FOUND);
-
         require(amount <= payout.amount, Errors.CLAIM_AMOUNT_EXCEEDS_BALANCE);
 
         payout.amount -= amount;
@@ -116,7 +115,6 @@ contract ThetaVault is BaseVault {
         payouts[round] = payout;
 
         IKnoxToken(token).burn(account, longTokenId, shares);
-
         VaultLogic.transferAsset(account, vaultParams.asset, WETH, amount);
     }
 
