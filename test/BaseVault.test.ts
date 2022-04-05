@@ -6,10 +6,8 @@ const { parseUnits, parseEther } = ethers.utils;
 
 import { expect } from "chai";
 import moment from "moment-timezone";
-import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 
 import * as time from "./helpers/time";
-import * as utils from "./helpers/utils";
 import * as fixtures from "./helpers/fixtures";
 import * as types from "./helpers/types";
 
@@ -26,7 +24,6 @@ import {
   WETH_DECIMALS,
   DAI_DECIMALS,
   DAI_ADDRESS,
-  ADDRESS_ONE,
 } from "../constants";
 
 import { MockRegistry__factory } from "../types";

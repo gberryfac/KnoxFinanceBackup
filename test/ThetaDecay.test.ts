@@ -8,7 +8,6 @@ import { expect } from "chai";
 import { fixedFromFloat } from "@premia/utils";
 
 import * as time from "./helpers/time";
-import * as utils from "./helpers/utils";
 import * as fixtures from "./helpers/fixtures";
 import * as types from "./helpers/types";
 
@@ -27,8 +26,6 @@ import {
 } from "../constants";
 
 import { MockRegistry__factory } from "../types";
-
-import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 
 const chainId = network.config.chainId;
 const gasPrice = parseUnits("100", "gwei");
