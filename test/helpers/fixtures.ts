@@ -93,6 +93,7 @@ export async function impersonateWhale(
 
 export async function getThetaVaultFixture(
   poolContract: Contract,
+  vaultDisplayLibrary: Contract,
   vaultLifecycleLibrary: Contract,
   vaultLogicLibrary: Contract,
   registryContact: Contract,
@@ -142,6 +143,7 @@ export async function getThetaVaultFixture(
       [poolContract.address, WETH_ADDRESS[chainId], registryContact.address],
       {
         libraries: {
+          VaultDisplay: vaultDisplayLibrary.address,
           VaultLifecycle: vaultLifecycleLibrary.address,
           VaultLogic: vaultLogicLibrary.address,
         },

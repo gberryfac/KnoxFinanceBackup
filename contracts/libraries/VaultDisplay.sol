@@ -4,14 +4,11 @@ pragma solidity ^0.8.0;
 import "./../interfaces/IKnoxToken.sol";
 import "../libraries/ShareMath.sol";
 import "../libraries/Vault.sol";
-import "../vaults/BaseVault.sol";
 
 import "hardhat/console.sol";
 
-contract VaultDisplay {
+library VaultDisplay {
     using ShareMath for Vault.DepositReceipt;
-
-    constructor() {}
 
     /**
      * @notice Returns the asset balance held on the vault for the account
@@ -19,17 +16,18 @@ contract VaultDisplay {
      * @return the amount of `asset` custodied by the vault for the user
      */
     function accountVaultBalance(
-        uint256 decimals,
         uint256 round,
+        uint256 decimals,
         uint256 queuedDeposits,
-        BaseVault vault,
+        uint256 totalBalance,
         address account,
         address token,
-        Vault.DepositReceipt memory depositReceipt
-    ) public view returns (uint256) {
+        Vault.DepositReceipt memory depositReceipt,
+        mapping(uint256 => uint256) storage lpTokenPricePerShare
+    ) external view returns (uint256) {
         uint256 assetPerShare = ShareMath.pricePerShare(
             IKnoxToken(token).totalSupply(Vault.LP_TOKEN_ID),
-            vault.totalBalance(),
+            totalBalance,
             queuedDeposits,
             decimals
         );
@@ -37,12 +35,12 @@ contract VaultDisplay {
         return
             ShareMath.sharesToAsset(
                 lpShares(
-                    decimals,
                     round,
-                    vault,
+                    decimals,
                     account,
                     token,
-                    depositReceipt
+                    depositReceipt,
+                    lpTokenPricePerShare
                 ),
                 assetPerShare,
                 decimals
@@ -55,20 +53,20 @@ contract VaultDisplay {
      * @return the share balance
      */
     function lpShares(
-        uint256 decimals,
         uint256 round,
-        BaseVault vault,
+        uint256 decimals,
         address account,
         address token,
-        Vault.DepositReceipt memory depositReceipt
+        Vault.DepositReceipt memory depositReceipt,
+        mapping(uint256 => uint256) storage lpTokenPricePerShare
     ) public view returns (uint256) {
         (uint256 heldByAccount, uint256 heldByVault) = lpShareBalances(
-            decimals,
             round,
-            vault,
+            decimals,
             account,
             token,
-            depositReceipt
+            depositReceipt,
+            lpTokenPricePerShare
         );
 
         return heldByAccount + heldByVault;
@@ -81,12 +79,12 @@ contract VaultDisplay {
      * @return heldByVault is the shares held on the vault (unredeemedShares)
      */
     function lpShareBalances(
-        uint256 decimals,
         uint256 round,
-        BaseVault vault,
+        uint256 decimals,
         address account,
         address token,
-        Vault.DepositReceipt memory depositReceipt
+        Vault.DepositReceipt memory depositReceipt,
+        mapping(uint256 => uint256) storage lpTokenPricePerShare
     ) public view returns (uint256 heldByAccount, uint256 heldByVault) {
         if (depositReceipt.round < ShareMath.PLACEHOLDER_UINT) {
             return (IKnoxToken(token).balanceOf(account, Vault.LP_TOKEN_ID), 0);
@@ -94,7 +92,7 @@ contract VaultDisplay {
 
         uint256 unredeemedShares = depositReceipt.getSharesFromReceipt(
             round,
-            vault.lpTokenPricePerShare(depositReceipt.round),
+            lpTokenPricePerShare[depositReceipt.round],
             decimals
         );
 
@@ -110,13 +108,13 @@ contract VaultDisplay {
     function lpPricePerShare(
         uint256 decimals,
         uint256 queuedDeposits,
-        BaseVault vault,
+        uint256 totalBalance,
         address token
-    ) public view returns (uint256) {
+    ) external view returns (uint256) {
         return
             ShareMath.pricePerShare(
                 IKnoxToken(token).totalSupply(Vault.LP_TOKEN_ID),
-                vault.totalBalance(),
+                totalBalance,
                 queuedDeposits,
                 decimals
             );

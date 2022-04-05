@@ -157,9 +157,9 @@ function behavesLikeRibbonOptionsVault(params: {
   let isCall = params.isCall;
 
   // Contracts
+  let vaultDisplayLibrary: Contract;
   let vaultLifecycleLibrary: Contract;
   let vaultLogicLibrary: Contract;
-  let vaultDisplayLib: Contract;
   let vaultContract: Contract;
   let mockRegistry: Contract;
   let assetContract: Contract;
@@ -198,7 +198,7 @@ function behavesLikeRibbonOptionsVault(params: {
       );
 
       const VaultDisplay = await ethers.getContractFactory("VaultDisplay");
-      vaultDisplayLib = await VaultDisplay.deploy();
+      vaultDisplayLibrary = await VaultDisplay.deploy();
 
       const VaultLifecycle = await ethers.getContractFactory("VaultLifecycle");
       vaultLifecycleLibrary = await VaultLifecycle.deploy();
@@ -222,6 +222,7 @@ function behavesLikeRibbonOptionsVault(params: {
 
       [vaultContract, knoxTokenContract] = await fixtures.getThetaVaultFixture(
         mockPremiaPool,
+        vaultDisplayLibrary,
         vaultLifecycleLibrary,
         vaultLogicLibrary,
         mockRegistry,
@@ -252,6 +253,7 @@ function behavesLikeRibbonOptionsVault(params: {
       time.revertToSnapshotAfterEach(async function () {
         const BaseVault = await ethers.getContractFactory("BaseVault", {
           libraries: {
+            VaultDisplay: vaultDisplayLibrary.address,
             VaultLifecycle: vaultLifecycleLibrary.address,
             VaultLogic: vaultLogicLibrary.address,
           },
@@ -681,14 +683,7 @@ function behavesLikeRibbonOptionsVault(params: {
         );
 
         assert.bnEqual(
-          await vaultDisplayLib.lpShares(
-            decimals,
-            round,
-            vaultContract.address,
-            addresses.user,
-            knoxTokenAddress,
-            userDepositReceipt
-          ),
+          await vaultContract.lpShares(addresses.user),
           depositAmount
         );
 
@@ -705,14 +700,7 @@ function behavesLikeRibbonOptionsVault(params: {
         // Share balance should remain the same because the 1 share
         // is transferred to the user
         assert.bnEqual(
-          await vaultDisplayLib.lpShares(
-            decimals,
-            round,
-            vaultContract.address,
-            addresses.user,
-            knoxTokenAddress,
-            userDepositReceipt
-          ),
+          await vaultContract.lpShares(addresses.user),
           depositAmount
         );
 
@@ -732,26 +720,12 @@ function behavesLikeRibbonOptionsVault(params: {
         );
 
         assert.bnEqual(
-          await vaultDisplayLib.lpShares(
-            decimals,
-            round,
-            vaultContract.address,
-            addresses.user,
-            knoxTokenAddress,
-            userDepositReceipt
-          ),
+          await vaultContract.lpShares(addresses.user),
           depositAmount.sub(redeemAmount)
         );
 
         assert.bnEqual(
-          await vaultDisplayLib.lpShares(
-            decimals,
-            round,
-            vaultContract.address,
-            addresses.owner,
-            knoxTokenAddress,
-            ownerDepositReceipt
-          ),
+          await vaultContract.lpShares(addresses.owner),
           redeemAmount
         );
       });
@@ -780,14 +754,7 @@ function behavesLikeRibbonOptionsVault(params: {
         );
 
         assert.bnEqual(
-          await vaultDisplayLib.lpShares(
-            decimals,
-            round,
-            vaultContract.address,
-            addresses.user,
-            knoxTokenAddress,
-            userDepositReceipt
-          ),
+          await vaultContract.lpShares(addresses.user),
           depositAmount
         );
 
@@ -799,14 +766,7 @@ function behavesLikeRibbonOptionsVault(params: {
         );
 
         assert.bnEqual(
-          await vaultDisplayLib.lpShares(
-            decimals,
-            round,
-            vaultContract.address,
-            addresses.user,
-            knoxTokenAddress,
-            userDepositReceipt
-          ),
+          await vaultContract.lpShares(addresses.user),
           depositAmount
         );
       });
@@ -839,14 +799,7 @@ function behavesLikeRibbonOptionsVault(params: {
         );
 
         const [heldByAccount1, heldByVault1] =
-          await vaultDisplayLib.lpShareBalances(
-            decimals,
-            round,
-            vaultContract.address,
-            addresses.user,
-            knoxTokenAddress,
-            userDepositReceipt
-          );
+          await vaultContract.lpShareBalances(addresses.user);
 
         assert.bnEqual(heldByAccount1, BigNumber.from(0));
         assert.bnEqual(heldByVault1, depositAmount);
@@ -858,14 +811,7 @@ function behavesLikeRibbonOptionsVault(params: {
         );
 
         const [heldByAccount2, heldByVault2] =
-          await vaultDisplayLib.lpShareBalances(
-            decimals,
-            round,
-            vaultContract.address,
-            addresses.user,
-            knoxTokenAddress,
-            userDepositReceipt
-          );
+          await vaultContract.lpShareBalances(addresses.user);
 
         assert.bnEqual(heldByAccount2, BigNumber.from(1));
         assert.bnEqual(heldByVault2, depositAmount.sub(1));
@@ -876,9 +822,9 @@ function behavesLikeRibbonOptionsVault(params: {
       time.revertToSnapshotAfterEach();
 
       // TODO: Finish test
-      // it("returns a lesser underlyingAsset amount for user", async function () {
-      //   assert.isFalse(true);
-      // });
+      it("returns a lesser underlyingAsset amount for user", async function () {
+        assert.isFalse(true);
+      });
     });
 
     describe("#withdrawInstantly", () => {
@@ -983,7 +929,7 @@ function behavesLikeRibbonOptionsVault(params: {
 
       // // Should decrement the pending amounts
       // assert.bnEqual(
-      //   await vaultDisplayLib.queuedDeposits(vaultContract.address),
+      //   await vaultDisplayLibrary.queuedDeposits(vaultContract.address),
       //   BigNumber.from(0)
       // );
       // });
@@ -1840,7 +1786,7 @@ function behavesLikeRibbonOptionsVault(params: {
       //     .mul(pricePerShare)
       //     .div(
       //       BigNumber.from(10).pow(
-      //         await vaultDisplayLib.decimals(vaultContract.address)
+      //         await vaultDisplayLibrary.decimals(vaultContract.address)
       //       )
       //     );
       //   const lastQueuedWithdrawAmount = await vaultContract.lastQueuedWithdrawAmount();

@@ -12,9 +12,10 @@ import "./../interfaces/IKnoxToken.sol";
 import "./../interfaces/IRegistry.sol";
 import "./../interfaces/IWETH.sol";
 
+import "./../libraries/Errors.sol";
 import "./../libraries/ShareMath.sol";
 import "./../libraries/Vault.sol";
-import "./../libraries/Errors.sol";
+import "./../libraries/VaultDisplay.sol";
 import "./../libraries/VaultLifecycle.sol";
 import "./../libraries/VaultLogic.sol";
 
@@ -787,32 +788,74 @@ contract BaseVault is OwnableUpgradeable, ReentrancyGuardUpgradeable {
      *  HELPERS
      ***********************************************/
 
-    // function toBaseDecimals(uint256 value) internal view returns (uint256) {
-    //     int128 value64x64 = ABDKMath64x64.divu(
-    //         value,
-    //         10**vaultParams.underlyingDecimals
-    //     );
+    function accountVaultBalance(address account)
+        external
+        view
+        returns (uint256)
+    {
+        return
+            VaultDisplay.accountVaultBalance(
+                vaultState.round,
+                vaultParams.decimals,
+                vaultState.queuedDeposits,
+                totalBalance(),
+                account,
+                token,
+                depositReceipts[account],
+                lpTokenPricePerShare
+            );
+    }
 
-    //     return value64x64.mulu(10**vaultParams.assetDecimals);
-    // }
+    /**
+     * @notice Getter for returning the account's share balance including unredeemed shares
+     * @param account is the account to lookup share balance for
+     * @return the share balance
+     */
+    function lpShares(address account) external view returns (uint256) {
+        return
+            VaultDisplay.lpShares(
+                vaultState.round,
+                vaultParams.decimals,
+                account,
+                token,
+                depositReceipts[account],
+                lpTokenPricePerShare
+            );
+    }
 
-    // /**
-    //  * @notice Helper function to make either an ETH transfer or ERC20 transfer
-    //  * @param recipient is the receiving address
-    //  * @param amount is the transfer amount
-    //  */
-    // function transferAsset(address recipient, uint256 amount) internal {
-    //     address asset = vaultParams.asset;
+    /**
+     * @notice Getter for returning the account's share balance split between account and vault holdings
+     * @param account is the account to lookup share balance for
+     * @return heldByAccount is the shares held by account
+     * @return heldByVault is the shares held on the vault (unredeemedShares)
+     */
+    function lpShareBalances(address account)
+        external
+        view
+        returns (uint256 heldByAccount, uint256 heldByVault)
+    {
+        (heldByAccount, heldByVault) = VaultDisplay.lpShareBalances(
+            vaultState.round,
+            vaultParams.decimals,
+            account,
+            token,
+            depositReceipts[account],
+            lpTokenPricePerShare
+        );
+    }
 
-    //     if (asset == WETH) {
-    //         IWETH(WETH).withdraw(amount);
-    //         (bool success, ) = recipient.call{value: amount}("");
-    //         require(success, Errors.TRANSFER_FAILED);
-    //         return;
-    //     }
-
-    //     IERC20(asset).safeTransfer(recipient, amount);
-    // }
+    /**
+     * @notice The price of a unit of share denominated in the `asset`
+     */
+    function lpPricePerShare() external view returns (uint256) {
+        return
+            VaultDisplay.lpPricePerShare(
+                vaultParams.decimals,
+                vaultState.queuedDeposits,
+                totalBalance(),
+                token
+            );
+    }
 
     /**
      * @dev See {IERC1155Receiver-onERC1155Received}.
