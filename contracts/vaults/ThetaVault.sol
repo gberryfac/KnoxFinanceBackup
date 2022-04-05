@@ -33,7 +33,7 @@ contract ThetaVault is BaseVault {
         address _weth,
         address _registry
     ) BaseVault(_weth, _registry) {
-        require(_pool != address(0), VaultErrors.ADDRESS_NOT_PROVIDED);
+        require(_pool != address(0), Errors.ADDRESS_NOT_PROVIDED);
         pool = _pool;
     }
 
@@ -93,7 +93,7 @@ contract ThetaVault is BaseVault {
 
         vaultState.lockedCollateral += uint104(liquidityRequired);
 
-        _mint(msg.sender, longTokenId, contractSize, "");
+        IKnoxToken(token).mint(msg.sender, longTokenId, contractSize, "");
     }
 
     function closePosition(
@@ -106,27 +106,22 @@ contract ThetaVault is BaseVault {
 
         uint256 amount = ABDKMath64x64.mulu(payout.pricePerShare, shares);
 
-        require(payout.amount > 0, VaultErrors.CLAIM_NOT_FOUND);
-
-        require(
-            amount <= payout.amount,
-            VaultErrors.CLAIM_AMOUNT_EXCEEDS_BALANCE
-        );
+        require(payout.amount > 0, Errors.CLAIM_NOT_FOUND);
+        require(amount <= payout.amount, Errors.CLAIM_AMOUNT_EXCEEDS_BALANCE);
 
         payout.amount -= amount;
         vaultState.queuedPayouts -= uint128(amount);
 
         payouts[round] = payout;
 
-        _burn(account, longTokenId, shares);
-
-        _transferAsset(account, amount);
+        IKnoxToken(token).burn(account, longTokenId, shares);
+        VaultLogic.transferAsset(account, vaultParams.asset, WETH, amount);
     }
 
     function harvest() external nonReentrant onlyKeeper {
         require(
             block.timestamp >= vaultState.expiry,
-            VaultErrors.VAULT_ROUND_NOT_CLOSED
+            Errors.VAULT_ROUND_NOT_CLOSED
         );
 
         bool isCall = vaultParams.isCall;
@@ -162,7 +157,7 @@ contract ThetaVault is BaseVault {
             payout.amount = liquidatedLongPosition;
             payout.pricePerShare = ABDKMath64x64.divu(
                 liquidatedLongPosition,
-                totalSupply(payout.longTokenId)
+                IKnoxToken(token).totalSupply(payout.longTokenId)
             );
 
             payouts[round] = payout;

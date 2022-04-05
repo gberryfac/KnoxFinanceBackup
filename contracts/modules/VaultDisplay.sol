@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+import "./../interfaces/IKnoxToken.sol";
 import "../libraries/ShareMath.sol";
 import "../libraries/Vault.sol";
 import "../vaults/BaseVault.sol";
@@ -23,10 +24,11 @@ contract VaultDisplay {
         uint256 queuedDeposits,
         BaseVault vault,
         address account,
+        address token,
         Vault.DepositReceipt memory depositReceipt
     ) public view returns (uint256) {
         uint256 assetPerShare = ShareMath.pricePerShare(
-            vault.totalSupply(Vault.LP_TOKEN_ID),
+            IKnoxToken(token).totalSupply(Vault.LP_TOKEN_ID),
             vault.totalBalance(),
             queuedDeposits,
             decimals
@@ -34,7 +36,14 @@ contract VaultDisplay {
 
         return
             ShareMath.sharesToAsset(
-                lpShares(decimals, round, vault, account, depositReceipt),
+                lpShares(
+                    decimals,
+                    round,
+                    vault,
+                    account,
+                    token,
+                    depositReceipt
+                ),
                 assetPerShare,
                 decimals
             );
@@ -50,6 +59,7 @@ contract VaultDisplay {
         uint256 round,
         BaseVault vault,
         address account,
+        address token,
         Vault.DepositReceipt memory depositReceipt
     ) public view returns (uint256) {
         (uint256 heldByAccount, uint256 heldByVault) = lpShareBalances(
@@ -57,6 +67,7 @@ contract VaultDisplay {
             round,
             vault,
             account,
+            token,
             depositReceipt
         );
 
@@ -74,10 +85,11 @@ contract VaultDisplay {
         uint256 round,
         BaseVault vault,
         address account,
+        address token,
         Vault.DepositReceipt memory depositReceipt
     ) public view returns (uint256 heldByAccount, uint256 heldByVault) {
         if (depositReceipt.round < ShareMath.PLACEHOLDER_UINT) {
-            return (vault.balanceOf(account, Vault.LP_TOKEN_ID), 0);
+            return (IKnoxToken(token).balanceOf(account, Vault.LP_TOKEN_ID), 0);
         }
 
         uint256 unredeemedShares = depositReceipt.getSharesFromReceipt(
@@ -86,7 +98,10 @@ contract VaultDisplay {
             decimals
         );
 
-        return (vault.balanceOf(account, Vault.LP_TOKEN_ID), unredeemedShares);
+        return (
+            IKnoxToken(token).balanceOf(account, Vault.LP_TOKEN_ID),
+            unredeemedShares
+        );
     }
 
     /**
@@ -95,11 +110,12 @@ contract VaultDisplay {
     function lpPricePerShare(
         uint256 decimals,
         uint256 queuedDeposits,
-        BaseVault vault
+        BaseVault vault,
+        address token
     ) public view returns (uint256) {
         return
             ShareMath.pricePerShare(
-                vault.totalSupply(Vault.LP_TOKEN_ID),
+                IKnoxToken(token).totalSupply(Vault.LP_TOKEN_ID),
                 vault.totalBalance(),
                 queuedDeposits,
                 decimals

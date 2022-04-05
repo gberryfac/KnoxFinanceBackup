@@ -12,24 +12,26 @@ library Vault {
     // @notice Placeholder uint value to prevent cold writes
     uint256 public constant PLACEHOLDER_UINT = 1;
 
+    // TODO: VERIFY assetDecimals, underlyingDecimals, minimumContractSize
+
     struct VaultParams {
-        // @notice option type the vault is selling
+        // @notice Option type the vault is selling
         bool isCall;
-        // @notice token decimals for vault shares
+        // @notice Token decimals for vault shares
         uint8 decimals;
-        // @notice decimals for asset used in vault
+        // @notice Decimals for asset used in vault
         uint8 assetDecimals;
-        // @notice asset used in vault
+        // @notice Asset used in vault
         address asset;
-        // @notice decimals for underlying used in vault
+        // @notice Decimals for underlying used in vault
         uint8 underlyingDecimals;
-        // @notice underlying asset of the options sold by vault
+        // @notice Underlying asset of the options sold by vault
         address underlying;
-        // @notice minimum supply of the vault shares issued, for ETH it's 10**10
+        // @notice Minimum supply of the vault shares issued, for ETH it's 10**10
         uint56 minimumSupply;
-        // @notice
+        // @notice Minimum contract size a vault will sell
         uint80 minimumContractSize;
-        // @notice maximum amount of assets to be deposited
+        // @notice Maximum amount of assets to be deposited
         uint104 cap;
     }
 
@@ -40,13 +42,13 @@ library Vault {
         // @notice Amount of collateral currently used to underwrite options
         uint104 lockedCollateral;
         // 32 byte slot 2
-        // @notice
+        // @notice Amount withheld for weekly vault deposits
         uint128 queuedDeposits;
-        // @notice
+        // @notice Funds witheld for settlement of options expired ITM
         uint128 queuedPayouts;
-        // @notice Amount locked for scheduled withdrawals;
+        // @notice Shares withheld for scheduled withdrawals during a round
         uint128 queuedWithdrawShares;
-        // @notice Amount locked for scheduled withdrawals last week;
+        // @notice Amount withheld for scheduled withdrawals
         uint128 queuedWithdrawals;
         // @notice The timestamp when the current round ends
         uint32 expiry;

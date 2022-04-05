@@ -1,13 +1,15 @@
 import { ethers, network } from "hardhat";
 import { BigNumber, Contract } from "ethers";
 
-const { getContractAt, getContractFactory, provider } = ethers;
-const { parseEther, parseUnits } = ethers.utils;
+const { getContractAt, provider } = ethers;
+const { parseUnits } = ethers.utils;
 
 import { fixedFromFloat, formatTokenId, TokenType } from "@premia/utils";
 
 import * as time from "./helpers/time";
-import * as utils from "./helpers/utils";
+import * as fixtures from "./helpers/fixtures";
+import * as types from "./helpers/types";
+
 import { assert } from "./helpers/assertions";
 
 import {
@@ -27,8 +29,6 @@ import {
 } from "../constants";
 
 import { MockRegistry__factory } from "../types";
-
-import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 
 const chainId = network.config.chainId;
 
@@ -86,21 +86,11 @@ function behavesLikeRibbonOptionsVault(params: {
   performanceFee: BigNumber;
   isCall: boolean;
 }) {
-  // Addresses
-  let admin: string,
-    owner: string,
-    keeper: string,
-    user: string,
-    feeRecipient: string,
-    whale = params.whale;
+  let signers: types.Signers;
+  let addresses: types.Addresses;
+  let knoxTokenAddress: string;
 
-  // Signers
-  let adminSigner: SignerWithAddress,
-    whaleSigner: SignerWithAddress,
-    userSigner: SignerWithAddress,
-    ownerSigner: SignerWithAddress,
-    keeperSigner: SignerWithAddress,
-    feeRecipientSigner: SignerWithAddress;
+  let whale = params.whale;
 
   // Parameters
   let pool = params.pool;
@@ -118,13 +108,16 @@ function behavesLikeRibbonOptionsVault(params: {
   let isCall = params.isCall;
 
   // Contracts
-  let vaultLifecycleLib: Contract;
   let vaultContract: Contract;
   let mockRegistry: Contract;
   let poolContract: Contract;
   let assetContract: Contract;
   let keeperContract: Contract;
   let oracleContract: Contract;
+  let vaultLifecycleLibrary: Contract;
+  let vaultLogicLibrary: Contract;
+  let mockPremiaPool: Contract;
+  let knoxTokenContract: Contract;
 
   describe.only(`${params.tokenName}`, () => {
     let initSnapshotId: string;
@@ -144,23 +137,16 @@ function behavesLikeRibbonOptionsVault(params: {
       });
 
       initSnapshotId = await time.takeSnapshot();
-
       block = await provider.getBlock(await provider.getBlockNumber());
 
-      [adminSigner, userSigner, ownerSigner, keeperSigner, feeRecipientSigner] =
-        await ethers.getSigners();
-
-      admin = adminSigner.address;
-      user = userSigner.address;
-      owner = ownerSigner.address;
-      keeper = keeperSigner.address;
-      feeRecipient = feeRecipientSigner.address;
+      signers = await fixtures.getSigners();
+      addresses = await fixtures.getAddresses(signers);
 
       poolContract = await getContractAt("IPremiaPool", WETH_DAI_POOL[chainId]);
 
       keeperContract = await (
         await getContractAt("IPremiaKeeper", WETH_DAI_POOL[chainId])
-      ).connect(keeperSigner);
+      ).connect(signers.keeper);
 
       oracleContract = await getContractAt(
         "AggregatorInterface",
@@ -170,54 +156,44 @@ function behavesLikeRibbonOptionsVault(params: {
       assetContract = await getContractAt("IAsset", depositAsset);
 
       const VaultLifecycle = await ethers.getContractFactory("VaultLifecycle");
-      vaultLifecycleLib = await VaultLifecycle.deploy();
+      vaultLifecycleLibrary = await VaultLifecycle.deploy();
 
-      mockRegistry = await new MockRegistry__factory(adminSigner).deploy(true);
+      const VaultLogic = await ethers.getContractFactory("VaultLogic");
+      vaultLogicLibrary = await VaultLogic.deploy();
 
-      const initializeArgs = [
-        [owner, keeper, feeRecipient, managementFee, performanceFee, tokenName],
-        [
-          isCall,
-          tokenDecimals,
-          depositAssetDecimals,
-          assetContract.address,
-          underlyingAssetDecimals,
-          underlyingAsset,
-          minimumSupply,
-          minimumContractSize,
-          parseUnits("500", tokenDecimals > 18 ? tokenDecimals : 18),
-        ],
-      ];
+      mockRegistry = await new MockRegistry__factory(signers.admin).deploy(
+        true
+      );
 
-      whaleSigner = await utils.impersonateWhale(whale, "1000");
+      [signers, addresses, assetContract] = await fixtures.impersonateWhale(
+        whale,
+        depositAsset,
+        depositAssetDecimals,
+        signers,
+        addresses
+      );
 
-      vaultContract = (
-        await utils.deployProxy(
-          "ThetaVault",
-          adminSigner,
-          initializeArgs,
-          [poolContract.address, WETH_ADDRESS[chainId], mockRegistry.address],
-          {
-            libraries: {
-              VaultLifecycle: vaultLifecycleLib.address,
-            },
-          }
-        )
-      ).connect(whaleSigner);
+      [vaultContract, knoxTokenContract] = await fixtures.getThetaVaultFixture(
+        poolContract,
+        vaultLifecycleLibrary,
+        vaultLogicLibrary,
+        mockRegistry,
+        tokenName,
+        tokenDecimals,
+        depositAsset,
+        depositAssetDecimals,
+        underlyingAssetDecimals,
+        underlyingAsset,
+        minimumSupply,
+        minimumContractSize,
+        managementFee,
+        performanceFee,
+        isCall,
+        signers,
+        addresses
+      );
 
-      if (depositAsset === WETH_ADDRESS[chainId]) {
-        await assetContract
-          .connect(whaleSigner)
-          .deposit({ value: parseEther("500") });
-
-        await assetContract
-          .connect(whaleSigner)
-          .transfer(admin, parseEther("300"));
-      } else {
-        await assetContract
-          .connect(whaleSigner)
-          .transfer(admin, parseUnits("1000000", depositAssetDecimals));
-      }
+      knoxTokenAddress = knoxTokenContract.address;
     });
 
     after(async () => {
@@ -234,7 +210,7 @@ function behavesLikeRibbonOptionsVault(params: {
         const liquidity = isCall ? size : size.mul(strike);
 
         await assetContract
-          .connect(adminSigner)
+          .connect(signers.admin)
           .transfer(vaultContract.address, liquidity);
 
         const maturity = block.timestamp + EPOCH_SPAN_IN_SECONDS;
@@ -288,7 +264,7 @@ function behavesLikeRibbonOptionsVault(params: {
         const liquidity = isCall ? size : size.mul(strike);
 
         await assetContract
-          .connect(adminSigner)
+          .connect(signers.admin)
           .transfer(vaultContract.address, liquidity);
 
         const maturity = block.timestamp + EPOCH_SPAN_IN_SECONDS;
@@ -339,7 +315,7 @@ function behavesLikeRibbonOptionsVault(params: {
         assert.bnEqual(balanceAfterExpiredProcessed, BigNumber.from(0));
         assert.bnEqual(reservedLiquidityAfterExpired, liquidity);
 
-        await vaultContract.connect(keeperSigner).harvest();
+        await vaultContract.connect(signers.keeper).harvest();
 
         const balanceAfterHarvest = await assetContract.balanceOf(
           vaultContract.address
@@ -363,7 +339,7 @@ function behavesLikeRibbonOptionsVault(params: {
         const liquidity = isCall ? size : size.mul(strike);
 
         await assetContract
-          .connect(adminSigner)
+          .connect(signers.admin)
           .transfer(vaultContract.address, liquidity);
 
         /**
@@ -447,7 +423,7 @@ function behavesLikeRibbonOptionsVault(params: {
         assert.bnLt(reservedLiquidityAfterExpired, reservedLiquidityUpper);
         assert.bnGt(reservedLiquidityAfterExpired, reservedLiquidityLower);
 
-        await vaultContract.connect(keeperSigner).harvest();
+        await vaultContract.connect(signers.keeper).harvest();
 
         const balanceAfterHarvest = await assetContract.balanceOf(
           vaultContract.address
