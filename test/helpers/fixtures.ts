@@ -7,7 +7,7 @@ const { parseUnits, parseEther } = ethers.utils;
 import * as utils from "./utils";
 import * as types from "./types";
 
-import { TEST_URI, BLOCK_NUMBER, WETH_ADDRESS } from "../../constants";
+import { WETH_ADDRESS } from "../../constants";
 
 const chainId = network.config.chainId;
 
@@ -103,6 +103,7 @@ export async function getThetaVaultFixture(
   depositAssetDecimals: number,
   underlyingAssetDecimals: number,
   underlyingAsset: string,
+  cap: BigNumber,
   minimumSupply: string,
   minimumContractSize: string,
   managementFee: BigNumber,
@@ -131,13 +132,13 @@ export async function getThetaVaultFixture(
       underlyingAsset,
       minimumSupply,
       minimumContractSize,
-      parseUnits("500", tokenDecimals > 18 ? tokenDecimals : 18),
+      cap,
     ],
   ];
 
   const vaultContract = (
     await utils.deployProxy(
-      "ThetaVault",
+      "PremiaThetaVault",
       signers.admin,
       initializeArgs,
       [poolContract.address, WETH_ADDRESS[chainId], registryContact.address],

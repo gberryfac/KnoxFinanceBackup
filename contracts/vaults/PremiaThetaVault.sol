@@ -7,7 +7,7 @@ import "./BaseVault.sol";
 
 import "hardhat/console.sol";
 
-contract ThetaVault is BaseVault {
+contract PremiaThetaVault is BaseVault {
     mapping(uint256 => uint256) public roundByLongTokenId;
     mapping(uint256 => Payout) public payouts;
 
@@ -48,6 +48,8 @@ contract ThetaVault is BaseVault {
         uint256 contractSize,
         bool isCall
     ) external nonReentrant returns (uint256 longTokenId) {
+        // TODO: PREVENT USERS FROM BUYING 48 HOURS PRIOR TO ROUND CLOSE
+
         uint256 liquidityRequired = _openPosition(
             signature,
             deadline,

@@ -63,6 +63,8 @@ contract BaseVault is OwnableUpgradeable, ReentrancyGuardUpgradeable {
     /// @notice Management fee charged on entire AUM in rollover. Only charged when there is no loss.
     uint256 public managementFee;
 
+    uint256 public totalCapital;
+
     // Gap is left to avoid storage collisions. Though RibbonVault is not upgradeable, we add this as a safety measure.
     uint256[30] private ____gap;
 
@@ -473,7 +475,7 @@ contract BaseVault is OwnableUpgradeable, ReentrancyGuardUpgradeable {
         ShareMath.assertUint128(newQueuedWithdrawShares);
         vaultState.queuedWithdrawShares = uint128(newQueuedWithdrawShares);
 
-        // an setApprovalForAll() by the msg.sender is required beforehand
+        // setApprovalForAll() by the msg.sender is required beforehand
         IKnoxToken(token).safeTransferFrom(
             msg.sender,
             address(this),
@@ -678,6 +680,7 @@ contract BaseVault is OwnableUpgradeable, ReentrancyGuardUpgradeable {
         uint256 newPricePerShare;
         uint256 mintShares;
         uint256 performanceFeeInAsset;
+        uint256 managementFeeInAsset;
         uint256 totalVaultFee;
 
         {
@@ -686,35 +689,38 @@ contract BaseVault is OwnableUpgradeable, ReentrancyGuardUpgradeable {
                 address(this)
             ) - vaultState.queuedPayouts;
 
-            uint256 tokenSupply = IKnoxToken(token).totalSupply(
+            uint256 totalSupply = IKnoxToken(token).totalSupply(
                 Vault.LP_TOKEN_ID
             );
 
             uint256 balanceForVaultFees = VaultLifecycle.getBalanceForVaultFees(
                 currentBalance,
-                tokenSupply,
+                totalSupply,
                 vaultParams.decimals,
                 vaultState.queuedDeposits,
                 vaultState.queuedWithdrawShares,
                 vaultState.queuedWithdrawals
             );
 
-            (performanceFeeInAsset, , totalVaultFee) = VaultLifecycle
-                .getVaultFees(
-                    balanceForVaultFees,
-                    vaultState.lockedCollateral,
-                    vaultState.queuedDeposits,
-                    performanceFee,
-                    managementFee
-                );
+            (
+                performanceFeeInAsset,
+                managementFeeInAsset,
+                totalVaultFee
+            ) = VaultLifecycle.getVaultFees(
+                balanceForVaultFees,
+                totalCapital,
+                vaultState.queuedDeposits,
+                performanceFee,
+                managementFee
+            );
 
             // Take into account the fee so we can calculate the newPricePerShare
-            currentBalance = currentBalance - totalVaultFee;
+            currentBalance = currentBalance.sub(totalVaultFee);
 
             (queuedWithdrawals, newPricePerShare, mintShares) = VaultLifecycle
                 .rollover(
                     currentBalance,
-                    tokenSupply,
+                    totalSupply,
                     vaultParams.decimals,
                     vaultState.queuedDeposits,
                     vaultState.queuedWithdrawShares
@@ -747,6 +753,9 @@ contract BaseVault is OwnableUpgradeable, ReentrancyGuardUpgradeable {
             vaultState.lockedCollateral = 0;
             vaultState.queuedDeposits = 0;
             vaultState.queuedWithdrawals = uint128(queuedWithdrawals);
+
+            // Total capital should not include payouts, withdrawals, or vault fees.
+            totalCapital = currentBalance.sub(queuedWithdrawals);
         }
 
         IKnoxToken(token).mint(
@@ -775,13 +784,12 @@ contract BaseVault is OwnableUpgradeable, ReentrancyGuardUpgradeable {
      * @return total balance of the vault, including the amounts locked in third party protocols
      */
     function totalBalance() public view returns (uint256) {
-        /* The total balance should include new deposits, premiums paid, free/locked liquidity. It should not include the payout, and withdrawal amounts. */
+        /* The total balance should include new deposits, premiums paid, free/locked liquidity, and withdrawals. It should not include the payouts. */
         return
             IERC20(vaultParams.asset)
                 .balanceOf(address(this))
                 .add(vaultState.lockedCollateral)
-                .sub(vaultState.queuedPayouts)
-                .sub(vaultState.queuedWithdrawals);
+                .sub(vaultState.queuedPayouts);
     }
 
     /************************************************

@@ -39,7 +39,7 @@ contract MockPremiaPool {
     function writeFrom(
         address underwriter,
         address longReceiver,
-        uint64 maturity,
+        uint64,
         int128 _strike64x64,
         uint256 contractSize,
         bool isCall

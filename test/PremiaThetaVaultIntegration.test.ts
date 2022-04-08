@@ -34,7 +34,7 @@ const chainId = network.config.chainId;
 
 let block;
 
-describe("ThetaVault Integration", () => {
+describe("PremiaThetaVault Integration", () => {
   behavesLikeRibbonOptionsVault({
     whale: WHALE_ADDRESS[chainId],
     tokenName: `Knox WETH-DAI Call`,
@@ -45,6 +45,7 @@ describe("ThetaVault Integration", () => {
     baseAssetDecimals: DAI_DECIMALS,
     underlyingAssetDecimals: WETH_DECIMALS,
     underlyingAsset: WETH_ADDRESS[chainId],
+    cap: parseUnits("1000", WETH_DECIMALS),
     minimumSupply: BigNumber.from("10").pow("10").toString(),
     minimumContractSize: BigNumber.from("10").pow("17").toString(),
     managementFee: BigNumber.from("2000000"),
@@ -62,6 +63,7 @@ describe("ThetaVault Integration", () => {
     baseAssetDecimals: DAI_DECIMALS,
     underlyingAssetDecimals: WETH_DECIMALS,
     underlyingAsset: WETH_ADDRESS[chainId],
+    cap: parseUnits("5000000", DAI_DECIMALS),
     minimumSupply: BigNumber.from("10").pow("3").toString(),
     minimumContractSize: BigNumber.from("10").pow("17").toString(),
     managementFee: BigNumber.from("2000000"),
@@ -80,6 +82,7 @@ function behavesLikeRibbonOptionsVault(params: {
   baseAssetDecimals: number;
   underlyingAssetDecimals: number;
   underlyingAsset: string;
+  cap: BigNumber;
   minimumSupply: string;
   minimumContractSize: string;
   managementFee: BigNumber;
@@ -101,6 +104,7 @@ function behavesLikeRibbonOptionsVault(params: {
   let baseAssetDecimals = params.baseAssetDecimals;
   let underlyingAssetDecimals = params.underlyingAssetDecimals;
   let underlyingAsset = params.underlyingAsset;
+  let cap = params.cap;
   let minimumSupply = params.minimumSupply;
   let minimumContractSize = params.minimumContractSize;
   let managementFee = params.managementFee;
@@ -114,6 +118,7 @@ function behavesLikeRibbonOptionsVault(params: {
   let assetContract: Contract;
   let keeperContract: Contract;
   let oracleContract: Contract;
+  let vaultDisplayLibrary: Contract;
   let vaultLifecycleLibrary: Contract;
   let vaultLogicLibrary: Contract;
   let mockPremiaPool: Contract;
@@ -155,6 +160,9 @@ function behavesLikeRibbonOptionsVault(params: {
 
       assetContract = await getContractAt("IAsset", depositAsset);
 
+      const VaultDisplay = await ethers.getContractFactory("VaultDisplay");
+      vaultDisplayLibrary = await VaultDisplay.deploy();
+
       const VaultLifecycle = await ethers.getContractFactory("VaultLifecycle");
       vaultLifecycleLibrary = await VaultLifecycle.deploy();
 
@@ -175,6 +183,7 @@ function behavesLikeRibbonOptionsVault(params: {
 
       [vaultContract, knoxTokenContract] = await fixtures.getThetaVaultFixture(
         poolContract,
+        vaultDisplayLibrary,
         vaultLifecycleLibrary,
         vaultLogicLibrary,
         mockRegistry,
@@ -184,6 +193,7 @@ function behavesLikeRibbonOptionsVault(params: {
         depositAssetDecimals,
         underlyingAssetDecimals,
         underlyingAsset,
+        cap,
         minimumSupply,
         minimumContractSize,
         managementFee,
@@ -256,7 +266,7 @@ function behavesLikeRibbonOptionsVault(params: {
     describe("#rollover", () => {
       time.revertToSnapshotAfterEach(async function () {});
 
-      it("strategy withdraws no reserved liquidity when option is OTM", async function () {
+      it("should return no reserved liquidity when option is OTM", async function () {
         // Should expire OTM
         const strike = isCall ? 3000 : 2000;
         const size = parseUnits("15", depositAssetDecimals);
@@ -331,7 +341,7 @@ function behavesLikeRibbonOptionsVault(params: {
         assert.bnEqual(reservedLiquidityHarvest, BigNumber.from(0));
       });
 
-      it("strategy withdraws reserved liquidity when option is ITM", async function () {
+      it("should withdraw reserved liquidity when option is ITM", async function () {
         // Should expire ITM
         const strike = isCall ? 2000 : 3000;
         const size = parseUnits("15", depositAssetDecimals);
