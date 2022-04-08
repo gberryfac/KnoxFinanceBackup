@@ -6,6 +6,7 @@ const { parseUnits, parseEther } = ethers.utils;
 
 import { expect } from "chai";
 import moment from "moment-timezone";
+import { fixedFromFloat } from "@premia/utils";
 
 import * as time from "./helpers/time";
 import * as fixtures from "./helpers/fixtures";
@@ -14,6 +15,7 @@ import * as types from "./helpers/types";
 import { assert } from "./helpers/assertions";
 
 import {
+  BYTES_ZERO,
   WHALE_ADDRESS,
   LP_TOKEN_ID,
   TEST_URI,
@@ -47,6 +49,7 @@ describe("BaseVault", () => {
     underlyingAssetDecimals: WETH_DECIMALS,
     underlyingAsset: WETH_ADDRESS[chainId],
     depositAmount: parseEther("10"),
+    cap: parseUnits("1000", WETH_DECIMALS),
     minimumSupply: BigNumber.from("10").pow("10").toString(),
     minimumContractSize: BigNumber.from("10").pow("17").toString(),
     managementFee: BigNumber.from("2000000"),
@@ -70,6 +73,7 @@ describe("BaseVault", () => {
     underlyingAssetDecimals: WETH_DECIMALS,
     underlyingAsset: WETH_ADDRESS[chainId],
     depositAmount: parseEther("10"),
+    cap: parseUnits("5000000", DAI_DECIMALS),
     minimumSupply: BigNumber.from("10").pow("3").toString(),
     minimumContractSize: BigNumber.from("10").pow("17").toString(),
     managementFee: BigNumber.from("2000000"),
@@ -125,6 +129,7 @@ function behavesLikeRibbonOptionsVault(params: {
   underlyingAssetDecimals: number;
   underlyingAsset: string;
   depositAmount: BigNumber;
+  cap: BigNumber;
   minimumSupply: string;
   minimumContractSize: string;
   managementFee: BigNumber;
@@ -144,6 +149,7 @@ function behavesLikeRibbonOptionsVault(params: {
   // Parameters
   let tokenName = params.tokenName;
   let tokenDecimals = params.tokenDecimals;
+  let cap = params.cap;
   let minimumSupply = params.minimumSupply;
   let minimumContractSize = params.minimumContractSize;
   let depositAsset = params.depositAsset;
@@ -157,9 +163,9 @@ function behavesLikeRibbonOptionsVault(params: {
   let isCall = params.isCall;
 
   // Contracts
+  let vaultDisplayLibrary: Contract;
   let vaultLifecycleLibrary: Contract;
   let vaultLogicLibrary: Contract;
-  let vaultDisplayLib: Contract;
   let vaultContract: Contract;
   let mockRegistry: Contract;
   let assetContract: Contract;
@@ -198,7 +204,7 @@ function behavesLikeRibbonOptionsVault(params: {
       );
 
       const VaultDisplay = await ethers.getContractFactory("VaultDisplay");
-      vaultDisplayLib = await VaultDisplay.deploy();
+      vaultDisplayLibrary = await VaultDisplay.deploy();
 
       const VaultLifecycle = await ethers.getContractFactory("VaultLifecycle");
       vaultLifecycleLibrary = await VaultLifecycle.deploy();
@@ -222,6 +228,7 @@ function behavesLikeRibbonOptionsVault(params: {
 
       [vaultContract, knoxTokenContract] = await fixtures.getThetaVaultFixture(
         mockPremiaPool,
+        vaultDisplayLibrary,
         vaultLifecycleLibrary,
         vaultLogicLibrary,
         mockRegistry,
@@ -231,6 +238,7 @@ function behavesLikeRibbonOptionsVault(params: {
         depositAssetDecimals,
         underlyingAssetDecimals,
         underlyingAsset,
+        cap,
         minimumSupply,
         minimumContractSize,
         managementFee,
@@ -252,6 +260,7 @@ function behavesLikeRibbonOptionsVault(params: {
       time.revertToSnapshotAfterEach(async function () {
         const BaseVault = await ethers.getContractFactory("BaseVault", {
           libraries: {
+            VaultDisplay: vaultDisplayLibrary.address,
             VaultLifecycle: vaultLifecycleLibrary.address,
             VaultLogic: vaultLogicLibrary.address,
           },
@@ -268,10 +277,7 @@ function behavesLikeRibbonOptionsVault(params: {
       it("initializes with correct values", async function () {
         const vaultParams = await vaultContract.vaultParams();
 
-        assert.equal(
-          vaultParams.cap.toString(),
-          parseUnits("500", tokenDecimals > 18 ? tokenDecimals : 18)
-        );
+        assert.equal(vaultParams.cap.toString(), params.cap);
         assert.equal(await vaultContract.owner(), addresses.owner);
         assert.equal(await vaultContract.keeper(), addresses.keeper);
         assert.equal(
@@ -316,10 +322,7 @@ function behavesLikeRibbonOptionsVault(params: {
         assert.bnEqual(queuedDeposits, BigNumber.from(0));
         assert.equal(minimumSupply, params.minimumSupply);
         assert.equal(isCall, params.isCall);
-        assert.bnEqual(
-          cap,
-          parseUnits("500", tokenDecimals > 18 ? tokenDecimals : 18)
-        );
+        assert.bnEqual(cap, params.cap);
       });
 
       it("cannot be initialized twice", async function () {
@@ -348,7 +351,7 @@ function behavesLikeRibbonOptionsVault(params: {
         ).to.be.revertedWith("Initializable: contract is already initialized");
       });
 
-      it("reverts when initializing with 0 addresses.owner", async function () {
+      it("should revert when initializing with 0 addresses.owner", async function () {
         await expect(
           testVault.initialize(
             [
@@ -374,7 +377,7 @@ function behavesLikeRibbonOptionsVault(params: {
         ).to.be.revertedWith("0");
       });
 
-      it("reverts when initializing with 0 addresses.keeper", async function () {
+      it("should revert when initializing with 0 addresses.keeper", async function () {
         await expect(
           testVault.initialize(
             [
@@ -400,7 +403,7 @@ function behavesLikeRibbonOptionsVault(params: {
         ).to.be.revertedWith("0");
       });
 
-      it("reverts when initializing with 0 addresses.feeRecipient", async function () {
+      it("should revert when initializing with 0 addresses.feeRecipient", async function () {
         await expect(
           testVault.initialize(
             [
@@ -426,7 +429,7 @@ function behavesLikeRibbonOptionsVault(params: {
         ).to.be.revertedWith("0");
       });
 
-      it("reverts when initializing with 0 initCap", async function () {
+      it("should revert when initializing with 0 initCap", async function () {
         await expect(
           testVault.initialize(
             [
@@ -452,7 +455,7 @@ function behavesLikeRibbonOptionsVault(params: {
         ).to.be.revertedWith("15");
       });
 
-      it("reverts when assetContract is 0x", async function () {
+      it("should revert when assetContract is 0x", async function () {
         await expect(
           testVault.initialize(
             [
@@ -497,10 +500,7 @@ function behavesLikeRibbonOptionsVault(params: {
         assert.equal(vaultParams.cap.toString(), parseEther("10"));
         await expect(tx)
           .to.emit(vaultContract, "CapSet")
-          .withArgs(
-            parseUnits("500", tokenDecimals > 18 ? tokenDecimals : 18),
-            parseEther("10")
-          );
+          .withArgs(cap, parseEther("10"));
       });
 
       it("should revert when depositing over the cap", async function () {
@@ -565,7 +565,7 @@ function behavesLikeRibbonOptionsVault(params: {
         assert.equal(await vaultContract.keeper(), addresses.owner);
       });
 
-      it("reverts when not owner call", async function () {
+      it("should revert when not owner call", async function () {
         await expect(
           vaultContract.setNewKeeper(addresses.owner)
         ).to.be.revertedWith("caller is not the owner");
@@ -575,7 +575,7 @@ function behavesLikeRibbonOptionsVault(params: {
     describe("#setFeeRecipient", () => {
       time.revertToSnapshotAfterTest();
 
-      it("reverts when setting 0x0 as addresses.feeRecipient", async function () {
+      it("should revert when setting 0x0 as addresses.feeRecipient", async function () {
         await expect(
           vaultContract
             .connect(signers.owner)
@@ -583,7 +583,7 @@ function behavesLikeRibbonOptionsVault(params: {
         ).to.be.revertedWith("0");
       });
 
-      it("reverts when not owner call", async function () {
+      it("should revert when not owner call", async function () {
         await expect(
           vaultContract.setFeeRecipient(addresses.owner)
         ).to.be.revertedWith("caller is not the owner");
@@ -605,7 +605,7 @@ function behavesLikeRibbonOptionsVault(params: {
         assert.bnEqual(await vaultContract.managementFee(), BigNumber.from(0));
       });
 
-      it("reverts when not owner call", async function () {
+      it("should revert when not owner call", async function () {
         await expect(
           vaultContract.setManagementFee(BigNumber.from("1000000").toString())
         ).to.be.revertedWith("caller is not the owner");
@@ -633,7 +633,7 @@ function behavesLikeRibbonOptionsVault(params: {
         assert.bnEqual(await vaultContract.performanceFee(), BigNumber.from(0));
       });
 
-      it("reverts when not owner call", async function () {
+      it("should revert when not owner call", async function () {
         await expect(
           vaultContract.setPerformanceFee(BigNumber.from("1000000").toString())
         ).to.be.revertedWith("caller is not the owner");
@@ -681,14 +681,7 @@ function behavesLikeRibbonOptionsVault(params: {
         );
 
         assert.bnEqual(
-          await vaultDisplayLib.lpShares(
-            decimals,
-            round,
-            vaultContract.address,
-            addresses.user,
-            knoxTokenAddress,
-            userDepositReceipt
-          ),
+          await vaultContract.lpShares(addresses.user),
           depositAmount
         );
 
@@ -705,14 +698,7 @@ function behavesLikeRibbonOptionsVault(params: {
         // Share balance should remain the same because the 1 share
         // is transferred to the user
         assert.bnEqual(
-          await vaultDisplayLib.lpShares(
-            decimals,
-            round,
-            vaultContract.address,
-            addresses.user,
-            knoxTokenAddress,
-            userDepositReceipt
-          ),
+          await vaultContract.lpShares(addresses.user),
           depositAmount
         );
 
@@ -732,26 +718,12 @@ function behavesLikeRibbonOptionsVault(params: {
         );
 
         assert.bnEqual(
-          await vaultDisplayLib.lpShares(
-            decimals,
-            round,
-            vaultContract.address,
-            addresses.user,
-            knoxTokenAddress,
-            userDepositReceipt
-          ),
+          await vaultContract.lpShares(addresses.user),
           depositAmount.sub(redeemAmount)
         );
 
         assert.bnEqual(
-          await vaultDisplayLib.lpShares(
-            decimals,
-            round,
-            vaultContract.address,
-            addresses.owner,
-            knoxTokenAddress,
-            ownerDepositReceipt
-          ),
+          await vaultContract.lpShares(addresses.owner),
           redeemAmount
         );
       });
@@ -780,14 +752,7 @@ function behavesLikeRibbonOptionsVault(params: {
         );
 
         assert.bnEqual(
-          await vaultDisplayLib.lpShares(
-            decimals,
-            round,
-            vaultContract.address,
-            addresses.user,
-            knoxTokenAddress,
-            userDepositReceipt
-          ),
+          await vaultContract.lpShares(addresses.user),
           depositAmount
         );
 
@@ -799,14 +764,7 @@ function behavesLikeRibbonOptionsVault(params: {
         );
 
         assert.bnEqual(
-          await vaultDisplayLib.lpShares(
-            decimals,
-            round,
-            vaultContract.address,
-            addresses.user,
-            knoxTokenAddress,
-            userDepositReceipt
-          ),
+          await vaultContract.lpShares(addresses.user),
           depositAmount
         );
       });
@@ -839,14 +797,7 @@ function behavesLikeRibbonOptionsVault(params: {
         );
 
         const [heldByAccount1, heldByVault1] =
-          await vaultDisplayLib.lpShareBalances(
-            decimals,
-            round,
-            vaultContract.address,
-            addresses.user,
-            knoxTokenAddress,
-            userDepositReceipt
-          );
+          await vaultContract.lpShareBalances(addresses.user);
 
         assert.bnEqual(heldByAccount1, BigNumber.from(0));
         assert.bnEqual(heldByVault1, depositAmount);
@@ -858,14 +809,7 @@ function behavesLikeRibbonOptionsVault(params: {
         );
 
         const [heldByAccount2, heldByVault2] =
-          await vaultDisplayLib.lpShareBalances(
-            decimals,
-            round,
-            vaultContract.address,
-            addresses.user,
-            knoxTokenAddress,
-            userDepositReceipt
-          );
+          await vaultContract.lpShareBalances(addresses.user);
 
         assert.bnEqual(heldByAccount2, BigNumber.from(1));
         assert.bnEqual(heldByVault2, depositAmount.sub(1));
@@ -875,16 +819,15 @@ function behavesLikeRibbonOptionsVault(params: {
     describe("#accountVaultBalance", () => {
       time.revertToSnapshotAfterEach();
 
-      // TODO: Finish test
-      // it("returns a lesser underlyingAsset amount for user", async function () {
-      //   assert.isFalse(true);
-      // });
+      it("returns a lesser underlyingAsset amount for user", async function () {
+        assert.isFalse(true);
+      });
     });
 
     describe("#withdrawInstantly", () => {
       time.revertToSnapshotAfterEach();
 
-      it("reverts with 0 amount", async function () {
+      it("should revert with 0 amount", async function () {
         await assetContract
           .connect(signers.user)
           .approve(vaultContract.address, depositAmount);
@@ -895,7 +838,7 @@ function behavesLikeRibbonOptionsVault(params: {
         );
       });
 
-      it("reverts when withdrawing more than available", async function () {
+      it("should revert when withdrawing more than available", async function () {
         await assetContract
           .connect(signers.user)
           .approve(vaultContract.address, depositAmount);
@@ -906,7 +849,7 @@ function behavesLikeRibbonOptionsVault(params: {
         ).to.be.revertedWith("20");
       });
 
-      it("reverts when deposit receipt is processed", async function () {
+      it("should revert when deposit receipt is processed", async function () {
         await assetContract
           .connect(signers.user)
           .approve(vaultContract.address, depositAmount);
@@ -925,7 +868,7 @@ function behavesLikeRibbonOptionsVault(params: {
         ).to.be.revertedWith("7");
       });
 
-      it("reverts when withdrawing next round", async function () {
+      it("should revert when withdrawing next round", async function () {
         await assetContract
           .connect(signers.user)
           .approve(vaultContract.address, depositAmount);
@@ -942,51 +885,58 @@ function behavesLikeRibbonOptionsVault(params: {
         ).to.be.revertedWith("7");
       });
 
-      // TODO: finish test
-      // it("withdraws the amount in deposit receipt", async function () {
-      //   assert.isFalse(true);
+      it("withdraws the amount in deposit receipt", async function () {
+        await assetContract
+          .connect(signers.user)
+          .approve(vaultContract.address, depositAmount);
 
-      // await assetContract
-      //   .connect(signers.user)
-      //   .approve(vaultContract.address, depositAmount);
-      // await vaultContract.deposit(depositAmount);
+        await vaultContract.deposit(depositAmount);
 
-      // let startBalance: BigNumber;
-      // let withdrawAmount: BigNumber;
-      // if (underlyingAsset === WETH_ADDRESS[chainId]) {
-      //   startBalance = await provider.getBalance(addresses.user);
-      // } else {
-      //   startBalance = await assetContract.balanceOf(addresses.user);
-      // }
+        let startBalance: BigNumber;
+        let withdrawAmount: BigNumber;
 
-      // const tx = await vaultContract.withdrawInstantly(depositAmount, { gasPrice });
-      // const receipt = await tx.wait();
+        if (depositAsset === WETH_ADDRESS[chainId]) {
+          startBalance = await provider.getBalance(addresses.user);
+        } else {
+          startBalance = await assetContract.balanceOf(addresses.user);
+        }
 
-      // if (underlyingAsset === WETH_ADDRESS[chainId]) {
-      //   const endBalance = await provider.getBalance(addresses.user);
-      //   withdrawAmount = endBalance
-      //     .sub(startBalance)
-      //     .add(receipt.gasUsed.mul(gasPrice));
-      // } else {
-      //   const endBalance = await assetContract.balanceOf(addresses.user);
-      //   withdrawAmount = endBalance.sub(startBalance);
-      // }
-      // assert.bnEqual(withdrawAmount, depositAmount);
+        const tx = await vaultContract.withdrawInstantly(depositAmount, {
+          gasPrice,
+        });
+        const receipt = await tx.wait();
 
-      // await expect(tx)
-      //   .to.emit(vaultContract, "InstantWithdraw")
-      //   .withArgs(addresses.user, depositAmount, 1);
+        if (depositAsset === WETH_ADDRESS[chainId]) {
+          const endBalance = await provider.getBalance(addresses.user);
+          withdrawAmount = endBalance
+            .sub(startBalance)
+            .add(receipt.gasUsed.mul(gasPrice));
+        } else {
+          const endBalance = await assetContract.balanceOf(addresses.user);
+          withdrawAmount = endBalance.sub(startBalance);
+        }
 
-      // const { round, amount } = await vaultContract.depositReceipts(addresses.user);
-      // assert.equal(round, 1);
-      // assert.bnEqual(amount, BigNumber.from(0));
+        assert.bnEqual(withdrawAmount, depositAmount);
 
-      // // Should decrement the pending amounts
-      // assert.bnEqual(
-      //   await vaultDisplayLib.queuedDeposits(vaultContract.address),
-      //   BigNumber.from(0)
-      // );
-      // });
+        await expect(tx)
+          .to.emit(vaultContract, "InstantWithdraw")
+          .withArgs(addresses.user, depositAmount, 1);
+
+        const { round, amount } = await vaultContract.depositReceipts(
+          addresses.user
+        );
+
+        assert.equal(round, 1);
+        assert.bnEqual(amount, BigNumber.from(0));
+
+        // Should decrement the pending amounts
+        assert.bnEqual(
+          await (
+            await vaultContract.vaultState()
+          ).queuedDeposits,
+          BigNumber.from(0)
+        );
+      });
     });
 
     // Only apply to when assets is WETH
@@ -1054,7 +1004,7 @@ function behavesLikeRibbonOptionsVault(params: {
         //   // console.log("Best case depositETH", receipt2.gasUsed.toNumber());
         // });
 
-        it("reverts when no value passed", async function () {
+        it("should revert when no value passed", async function () {
           await expect(
             vaultContract.connect(signers.user).depositETH({ value: 0 })
           ).to.be.revertedWith("15");
@@ -1080,7 +1030,7 @@ function behavesLikeRibbonOptionsVault(params: {
           );
         });
 
-        it("reverts when minimum shares are not minted", async function () {
+        it("should revert when minimum shares are not minted", async function () {
           await expect(
             vaultContract.connect(signers.user).depositETH({
               value: BigNumber.from("10").pow("10").sub(BigNumber.from("1")),
@@ -1090,7 +1040,7 @@ function behavesLikeRibbonOptionsVault(params: {
       });
     } else {
       describe("#depositETH", () => {
-        it("reverts when assetContract is not WETH", async function () {
+        it("should revert when assetContract is not WETH", async function () {
           const depositAmount = parseEther("1");
           await expect(
             vaultContract.depositETH({ value: depositAmount })
@@ -1234,7 +1184,7 @@ function behavesLikeRibbonOptionsVault(params: {
         );
       });
 
-      it("reverts when minimum shares are not minted", async function () {
+      it("should revert when minimum shares are not minted", async function () {
         await expect(
           vaultContract
             .connect(signers.user)
@@ -1242,7 +1192,7 @@ function behavesLikeRibbonOptionsVault(params: {
         ).to.be.revertedWith("4");
       });
 
-      it("updates the previous deposit receipt", async function () {
+      it("should update the previous deposit receipt when multiple deposits are made", async function () {
         await assetContract
           .connect(signers.user)
           .approve(vaultContract.address, params.depositAmount.mul(2));
@@ -1440,7 +1390,7 @@ function behavesLikeRibbonOptionsVault(params: {
         );
       });
 
-      it("reverts when minimum shares are not minted", async function () {
+      it("should revert when minimum shares are not minted", async function () {
         await expect(
           vaultContract
             .connect(signers.user)
@@ -1512,21 +1462,21 @@ function behavesLikeRibbonOptionsVault(params: {
     describe("#initiateWithdraw", () => {
       time.revertToSnapshotAfterEach(async () => {});
 
-      it("reverts when user initiates withdraws without any deposit", async function () {
+      it("should revert when user initiates withdraws without any deposit", async function () {
         await knoxTokenContract.setApprovalForAll(vaultContract.address, true);
         await expect(
           vaultContract.initiateWithdraw(depositAmount)
         ).to.be.revertedWith("ERC1155: insufficient balance for transfer");
       });
 
-      it("reverts when passed 0 shares", async function () {
+      it("should revert when passed 0 shares", async function () {
         await knoxTokenContract.setApprovalForAll(vaultContract.address, true);
         await expect(vaultContract.initiateWithdraw(0)).to.be.revertedWith(
           "15"
         );
       });
 
-      it("reverts when withdrawing more than unredeemed balance", async function () {
+      it("should revert when withdrawing more than unredeemed balance", async function () {
         await assetContract
           .connect(signers.user)
           .approve(vaultContract.address, depositAmount);
@@ -1545,7 +1495,7 @@ function behavesLikeRibbonOptionsVault(params: {
         ).to.be.revertedWith("ERC1155: insufficient balance for transfer");
       });
 
-      it("reverts when withdrawing more than vaultContract + account balance", async function () {
+      it("should revert when withdrawing more than vaultContract + account balance", async function () {
         await assetContract
           .connect(signers.user)
           .approve(vaultContract.address, depositAmount);
@@ -1567,7 +1517,7 @@ function behavesLikeRibbonOptionsVault(params: {
         ).to.be.revertedWith("ERC1155: insufficient balance for transfer");
       });
 
-      it("reverts when initiating with past existing withdrawal", async function () {
+      it("should revert when initiating with past existing withdrawal", async function () {
         await assetContract
           .connect(signers.user)
           .approve(vaultContract.address, depositAmount);
@@ -1593,7 +1543,7 @@ function behavesLikeRibbonOptionsVault(params: {
         ).to.be.revertedWith("6");
       });
 
-      it("creates withdrawal from unredeemed shares", async function () {
+      it("should create withdrawal with unredeemed shares when a deposit has already been made", async function () {
         await assetContract
           .connect(signers.user)
           .approve(vaultContract.address, depositAmount);
@@ -1629,7 +1579,7 @@ function behavesLikeRibbonOptionsVault(params: {
         assert.bnEqual(shares, depositAmount);
       });
 
-      it("creates withdrawal by debiting user shares", async function () {
+      it("should create withdrawal by debiting user shares when a deposit has already been made", async function () {
         await assetContract
           .connect(signers.user)
           .approve(vaultContract.address, depositAmount);
@@ -1740,7 +1690,7 @@ function behavesLikeRibbonOptionsVault(params: {
         assert.bnEqual(shares, depositAmount);
       });
 
-      it("reverts when there is insufficient balance over multiple calls", async function () {
+      it("should revert when there is insufficient balance over multiple calls", async function () {
         await assetContract
           .connect(signers.user)
           .approve(vaultContract.address, depositAmount);
@@ -1780,21 +1730,32 @@ function behavesLikeRibbonOptionsVault(params: {
     });
 
     describe("#completeWithdraw", () => {
+      let userDepositSize = parseUnits("5", depositAssetDecimals);
+      let userDepositAmount = isCall
+        ? userDepositSize
+        : userDepositSize.mul(3000);
+
+      let ownerDepositSize = parseUnits("7", depositAssetDecimals);
+      let ownerDepositAmount = isCall
+        ? ownerDepositSize
+        : ownerDepositSize.mul(3000);
+
       time.revertToSnapshotAfterEach(async () => {
         await assetContract
           .connect(signers.user)
-          .approve(vaultContract.address, depositAmount);
+          .approve(vaultContract.address, userDepositAmount);
 
-        await vaultContract.deposit(depositAmount);
+        await vaultContract.deposit(userDepositAmount);
+
         await assetContract
           .connect(signers.user)
-          .transfer(addresses.owner, depositAmount);
+          .transfer(addresses.owner, ownerDepositAmount);
 
         await assetContract
           .connect(signers.owner)
-          .approve(vaultContract.address, depositAmount);
+          .approve(vaultContract.address, ownerDepositAmount);
 
-        await vaultContract.connect(signers.owner).deposit(depositAmount);
+        await vaultContract.connect(signers.owner).deposit(ownerDepositAmount);
 
         const vaultState = await vaultContract.vaultState();
         const expiry = vaultState.expiry;
@@ -1803,20 +1764,20 @@ function behavesLikeRibbonOptionsVault(params: {
         await vaultContract.connect(signers.keeper).harvest();
 
         await knoxTokenContract.setApprovalForAll(vaultContract.address, true);
-        await vaultContract.initiateWithdraw(depositAmount);
+        await vaultContract.initiateWithdraw(userDepositAmount);
       });
 
-      it("reverts when not initiated", async function () {
+      it("should revert when not initiated", async function () {
         await expect(
           vaultContract.connect(signers.owner).completeWithdraw()
         ).to.be.revertedWith("22");
       });
 
-      it("reverts when round not closed", async function () {
+      it("should revert when round not closed", async function () {
         await expect(vaultContract.completeWithdraw()).to.be.revertedWith("19");
       });
 
-      it("reverts when calling completeWithdraw twice", async function () {
+      it("should revert when called twice", async function () {
         const vaultState = await vaultContract.vaultState();
         const expiry = vaultState.expiry;
 
@@ -1827,67 +1788,300 @@ function behavesLikeRibbonOptionsVault(params: {
         await expect(vaultContract.completeWithdraw()).to.be.revertedWith("22");
       });
 
-      // TODO: Write Test
-      // it("completes the withdrawal", async function () {
-      //   assert.isTrue(false);
-      //   const firstStrikePrice = firstOptionStrike;
-      //   const settlePriceITM = isCall
-      //     ? firstStrikePrice.sub(100000000)
-      //     : firstStrikePrice.add(100000000);
-      //   await rollToSecondOption(settlePriceITM);
-      //   const pricePerShare = await vaultContract.roundPricePerShare(2);
-      //   const withdrawAmount = depositAmount
-      //     .mul(pricePerShare)
-      //     .div(
-      //       BigNumber.from(10).pow(
-      //         await vaultDisplayLib.decimals(vaultContract.address)
-      //       )
-      //     );
-      //   const lastQueuedWithdrawAmount = await vaultContract.lastQueuedWithdrawAmount();
-      //   let beforeBalance: BigNumber;
-      //   if (underlyingAsset === WETH_ADDRESS[chainId]) {
-      //     beforeBalance = await provider.getBalance(addresses.user);
-      //   } else {
-      //     beforeBalance = await assetContract.balanceOf(addresses.user);
-      //   }
-      //   const { queuedWithdrawShares: startQueuedShares } =
-      //     await vaultContract.vaultState();
-      //   const tx = await vaultContract.completeWithdraw({ gasPrice });
-      //   const receipt = await tx.wait();
+      it("should return deposit amount when total capital has remained neutral", async function () {
+        await time.increaseTo(await (await vaultContract.vaultState()).expiry);
+        await vaultContract.connect(signers.keeper).harvest();
 
-      //   const gasFee = receipt.gasUsed.mul(gasPrice);
-      //   await expect(tx)
-      //     .to.emit(vaultContract, "Withdraw")
-      //     .withArgs(addresses.user, withdrawAmount.toString(), depositAmount);
-      //   if (underlyingAsset !== WETH_ADDRESS[chainId]) {
-      //     const collateralERC20 = await getContractAt("IERC20", underlyingAsset);
-      //     await expect(tx)
-      //       .to.emit(collateralERC20, "Transfer")
-      //       .withArgs(vaultContract.address, addresses.user, withdrawAmount);
-      //   }
-      //   const { shares, round } = await vaultContract.withdrawals(addresses.user);
-      //   assert.equal(shares, 0);
-      // assert.equal(round, 2);
-      // const { queuedWithdrawShares: endQueuedShares } =
-      //   await vaultContract.vaultState();
-      // assert.bnEqual(endQueuedShares, BigNumber.from(0));
-      // assert.bnEqual(
-      //   await vaultContract.lastQueuedWithdrawAmount(),
-      //   lastQueuedWithdrawAmount.sub(withdrawAmount)
-      // );
-      // assert.bnEqual(startQueuedShares.sub(endQueuedShares), depositAmount);
-      // let actualWithdrawAmount: BigNumber;
-      // if (underlyingAsset === WETH_ADDRESS[chainId]) {
-      //   const afterBalance = await provider.getBalance(addresses.user);
-      //   actualWithdrawAmount = afterBalance.sub(beforeBalance).add(gasFee);
-      // } else {
-      //   const afterBalance = await assetContract.balanceOf(addresses.user);
-      //   actualWithdrawAmount = afterBalance.sub(beforeBalance);
-      // }
-      // // Should be less because the pps is down
-      // assert.bnLt(actualWithdrawAmount, depositAmount);
-      // assert.bnEqual(actualWithdrawAmount, withdrawAmount);
-      // });
+        const pricePerShare = await vaultContract.lpTokenPricePerShare(2);
+
+        const withdrawAmount = userDepositAmount
+          .mul(pricePerShare)
+          .div(
+            BigNumber.from(10).pow(
+              await (
+                await vaultContract.vaultParams()
+              ).decimals
+            )
+          );
+
+        let beforeBalance: BigNumber;
+
+        if (depositAsset === WETH_ADDRESS[chainId]) {
+          beforeBalance = await provider.getBalance(addresses.user);
+        } else {
+          beforeBalance = await assetContract.balanceOf(addresses.user);
+        }
+
+        const { queuedWithdrawShares: startQueuedShares } =
+          await vaultContract.vaultState();
+
+        const tx = await vaultContract.completeWithdraw({ gasPrice });
+        const receipt = await tx.wait();
+
+        const gasFee = receipt.gasUsed.mul(gasPrice);
+
+        await expect(tx)
+          .to.emit(vaultContract, "Withdraw")
+          .withArgs(
+            addresses.user,
+            userDepositAmount.toString(),
+            userDepositAmount
+          );
+
+        const { shares, round } = await vaultContract.withdrawals(
+          addresses.user
+        );
+
+        assert.equal(shares, 0);
+        assert.equal(round, 2);
+
+        const { queuedWithdrawShares: endQueuedShares } =
+          await vaultContract.vaultState();
+
+        assert.bnEqual(endQueuedShares, BigNumber.from(0));
+        assert.bnEqual(
+          startQueuedShares.sub(endQueuedShares),
+          userDepositAmount
+        );
+
+        let actualWithdrawAmount: BigNumber;
+
+        if (depositAsset === WETH_ADDRESS[chainId]) {
+          const afterBalance = await provider.getBalance(addresses.user);
+          actualWithdrawAmount = afterBalance.sub(beforeBalance).add(gasFee);
+        } else {
+          const afterBalance = await assetContract.balanceOf(addresses.user);
+          actualWithdrawAmount = afterBalance.sub(beforeBalance);
+        }
+
+        assert.bnEqual(actualWithdrawAmount, withdrawAmount);
+      });
+
+      it("should return less than deposit amount when total capital decreases", async function () {
+        let strike = 2500;
+        let strike64x64 = fixedFromFloat(strike);
+        let bnSpot = BigNumber.from(isCall ? 3000 : 2000);
+        let bnStrike = BigNumber.from(strike);
+
+        let user2PurchaseSize = parseUnits("10", depositAssetDecimals);
+
+        let user2PurchaseAmount = isCall
+          ? user2PurchaseSize
+          : user2PurchaseSize.mul(strike);
+
+        // this is the amount of funds sent back to the vault as "free liquidity"
+        let longHolderBalance = isCall
+          ? bnSpot.sub(bnStrike).mul(user2PurchaseSize).div(bnSpot)
+          : bnStrike.sub(bnSpot).mul(user2PurchaseSize);
+
+        // this is the amount of funds sent back to the vault as "queued payouts" designated for option buyers
+        let shortHolderBalance = user2PurchaseAmount.sub(longHolderBalance);
+
+        let premium = user2PurchaseAmount.div(10);
+
+        await assetContract
+          .connect(signers.user2)
+          .approve(vaultContract.address, premium);
+
+        let vaultState = await vaultContract.vaultState();
+        let expiry = vaultState.expiry;
+
+        await vaultContract
+          .connect(signers.user2)
+          .purchase(
+            BYTES_ZERO,
+            0,
+            expiry,
+            strike64x64,
+            premium,
+            user2PurchaseSize,
+            isCall
+          );
+
+        await mockPremiaPool.processExpired(
+          vaultContract.address,
+          shortHolderBalance,
+          longHolderBalance,
+          isCall
+        );
+
+        await time.increaseTo(await (await vaultContract.vaultState()).expiry);
+        await vaultContract.connect(signers.keeper).harvest();
+
+        const pricePerShare = await vaultContract.lpTokenPricePerShare(2);
+
+        const withdrawAmount = userDepositAmount
+          .mul(pricePerShare)
+          .div(
+            BigNumber.from(10).pow(
+              await (
+                await vaultContract.vaultParams()
+              ).decimals
+            )
+          );
+
+        let beforeBalance: BigNumber;
+
+        if (depositAsset === WETH_ADDRESS[chainId]) {
+          beforeBalance = await provider.getBalance(addresses.user);
+        } else {
+          beforeBalance = await assetContract.balanceOf(addresses.user);
+        }
+
+        const { queuedWithdrawShares: startQueuedShares } =
+          await vaultContract.vaultState();
+
+        const tx = await vaultContract.completeWithdraw({ gasPrice });
+        const receipt = await tx.wait();
+
+        const gasFee = receipt.gasUsed.mul(gasPrice);
+
+        await expect(tx)
+          .to.emit(vaultContract, "Withdraw")
+          .withArgs(
+            addresses.user,
+            withdrawAmount.toString(),
+            userDepositAmount
+          );
+
+        const { shares, round } = await vaultContract.withdrawals(
+          addresses.user
+        );
+
+        assert.equal(shares, 0);
+        assert.equal(round, 2);
+
+        const { queuedWithdrawShares: endQueuedShares } =
+          await vaultContract.vaultState();
+
+        assert.bnEqual(endQueuedShares, BigNumber.from(0));
+        assert.bnEqual(
+          startQueuedShares.sub(endQueuedShares),
+          userDepositAmount
+        );
+
+        let actualWithdrawAmount: BigNumber;
+
+        if (depositAsset === WETH_ADDRESS[chainId]) {
+          const afterBalance = await provider.getBalance(addresses.user);
+          actualWithdrawAmount = afterBalance.sub(beforeBalance).add(gasFee);
+        } else {
+          const afterBalance = await assetContract.balanceOf(addresses.user);
+          actualWithdrawAmount = afterBalance.sub(beforeBalance);
+        }
+
+        // amount withdrawn by user is less than deposit
+        assert.bnLt(actualWithdrawAmount, userDepositAmount);
+        assert.bnEqual(actualWithdrawAmount, withdrawAmount);
+      });
+
+      it("should return more than deposit amount when total capital increases", async function () {
+        let strike = 2500;
+        let strike64x64 = fixedFromFloat(strike);
+
+        let user2PurchaseSize = parseUnits("10", depositAssetDecimals);
+
+        let user2PurchaseAmount = isCall
+          ? user2PurchaseSize
+          : user2PurchaseSize.mul(strike);
+
+        let vaultState = await vaultContract.vaultState();
+        let expiry = vaultState.expiry;
+
+        let premium = user2PurchaseAmount.div(10);
+
+        await assetContract
+          .connect(signers.user2)
+          .approve(vaultContract.address, premium);
+
+        await vaultContract
+          .connect(signers.user2)
+          .purchase(
+            BYTES_ZERO,
+            0,
+            expiry,
+            strike64x64,
+            premium,
+            user2PurchaseSize,
+            isCall
+          );
+
+        await mockPremiaPool.processExpired(
+          vaultContract.address,
+          user2PurchaseAmount,
+          0,
+          isCall
+        );
+
+        await time.increaseTo(await (await vaultContract.vaultState()).expiry);
+        await vaultContract.connect(signers.keeper).harvest();
+
+        const pricePerShare = await vaultContract.lpTokenPricePerShare(2);
+
+        const withdrawAmount = userDepositAmount
+          .mul(pricePerShare)
+          .div(
+            BigNumber.from(10).pow(
+              await (
+                await vaultContract.vaultParams()
+              ).decimals
+            )
+          );
+
+        let beforeBalance: BigNumber;
+
+        if (depositAsset === WETH_ADDRESS[chainId]) {
+          beforeBalance = await provider.getBalance(addresses.user);
+        } else {
+          beforeBalance = await assetContract.balanceOf(addresses.user);
+        }
+
+        const { queuedWithdrawShares: startQueuedShares } =
+          await vaultContract.vaultState();
+
+        const tx = await vaultContract.completeWithdraw({ gasPrice });
+        const receipt = await tx.wait();
+
+        const gasFee = receipt.gasUsed.mul(gasPrice);
+
+        await expect(tx)
+          .to.emit(vaultContract, "Withdraw")
+          .withArgs(
+            addresses.user,
+            withdrawAmount.toString(),
+            userDepositAmount
+          );
+
+        const { shares, round } = await vaultContract.withdrawals(
+          addresses.user
+        );
+
+        assert.equal(shares, 0);
+        assert.equal(round, 2);
+
+        const { queuedWithdrawShares: endQueuedShares } =
+          await vaultContract.vaultState();
+
+        assert.bnEqual(endQueuedShares, BigNumber.from(0));
+        assert.bnEqual(
+          startQueuedShares.sub(endQueuedShares),
+          userDepositAmount
+        );
+
+        let actualWithdrawAmount: BigNumber;
+
+        if (depositAsset === WETH_ADDRESS[chainId]) {
+          const afterBalance = await provider.getBalance(addresses.user);
+          actualWithdrawAmount = afterBalance.sub(beforeBalance).add(gasFee);
+        } else {
+          const afterBalance = await assetContract.balanceOf(addresses.user);
+          actualWithdrawAmount = afterBalance.sub(beforeBalance);
+        }
+
+        // amount withdrawn by user is greater than deposit
+        assert.bnGt(actualWithdrawAmount, userDepositAmount);
+        assert.bnEqual(actualWithdrawAmount, withdrawAmount);
+      });
 
       // it("fits gas budget [ @skip-on-coverage ]", async function () {
       //   const vaultParams = await vaultContract.vaultParams();
@@ -1911,7 +2105,7 @@ function behavesLikeRibbonOptionsVault(params: {
     describe("#maxRedeem", () => {
       time.revertToSnapshotAfterEach(async function () {});
 
-      it("is able to redeem deposit at new price per share", async function () {
+      it("should remove all unredeemed shares from vault and transfer to user when called", async function () {
         await assetContract
           .connect(signers.user)
           .approve(vaultContract.address, depositAmount);
@@ -1935,6 +2129,7 @@ function behavesLikeRibbonOptionsVault(params: {
           await knoxTokenContract.balanceOf(addresses.user, LP_TOKEN_ID),
           depositAmount
         );
+
         assert.bnEqual(
           await knoxTokenContract.balanceOf(vaultContract.address, LP_TOKEN_ID),
           BigNumber.from(0)
@@ -1952,7 +2147,7 @@ function behavesLikeRibbonOptionsVault(params: {
         assert.bnEqual(unredeemedShares, BigNumber.from(0));
       });
 
-      it("changes user and vaultContract balances only once when redeeming twice", async function () {
+      it("should change user and vault balances only once when called twice", async function () {
         await assetContract
           .connect(signers.user)
           .approve(vaultContract.address, depositAmount);
@@ -2032,7 +2227,7 @@ function behavesLikeRibbonOptionsVault(params: {
 
     describe("#redeem", () => {
       time.revertToSnapshotAfterEach();
-      it("reverts when 0 passed", async function () {
+      it("should revert when 0 passed", async function () {
         await assetContract
           .connect(signers.user)
           .approve(vaultContract.address, depositAmount);
@@ -2047,7 +2242,7 @@ function behavesLikeRibbonOptionsVault(params: {
         await expect(vaultContract.redeem(0)).to.be.revertedWith("13");
       });
 
-      it("reverts when redeeming more than available", async function () {
+      it("should revert when redeeming more than available", async function () {
         await assetContract
           .connect(signers.user)
           .approve(vaultContract.address, depositAmount);
@@ -2111,135 +2306,5 @@ function behavesLikeRibbonOptionsVault(params: {
         assert.bnEqual(unredeemedShares2, BigNumber.from(0));
       });
     });
-
-    // describe("#purchase", () => {
-    //   let isCall: boolean;
-
-    //   time.revertToSnapshotAfterEach(async () => {
-    //     const vaultParams = await vaultContract.vaultParams();
-    //     isCall = vaultParams.isCall;
-
-    //     const depositAmount = parseUnits("50", depositAssetDecimals);
-
-    //     await assetContract
-    //       .connect(signers.user)
-    //       .approve(vaultContract.address, depositAmount);
-
-    //     await vaultContract.deposit(depositAmount);
-
-    //             const vaultParams = await vaultContract.vaultParams();
-    // const expiry = vaultParams.expiry;
-
-    // await time.increaseTo(expiry);
-    //     await vaultContract.connect(signers.keeper).harvest();
-    //   });
-
-    //   it("reverts if position is too small", async function () {
-    //     await mockRegistry.connect(signers.admin).setIsTrue(false);
-
-    //     await expect(
-    //       vaultContract.purchase(BYTES_ZERO, 0, 0, 0, 0, 0, 0, isCall)
-    //     ).to.be.revertedWith("vaultContract/size-below-minimum");
-    //   });
-
-    //   it("reverts if available capital is exceeded", async function () {
-    //     let size: BigNumber;
-
-    //     if (isCall) {
-    //       size = parseUnits("51", depositAssetDecimals);
-
-    //       await expect(
-    //         vaultContract.purchase(BYTES_ZERO, 0, 0, 0, 0, 0, size, isCall)
-    //       ).to.be.revertedWith("vaultContract/exceeds-available-capital");
-    //     } else {
-    //       size = parseUnits("1", depositAssetDecimals);
-    //       let strike = fixedFromFloat(2500);
-
-    //       await expect(
-    //         vaultContract.purchase(BYTES_ZERO, 0, 0, strike, 0, 0, size, isCall)
-    //       ).to.be.revertedWith("vaultContract/exceeds-available-capital");
-    //     }
-    //   });
-
-    //   it("reverts if signature is invalid", async function () {
-    //     let size = parseUnits("1", depositAssetDecimals);
-    //     let strike = fixedFromFloat(50);
-
-    //     await mockRegistry.connect(signers.admin).setIsTrue(false);
-    //     await expect(
-    //       vaultContract.purchase(BYTES_ZERO, 0, 0, strike, 0, 0, size, isCall)
-    //     ).to.be.revertedWith("vaultContract/invalid-signature");
-    //   });
-
-    //   it("vaultContract balance decreases by the correct amount", async function () {
-    //     let totalBalanceBefore = await vaultContract.totalBalance();
-    //     let vaultBalanceBefore = await assetContract.balanceOf(vaultContract.address);
-
-    //     let size: BigNumber;
-    //     if (isCall) {
-    //       size = parseUnits("50", depositAssetDecimals);
-    //     } else {
-    //       size = parseUnits("1", depositAssetDecimals);
-    //     }
-
-    //     let strike = fixedFromFloat(50);
-    //     await vaultContract.purchase(BYTES_ZERO, 0, 0, strike, 0, 0, size, isCall);
-
-    //     let totalBalanceAfter = await vaultContract.totalBalance();
-    //     let vaultBalanceAfter = await assetContract.balanceOf(vaultContract.address);
-
-    //     // totalBalance() should not change since premium is 0.
-    //     expect(totalBalanceBefore.toString()).to.be.equal(
-    //       totalBalanceAfter.toString()
-    //     );
-
-    //     // TODO: totalBalance is incorrect because the lockedAmount is not accounting for Payoff amount.
-
-    //     expect(vaultBalanceBefore.toString()).to.be.equal(
-    //       vaultBalanceAfter
-    //         .add(parseUnits("50", depositAssetDecimals))
-    //         .toString()
-    //     );
-    //   });
-
-    //   it("buyers balance decreases by the correct amount", async function () {
-    //     let buyerBalanceBefore = await assetContract.balanceOf(addresses.user);
-    //     let totalBalanceBefore = await vaultContract.totalBalance();
-
-    //     await assetContract
-    //       .connect(signers.user)
-    //       .approve(vaultContract.address, buyerBalanceBefore);
-
-    //     let size = parseUnits("50", depositAssetDecimals);
-    //     let strike = fixedFromFloat(1);
-    //     let premium = fixedFromFloat(1);
-
-    //     await vaultContract.purchase(
-    //       BYTES_ZERO,
-    //       0,
-    //       0,
-    //       strike,
-    //       0,
-    //       premium,
-    //       size,
-    //       isCall
-    //     );
-
-    //     let buyerBalanceAfter = await assetContract.balanceOf(addresses.user);
-    //     let totalBalanceAfter = await vaultContract.totalBalance();
-
-    //     expect(totalBalanceBefore.toString()).to.be.equal(
-    //       totalBalanceAfter
-    //         .sub(parseUnits("50", depositAssetDecimals))
-    //         .toString()
-    //     );
-
-    //     expect(buyerBalanceBefore.toString()).to.be.equal(
-    //       buyerBalanceAfter
-    //         .add(parseUnits("50", depositAssetDecimals))
-    //         .toString()
-    //     );
-    //   });
-    // });
   });
 }

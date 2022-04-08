@@ -91,7 +91,7 @@ library VaultLifecycle {
         uint256 decimals,
         uint256 queuedDeposits,
         uint256 queuedWithdrawShares,
-        uint256 queuedWithdrawals
+        uint256 lastQueuedWithdrawals
     ) external pure returns (uint256 balanceForVaultFees) {
         uint256 pricePerShareBeforeFee = ShareMath.pricePerShare(
             currentShareSupply,
@@ -100,7 +100,7 @@ library VaultLifecycle {
             decimals
         );
 
-        uint256 queuedWithdrawBeforeFee = currentShareSupply > 0
+        uint256 queuedWithdrawalsBeforeFee = currentShareSupply > 0
             ? ShareMath.sharesToAsset(
                 queuedWithdrawShares,
                 pricePerShareBeforeFee,
@@ -112,29 +112,25 @@ library VaultLifecycle {
          * Deduct the difference between the newly scheduled withdrawals
          * and the older withdrawals so we can charge them fees before they leave
          */
-        uint256 withdrawAmountDiff = queuedWithdrawBeforeFee > queuedWithdrawals
-            ? queuedWithdrawBeforeFee.sub(queuedWithdrawals)
-            : 0;
-
-        balanceForVaultFees = currentBalance.sub(queuedWithdrawBeforeFee).add(
-            withdrawAmountDiff
-        );
+        balanceForVaultFees = queuedWithdrawalsBeforeFee > lastQueuedWithdrawals
+            ? currentBalance.sub(lastQueuedWithdrawals)
+            : currentBalance.sub(queuedWithdrawalsBeforeFee);
     }
 
-    /**
-     * @notice Calculates the performance and management fee for this week's round
-     * @param balanceForVaultFees is the balance of funds held on the vault after closing short
-     * @param lastlockedCollateral is the amount of funds locked from the previous round
-     * @param queuedDeposits is the pending deposit amount
-     * @param performanceFeePercent is the performance fee pct.
-     * @param managementFeePercent is the management fee pct.
-     * @return performanceFeeInAsset is the performance fee
-     * @return managementFeeInAsset is the management fee
-     * @return vaultFee is the total fees
-     */
+    // /**
+    //  * @notice Calculates the performance and management fee for this week's round
+    //  * @param balanceForVaultFees is the balance of funds held on the vault after closing short
+    //  * @param lastlockedCollateral is the amount of funds locked from the previous round
+    //  * @param queuedDeposits is the pending deposit amount
+    //  * @param performanceFeePercent is the performance fee pct.
+    //  * @param managementFeePercent is the management fee pct.
+    //  * @return performanceFeeInAsset is the performance fee
+    //  * @return managementFeeInAsset is the management fee
+    //  * @return vaultFee is the total fees
+    //  */
     function getVaultFees(
         uint256 balanceForVaultFees,
-        uint256 lastlockedCollateral,
+        uint256 lastTotalCapital,
         uint256 queuedDeposits,
         uint256 performanceFeePercent,
         uint256 managementFeePercent
@@ -153,32 +149,28 @@ library VaultLifecycle {
             ? balanceForVaultFees.sub(queuedDeposits)
             : 0;
 
-        uint256 _performanceFeeInAsset;
-        uint256 _managementFeeInAsset;
-        uint256 _vaultFee;
-
         /* Take performance fee and management fee ONLY if difference between 
         last week and this week's vault deposits, taking into account pending 
         deposits and withdrawals, is positive. If it is negative, last week's 
         option expired ITM past breakeven, and the vault took a loss so we do 
         not collect performance fee for last week */
-        if (lockedBalanceSansPending > lastlockedCollateral) {
-            _performanceFeeInAsset = performanceFeePercent > 0
-                ? lockedBalanceSansPending
-                    .sub(lastlockedCollateral)
-                    .mul(performanceFeePercent)
-                    .div(100 * Vault.FEE_MULTIPLIER)
-                : 0;
-            _managementFeeInAsset = managementFeePercent > 0
-                ? lockedBalanceSansPending.mul(managementFeePercent).div(
-                    100 * Vault.FEE_MULTIPLIER
-                )
-                : 0;
+        if (lastTotalCapital > 0) {
+            if (lockedBalanceSansPending > lastTotalCapital) {
+                performanceFeeInAsset = performanceFeePercent > 0
+                    ? lockedBalanceSansPending
+                        .sub(lastTotalCapital)
+                        .mul(performanceFeePercent)
+                        .div(100 * Vault.FEE_MULTIPLIER)
+                    : 0;
+                managementFeeInAsset = managementFeePercent > 0
+                    ? lockedBalanceSansPending.mul(managementFeePercent).div(
+                        100 * Vault.FEE_MULTIPLIER
+                    )
+                    : 0;
 
-            _vaultFee = _performanceFeeInAsset.add(_managementFeeInAsset);
+                vaultFee = performanceFeeInAsset.add(managementFeeInAsset);
+            }
         }
-
-        return (_performanceFeeInAsset, _managementFeeInAsset, _vaultFee);
     }
 
     // /**
