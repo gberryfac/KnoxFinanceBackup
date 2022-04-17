@@ -91,12 +91,13 @@ export async function impersonateWhale(
   return [signers, addresses, assetContract];
 }
 
-export async function getThetaVaultFixture(
+export async function getVaultFixture(
   poolContract: Contract,
   vaultDisplayLibrary: Contract,
   vaultLifecycleLibrary: Contract,
   vaultLogicLibrary: Contract,
   registryContact: Contract,
+  strategyContractName: string,
   tokenName: string,
   tokenDecimals: number,
   depositAsset: string,
@@ -138,7 +139,7 @@ export async function getThetaVaultFixture(
 
   const vaultContract = (
     await utils.deployProxy(
-      "PremiaThetaVault",
+      strategyContractName,
       signers.admin,
       initializeArgs,
       [poolContract.address, WETH_ADDRESS[chainId], registryContact.address],
