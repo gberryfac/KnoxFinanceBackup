@@ -63,7 +63,7 @@ contract BaseVault is OwnableUpgradeable, ReentrancyGuardUpgradeable {
     /// @notice Management fee charged on entire AUM in rollover. Only charged when there is no loss.
     uint256 public managementFee;
 
-    uint256 public totalCapital;
+    uint256 public lastTotalCapital;
 
     // Gap is left to avoid storage collisions. Though RibbonVault is not upgradeable, we add this as a safety measure.
     uint256[30] private ____gap;
@@ -708,7 +708,7 @@ contract BaseVault is OwnableUpgradeable, ReentrancyGuardUpgradeable {
                 totalVaultFee
             ) = VaultLifecycle.getVaultFees(
                 balanceForVaultFees,
-                totalCapital,
+                lastTotalCapital,
                 vaultState.queuedDeposits,
                 performanceFee,
                 managementFee
@@ -755,7 +755,9 @@ contract BaseVault is OwnableUpgradeable, ReentrancyGuardUpgradeable {
             vaultState.queuedWithdrawals = uint128(queuedWithdrawals);
 
             // Total capital should not include payouts, withdrawals, or vault fees.
-            totalCapital = currentBalance.sub(queuedWithdrawals);
+            // TODO: MOVE `lastTotalCapital` TO VAULTSTATE
+            // @notice the vault total capital at the start of the last round
+            lastTotalCapital = currentBalance.sub(queuedWithdrawals);
         }
 
         IKnoxToken(token).mint(

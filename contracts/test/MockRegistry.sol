@@ -9,12 +9,12 @@ contract MockRegistry {
     }
 
     function authenticate(
-        bytes memory signature,
-        uint64 deadline,
-        uint64 maturity,
-        int128 strikePrice,
-        int128 premium,
-        bool isCall
+        bytes memory,
+        uint64,
+        uint64,
+        int128,
+        int128,
+        bool
     ) external view returns (bool) {
         return isTrue;
     }

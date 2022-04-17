@@ -181,12 +181,13 @@ function behavesLikeRibbonOptionsVault(params: {
         addresses
       );
 
-      [vaultContract, knoxTokenContract] = await fixtures.getThetaVaultFixture(
+      [vaultContract, knoxTokenContract] = await fixtures.getVaultFixture(
         poolContract,
         vaultDisplayLibrary,
         vaultLifecycleLibrary,
         vaultLogicLibrary,
         mockRegistry,
+        "PremiaThetaVault",
         tokenName,
         tokenDecimals,
         depositAsset,

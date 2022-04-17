@@ -31,7 +31,7 @@ contract TestVaultLifecycle {
         uint256 managementFeePercent
     )
         external
-        view
+        pure
         returns (
             uint256 performanceFeeInAsset,
             uint256 managementFeeInAsset,
