@@ -396,7 +396,7 @@ function behavesLikeRibbonOptionsVault(params: {
       });
     });
 
-    describe("#closePosition", () => {
+    describe("#claim", () => {
       let strike = 2500;
       let size = parseUnits("15", depositAssetDecimals);
       let liquidity = isCall ? size : size.mul(strike);
@@ -440,7 +440,7 @@ function behavesLikeRibbonOptionsVault(params: {
 
         assert.isTrue(payout.amount.isZero());
 
-        let tx = vaultContract.closePosition(
+        let tx = vaultContract.claim(
           addresses.user,
           LONG_TOKEN_ID,
           parseEther("1")
@@ -475,7 +475,7 @@ function behavesLikeRibbonOptionsVault(params: {
           LONG_TOKEN_ID
         );
 
-        let tx = vaultContract.closePosition(
+        let tx = vaultContract.claim(
           addresses.user,
           LONG_TOKEN_ID,
           balance.add(parseUnits("10", "wei"))
@@ -521,7 +521,7 @@ function behavesLikeRibbonOptionsVault(params: {
           LONG_TOKEN_ID
         );
 
-        let tx = vaultContract.closePosition(
+        let tx = vaultContract.claim(
           addresses.user,
           LONG_TOKEN_ID,
           balance.add(parseUnits("10", "wei"))
@@ -557,7 +557,7 @@ function behavesLikeRibbonOptionsVault(params: {
             : await assetContract.balanceOf(addresses.user);
 
         // Withdraw entire balance
-        const tx = await vaultContract.closePosition(
+        const tx = await vaultContract.claim(
           addresses.user,
           LONG_TOKEN_ID,
           userWrappedTokenBalanceBefore,
@@ -651,7 +651,7 @@ function behavesLikeRibbonOptionsVault(params: {
         );
 
         // Withdraw entire balance
-        let tx1 = await vaultContract.closePosition(
+        let tx1 = await vaultContract.claim(
           addresses.user,
           LONG_TOKEN_ID,
           userWrappedTokenBalance,
@@ -663,14 +663,9 @@ function behavesLikeRibbonOptionsVault(params: {
 
         let tx2 = await vaultContract
           .connect(signers.user2)
-          .closePosition(
-            addresses.user2,
-            LONG_TOKEN_ID,
-            user2WrappedTokenBalance,
-            {
-              gasPrice,
-            }
-          );
+          .claim(addresses.user2, LONG_TOKEN_ID, user2WrappedTokenBalance, {
+            gasPrice,
+          });
 
         const receipt2 = await tx2.wait();
         const gasFee2 = receipt2.gasUsed.mul(gasPrice);

@@ -21,7 +21,7 @@ contract MockStrategy is Vault {
         uint256 contractSize,
         bool isCall
     ) external {
-        _openPosition(
+        borrow(
             signature,
             deadline,
             maturity,

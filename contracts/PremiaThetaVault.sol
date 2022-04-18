@@ -50,7 +50,7 @@ contract PremiaThetaVault is Vault {
     ) external nonReentrant returns (uint256 longTokenId) {
         // TODO: PREVENT USERS FROM BUYING 48 HOURS PRIOR TO ROUND CLOSE
 
-        uint256 liquidityRequired = _openPosition(
+        uint256 liquidityRequired = borrow(
             signature,
             deadline,
             maturity,
@@ -98,7 +98,7 @@ contract PremiaThetaVault is Vault {
         IKnoxToken(token).mint(msg.sender, longTokenId, contractSize, "");
     }
 
-    function closePosition(
+    function claim(
         address account,
         uint256 longTokenId,
         uint256 shares

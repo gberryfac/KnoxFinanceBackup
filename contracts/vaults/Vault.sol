@@ -567,7 +567,7 @@ contract Vault is VaultStorage, OwnableUpgradeable, ReentrancyGuardUpgradeable {
     // TODO: `purchaseETH`
     // function purchaseETH() public {}
 
-    function _openPosition(
+    function borrow(
         bytes memory signature,
         uint64 deadline,
         uint64 maturity,
