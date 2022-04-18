@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "./../interfaces/IPremiaPool.sol";
+import "./interfaces/IPremiaPool.sol";
 
-import "./BaseVault.sol";
+import "./vaults/Vault.sol";
 
 import "hardhat/console.sol";
 
-contract PremiaThetaVault is BaseVault {
+contract PremiaThetaVault is Vault {
     mapping(uint256 => uint256) public roundByLongTokenId;
     mapping(uint256 => Payout) public payouts;
 
@@ -32,7 +32,7 @@ contract PremiaThetaVault is BaseVault {
         address _pool,
         address _weth,
         address _registry
-    ) BaseVault(_weth, _registry) {
+    ) Vault(_weth, _registry) {
         require(_pool != address(0), Errors.ADDRESS_NOT_PROVIDED);
         pool = _pool;
     }

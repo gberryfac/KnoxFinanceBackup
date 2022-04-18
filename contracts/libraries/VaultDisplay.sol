@@ -3,12 +3,12 @@ pragma solidity ^0.8.0;
 
 import "./../interfaces/IKnoxToken.sol";
 import "../libraries/ShareMath.sol";
-import "../libraries/Vault.sol";
+import "../libraries/VaultSchema.sol";
 
 import "hardhat/console.sol";
 
 library VaultDisplay {
-    using ShareMath for Vault.DepositReceipt;
+    using ShareMath for VaultSchema.DepositReceipt;
 
     /**
      * @notice Returns the asset balance held on the vault for the account
@@ -22,11 +22,11 @@ library VaultDisplay {
         uint256 totalBalance,
         address account,
         address token,
-        Vault.DepositReceipt memory depositReceipt,
+        VaultSchema.DepositReceipt memory depositReceipt,
         mapping(uint256 => uint256) storage lpTokenPricePerShare
     ) external view returns (uint256) {
         uint256 assetPerShare = ShareMath.pricePerShare(
-            IKnoxToken(token).totalSupply(Vault.LP_TOKEN_ID),
+            IKnoxToken(token).totalSupply(VaultSchema.LP_TOKEN_ID),
             totalBalance,
             queuedDeposits,
             decimals
@@ -57,7 +57,7 @@ library VaultDisplay {
         uint256 decimals,
         address account,
         address token,
-        Vault.DepositReceipt memory depositReceipt,
+        VaultSchema.DepositReceipt memory depositReceipt,
         mapping(uint256 => uint256) storage lpTokenPricePerShare
     ) public view returns (uint256) {
         (uint256 heldByAccount, uint256 heldByVault) = lpShareBalances(
@@ -83,11 +83,14 @@ library VaultDisplay {
         uint256 decimals,
         address account,
         address token,
-        Vault.DepositReceipt memory depositReceipt,
+        VaultSchema.DepositReceipt memory depositReceipt,
         mapping(uint256 => uint256) storage lpTokenPricePerShare
     ) public view returns (uint256 heldByAccount, uint256 heldByVault) {
         if (depositReceipt.round < ShareMath.PLACEHOLDER_UINT) {
-            return (IKnoxToken(token).balanceOf(account, Vault.LP_TOKEN_ID), 0);
+            return (
+                IKnoxToken(token).balanceOf(account, VaultSchema.LP_TOKEN_ID),
+                0
+            );
         }
 
         uint256 unredeemedShares = depositReceipt.getSharesFromReceipt(
@@ -97,7 +100,7 @@ library VaultDisplay {
         );
 
         return (
-            IKnoxToken(token).balanceOf(account, Vault.LP_TOKEN_ID),
+            IKnoxToken(token).balanceOf(account, VaultSchema.LP_TOKEN_ID),
             unredeemedShares
         );
     }
@@ -113,7 +116,7 @@ library VaultDisplay {
     ) external view returns (uint256) {
         return
             ShareMath.pricePerShare(
-                IKnoxToken(token).totalSupply(Vault.LP_TOKEN_ID),
+                IKnoxToken(token).totalSupply(VaultSchema.LP_TOKEN_ID),
                 totalBalance,
                 queuedDeposits,
                 decimals

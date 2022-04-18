@@ -37,7 +37,7 @@ const chainId = network.config.chainId;
 moment.tz.setDefault("UTC");
 
 let block;
-describe("BaseVault", () => {
+describe("Vault", () => {
   behavesLikeRibbonOptionsVault({
     whale: WHALE_ADDRESS[chainId],
     name: `Ribbon ETH Theta Vault (Call)`,
@@ -260,7 +260,7 @@ function behavesLikeRibbonOptionsVault(params: {
     let testVault: Contract;
     describe("#initialize", () => {
       time.revertToSnapshotAfterEach(async function () {
-        const BaseVault = await ethers.getContractFactory("BaseVault", {
+        const Vault = await ethers.getContractFactory("Vault", {
           libraries: {
             VaultDisplay: vaultDisplayLibrary.address,
             VaultLifecycle: vaultLifecycleLibrary.address,
@@ -273,7 +273,7 @@ function behavesLikeRibbonOptionsVault(params: {
             ? assetContract.address
             : WETH_ADDRESS[chainId];
 
-        testVault = await BaseVault.deploy(wethAddress, mockRegistry.address);
+        testVault = await Vault.deploy(wethAddress, mockRegistry.address);
       });
 
       it("initializes with correct values", async () => {

@@ -3,9 +3,10 @@ pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 
-import "./ShareMath.sol";
-import "./Vault.sol";
+import "./Constants.sol";
 import "./Errors.sol";
+import "./ShareMath.sol";
+import "./VaultSchema.sol";
 
 import "hardhat/console.sol";
 
@@ -43,17 +44,17 @@ library VaultLifecycle {
         uint256 performanceFee,
         uint256 managementFee,
         string calldata tokenName,
-        Vault.VaultParams calldata _vaultParams
+        VaultSchema.VaultParams calldata _vaultParams
     ) external pure {
         require(owner != address(0), Errors.ADDRESS_NOT_PROVIDED);
         require(keeper != address(0), Errors.ADDRESS_NOT_PROVIDED);
         require(feeRecipient != address(0), Errors.ADDRESS_NOT_PROVIDED);
         require(
-            performanceFee < 100 * Vault.FEE_MULTIPLIER,
+            performanceFee < 100 * Constants.FEE_MULTIPLIER,
             Errors.INVALID_FEE_AMOUNT
         );
         require(
-            managementFee < 100 * Vault.FEE_MULTIPLIER,
+            managementFee < 100 * Constants.FEE_MULTIPLIER,
             Errors.INVALID_FEE_AMOUNT
         );
         require(bytes(tokenName).length > 0, Errors.VAULT_TOKEN_NAME_INVALID);
@@ -160,11 +161,11 @@ library VaultLifecycle {
                     ? lockedBalanceSansPending
                         .sub(lastTotalCapital)
                         .mul(performanceFeePercent)
-                        .div(100 * Vault.FEE_MULTIPLIER)
+                        .div(100 * Constants.FEE_MULTIPLIER)
                     : 0;
                 managementFeeInAsset = managementFeePercent > 0
                     ? lockedBalanceSansPending.mul(managementFeePercent).div(
-                        100 * Vault.FEE_MULTIPLIER
+                        100 * Constants.FEE_MULTIPLIER
                     )
                     : 0;
 

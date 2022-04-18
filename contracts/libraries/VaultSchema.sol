@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-library Vault {
+library VaultSchema {
     // @notice
     uint256 public constant LP_TOKEN_ID =
         0x0999999999999999999999999999999999999999999999999999999999999999;
 
-    // @notice Fees are 6-decimal places. For example: 20 * 10**6 = 20%
-    uint256 public constant FEE_MULTIPLIER = 10**6;
+    // // @notice Fees are 6-decimal places. For example: 20 * 10**6 = 20%
+    // uint256 public constant FEE_MULTIPLIER = 10**6;
 
-    // @notice Placeholder uint value to prevent cold writes
-    uint256 public constant PLACEHOLDER_UINT = 1;
+    // // @notice Placeholder uint value to prevent cold writes
+    // uint256 public constant PLACEHOLDER_UINT = 1;
 
     // TODO: VERIFY assetDecimals, underlyingDecimals, minimumContractSize
 
@@ -41,6 +41,8 @@ library Vault {
         uint16 round;
         // @notice Amount of collateral currently used to underwrite options
         uint104 lockedCollateral;
+        //
+        uint256 lastTotalCapital;
         // 32 byte slot 2
         // @notice Amount withheld for weekly vault deposits
         uint128 queuedDeposits;

@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "abdk-libraries-solidity/ABDKMath64x64.sol";
 
-import "./Vault.sol";
+import "./VaultSchema.sol";
 
 import "hardhat/console.sol";
 
@@ -55,7 +55,7 @@ library ShareMath {
      * @return unredeemedShares is the user's virtual balance of shares that are owed
      */
     function getSharesFromReceipt(
-        Vault.DepositReceipt memory depositReceipt,
+        VaultSchema.DepositReceipt memory depositReceipt,
         uint256 currentRound,
         uint256 assetPerShare,
         uint256 decimals

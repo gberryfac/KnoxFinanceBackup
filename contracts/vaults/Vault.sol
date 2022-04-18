@@ -12,66 +12,25 @@ import "./../interfaces/IKnoxToken.sol";
 import "./../interfaces/IRegistry.sol";
 import "./../interfaces/IWETH.sol";
 
+import "./../libraries/Constants.sol";
 import "./../libraries/Errors.sol";
 import "./../libraries/ShareMath.sol";
-import "./../libraries/Vault.sol";
 import "./../libraries/VaultDisplay.sol";
 import "./../libraries/VaultLifecycle.sol";
 import "./../libraries/VaultLogic.sol";
+import "./../libraries/VaultSchema.sol";
+
+import "./VaultStorage.sol";
 
 import "../KnoxToken.sol";
 
 import "hardhat/console.sol";
 
-contract BaseVault is OwnableUpgradeable, ReentrancyGuardUpgradeable {
+contract Vault is VaultStorage, OwnableUpgradeable, ReentrancyGuardUpgradeable {
     using SafeERC20 for IERC20;
     using SafeMath for uint256;
-    using ShareMath for Vault.DepositReceipt;
+    using ShareMath for VaultSchema.DepositReceipt;
     using ABDKMath64x64 for int128;
-
-    /************************************************
-     *  NON UPGRADEABLE STORAGE
-     ***********************************************/
-
-    /// @notice Stores the user's pending deposit for the round
-    mapping(address => Vault.DepositReceipt) public depositReceipts;
-
-    /// @notice Stores pending user withdrawals
-    mapping(address => Vault.Withdrawal) public withdrawals;
-
-    /// @notice On every round's close, the pricePerShare value of an rTHETA token is stored
-    /// This is used to determine the number of shares to be returned
-    /// to a user with their DepositReceipt.depositAmount
-    mapping(uint256 => uint256) public lpTokenPricePerShare;
-
-    /// @notice Vault's parameters like cap, decimals
-    Vault.VaultParams public vaultParams;
-
-    /// @notice Vault's lifecycle state like round and locked amounts
-    Vault.VaultState public vaultState;
-
-    /// @notice Fee recipient for the performance and management fees
-    address public feeRecipient;
-
-    /// @notice role in charge of weekly vault operations such as rollover and burnRemainingOTokens
-    // no access to critical vault changes
-    address public keeper;
-
-    /// @notice Performance fee charged on premiums earned in rollover. Only charged when there is no loss.
-    uint256 public performanceFee;
-
-    /// @notice Management fee charged on entire AUM in rollover. Only charged when there is no loss.
-    uint256 public managementFee;
-
-    uint256 public lastTotalCapital;
-
-    // Gap is left to avoid storage collisions. Though RibbonVault is not upgradeable, we add this as a safety measure.
-    uint256[30] private ____gap;
-
-    // *IMPORTANT* NO NEW STORAGE VARIABLES SHOULD BE ADDED HERE
-    // This is to prevent storage collisions. All storage variables should be appended to VaultStorage
-    // Read this documentation to learn more:
-    // https://docs.openzeppelin.com/upgrades-plugins/1.x/writing-upgradeable#modifying-your-contracts
 
     /************************************************
      *  IMMUTABLES & CONSTANTS
@@ -80,10 +39,6 @@ contract BaseVault is OwnableUpgradeable, ReentrancyGuardUpgradeable {
     address public immutable WETH;
     address public immutable registry;
     address public token;
-
-    // Number of weeks per year = 52.142857 weeks * FEE_MULTIPLIER = 52142857
-    // Dividing by weeks per year requires doing num.mul(FEE_MULTIPLIER).div(WEEKS_PER_YEAR)
-    uint256 private constant WEEKS_PER_YEAR = 52142857;
 
     /************************************************
      *  EVENTS
@@ -125,7 +80,7 @@ contract BaseVault is OwnableUpgradeable, ReentrancyGuardUpgradeable {
      ***********************************************/
 
     /**
-     * @notice Initialization parameters for the vault.
+     * @notice Initialization parameters for the vaultSchema.
      * @param _owner is the owner of the vault with critical permissions
      * @param _feeRecipient is the address to recieve vault performance and management fees
      * @param _managementFee is the management fee pct.
@@ -162,7 +117,7 @@ contract BaseVault is OwnableUpgradeable, ReentrancyGuardUpgradeable {
      */
     function initialize(
         InitParams calldata _initParams,
-        Vault.VaultParams calldata _vaultParams
+        VaultSchema.VaultParams calldata _vaultParams
     ) external initializer {
         VaultLifecycle.verifyInitializerParams(
             _initParams._owner,
@@ -185,8 +140,8 @@ contract BaseVault is OwnableUpgradeable, ReentrancyGuardUpgradeable {
 
         managementFee = _initParams
             ._managementFee
-            .mul(Vault.FEE_MULTIPLIER)
-            .div(WEEKS_PER_YEAR);
+            .mul(Constants.FEE_MULTIPLIER)
+            .div(Constants.WEEKS_PER_YEAR);
 
         vaultParams = _vaultParams;
 
@@ -233,14 +188,14 @@ contract BaseVault is OwnableUpgradeable, ReentrancyGuardUpgradeable {
      */
     function setManagementFee(uint256 newManagementFee) external onlyOwner {
         require(
-            newManagementFee < 100 * Vault.FEE_MULTIPLIER,
+            newManagementFee < 100 * Constants.FEE_MULTIPLIER,
             Errors.INVALID_FEE_AMOUNT
         );
 
         // We are dividing annualized management fee by num weeks in a year
         uint256 tmpManagementFee = newManagementFee
-            .mul(Vault.FEE_MULTIPLIER)
-            .div(WEEKS_PER_YEAR);
+            .mul(Constants.FEE_MULTIPLIER)
+            .div(Constants.WEEKS_PER_YEAR);
 
         emit ManagementFeeSet(managementFee, newManagementFee);
 
@@ -253,7 +208,7 @@ contract BaseVault is OwnableUpgradeable, ReentrancyGuardUpgradeable {
      */
     function setPerformanceFee(uint256 newPerformanceFee) external onlyOwner {
         require(
-            newPerformanceFee < 100 * Vault.FEE_MULTIPLIER,
+            newPerformanceFee < 100 * Constants.FEE_MULTIPLIER,
             Errors.INVALID_FEE_AMOUNT
         );
 
@@ -362,7 +317,9 @@ contract BaseVault is OwnableUpgradeable, ReentrancyGuardUpgradeable {
 
         emit Deposit(creditor, amount, currentRound);
 
-        Vault.DepositReceipt memory depositReceipt = depositReceipts[creditor];
+        VaultSchema.DepositReceipt memory depositReceipt = depositReceipts[
+            creditor
+        ];
 
         // If we have an unprocessed pending deposit from the previous rounds, we have to process it.
         uint256 unredeemedShares = depositReceipt.getSharesFromReceipt(
@@ -381,7 +338,7 @@ contract BaseVault is OwnableUpgradeable, ReentrancyGuardUpgradeable {
 
         ShareMath.assertUint104(depositAmount);
 
-        depositReceipts[creditor] = Vault.DepositReceipt({
+        depositReceipts[creditor] = VaultSchema.DepositReceipt({
             round: uint16(currentRound),
             amount: uint104(depositAmount),
             unredeemedShares: uint128(unredeemedShares)
@@ -400,7 +357,7 @@ contract BaseVault is OwnableUpgradeable, ReentrancyGuardUpgradeable {
      * @param amount is the amount to withdraw
      */
     function withdrawInstantly(uint256 amount) external nonReentrant {
-        Vault.DepositReceipt storage depositReceipt = depositReceipts[
+        VaultSchema.DepositReceipt storage depositReceipt = depositReceipts[
             msg.sender
         ];
 
@@ -446,7 +403,7 @@ contract BaseVault is OwnableUpgradeable, ReentrancyGuardUpgradeable {
 
         // This caches the `round` variable used in lpShareBalances
         uint256 currentRound = vaultState.round;
-        Vault.Withdrawal storage withdrawal = withdrawals[msg.sender];
+        VaultSchema.Withdrawal storage withdrawal = withdrawals[msg.sender];
 
         emit InitiateWithdraw(msg.sender, numShares, currentRound);
 
@@ -479,7 +436,7 @@ contract BaseVault is OwnableUpgradeable, ReentrancyGuardUpgradeable {
         IKnoxToken(token).safeTransferFrom(
             msg.sender,
             address(this),
-            Vault.LP_TOKEN_ID,
+            VaultSchema.LP_TOKEN_ID,
             numShares,
             ""
         );
@@ -489,7 +446,7 @@ contract BaseVault is OwnableUpgradeable, ReentrancyGuardUpgradeable {
      * @notice Completes a scheduled withdrawal from a past round. Uses finalized pps for the round
      */
     function completeWithdraw() external nonReentrant {
-        Vault.Withdrawal storage withdrawal = withdrawals[msg.sender];
+        VaultSchema.Withdrawal storage withdrawal = withdrawals[msg.sender];
 
         uint256 withdrawalShares = withdrawal.shares;
         uint256 withdrawalRound = withdrawal.round;
@@ -518,7 +475,7 @@ contract BaseVault is OwnableUpgradeable, ReentrancyGuardUpgradeable {
 
         IKnoxToken(token).burn(
             address(this),
-            Vault.LP_TOKEN_ID,
+            VaultSchema.LP_TOKEN_ID,
             withdrawalShares
         );
 
@@ -558,7 +515,7 @@ contract BaseVault is OwnableUpgradeable, ReentrancyGuardUpgradeable {
      * @param isMax is flag for when callers do a max redemption
      */
     function _redeem(uint256 numShares, bool isMax) internal {
-        Vault.DepositReceipt memory depositReceipt = depositReceipts[
+        VaultSchema.DepositReceipt memory depositReceipt = depositReceipts[
             msg.sender
         ];
 
@@ -597,7 +554,7 @@ contract BaseVault is OwnableUpgradeable, ReentrancyGuardUpgradeable {
         IKnoxToken(token).safeTransferFrom(
             address(this),
             msg.sender,
-            Vault.LP_TOKEN_ID,
+            VaultSchema.LP_TOKEN_ID,
             numShares,
             ""
         );
@@ -673,7 +630,7 @@ contract BaseVault is OwnableUpgradeable, ReentrancyGuardUpgradeable {
      * minting new shares, getting vault fees, etc.
      */
     function _rollover() internal {
-        /* After the vaults strategy harvests, the "lockedCollateral" will be returned to the vault. Therefore everything in the vault minus payouts and withdrawal amount is the free liquidity of the next round. */
+        /* After the vaults strategy harvests, the "lockedCollateral" will be returned to the vaultSchema. Therefore everything in the vault minus payouts and withdrawal amount is the free liquidity of the next round. */
 
         address recipient = feeRecipient;
         uint256 queuedWithdrawals;
@@ -690,7 +647,7 @@ contract BaseVault is OwnableUpgradeable, ReentrancyGuardUpgradeable {
             ) - vaultState.queuedPayouts;
 
             uint256 totalSupply = IKnoxToken(token).totalSupply(
-                Vault.LP_TOKEN_ID
+                VaultSchema.LP_TOKEN_ID
             );
 
             uint256 balanceForVaultFees = VaultLifecycle.getBalanceForVaultFees(
@@ -708,7 +665,7 @@ contract BaseVault is OwnableUpgradeable, ReentrancyGuardUpgradeable {
                 totalVaultFee
             ) = VaultLifecycle.getVaultFees(
                 balanceForVaultFees,
-                lastTotalCapital,
+                vaultState.lastTotalCapital,
                 vaultState.queuedDeposits,
                 performanceFee,
                 managementFee
@@ -757,12 +714,12 @@ contract BaseVault is OwnableUpgradeable, ReentrancyGuardUpgradeable {
             // Total capital should not include payouts, withdrawals, or vault fees.
             // TODO: MOVE `lastTotalCapital` TO VAULTSTATE
             // @notice the vault total capital at the start of the last round
-            lastTotalCapital = currentBalance.sub(queuedWithdrawals);
+            vaultState.lastTotalCapital = currentBalance.sub(queuedWithdrawals);
         }
 
         IKnoxToken(token).mint(
             address(this),
-            Vault.LP_TOKEN_ID,
+            VaultSchema.LP_TOKEN_ID,
             mintShares,
             ""
         );
@@ -892,4 +849,9 @@ contract BaseVault is OwnableUpgradeable, ReentrancyGuardUpgradeable {
     ) public virtual returns (bytes4) {
         return this.onERC1155BatchReceived.selector;
     }
+
+    // TODO: CALCULATE CORRECT STORAGE GAP SIZE
+
+    // Gap is left to avoid storage collisions. Though RibbonVault is not upgradeable, we add this as a safety measure.
+    uint256[30] private ____gap;
 }

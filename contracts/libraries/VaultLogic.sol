@@ -8,9 +8,9 @@ import "abdk-libraries-solidity/ABDKMath64x64.sol";
 
 import "./../interfaces/IWETH.sol";
 
-import "./ShareMath.sol";
-import "./Vault.sol";
 import "./Errors.sol";
+import "./ShareMath.sol";
+import "./VaultSchema.sol";
 
 import "hardhat/console.sol";
 
@@ -40,11 +40,10 @@ library VaultLogic {
         IERC20(asset).safeTransfer(recipient, amount);
     }
 
-    function toBaseDecimals(uint256 value, Vault.VaultParams memory vaultParams)
-        external
-        pure
-        returns (uint256)
-    {
+    function toBaseDecimals(
+        uint256 value,
+        VaultSchema.VaultParams memory vaultParams
+    ) external pure returns (uint256) {
         int128 value64x64 = ABDKMath64x64.divu(
             value,
             10**vaultParams.underlyingDecimals

@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 import "../libraries/ShareMath.sol";
-import "../libraries/Vault.sol";
+import "../libraries/VaultSchema.sol";
 
 contract TestShareMath {
     function sharesToAsset(
@@ -22,7 +22,7 @@ contract TestShareMath {
     }
 
     function getSharesFromReceipt(
-        Vault.DepositReceipt memory depositReceipt,
+        VaultSchema.DepositReceipt memory depositReceipt,
         uint256 currentRound,
         uint256 assetPerShare,
         uint256 decimals

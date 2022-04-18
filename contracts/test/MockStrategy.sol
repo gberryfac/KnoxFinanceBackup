@@ -3,14 +3,14 @@ pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import "../vaults/BaseVault.sol";
+import "../vaults/Vault.sol";
 
-contract MockStrategy is BaseVault {
+contract MockStrategy is Vault {
     constructor(
         address,
         address _weth,
         address _registry
-    ) BaseVault(_weth, _registry) {}
+    ) Vault(_weth, _registry) {}
 
     function purchase(
         bytes memory signature,
