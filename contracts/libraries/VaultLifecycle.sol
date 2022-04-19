@@ -39,7 +39,6 @@ library VaultLifecycle {
      */
     function verifyInitializerParams(
         address owner,
-        address keeper,
         address feeRecipient,
         uint256 performanceFee,
         uint256 managementFee,
@@ -47,7 +46,6 @@ library VaultLifecycle {
         VaultSchema.VaultParams calldata _vaultParams
     ) external pure {
         require(owner != address(0), Errors.ADDRESS_NOT_PROVIDED);
-        require(keeper != address(0), Errors.ADDRESS_NOT_PROVIDED);
         require(feeRecipient != address(0), Errors.ADDRESS_NOT_PROVIDED);
         require(
             performanceFee < 100 * Constants.FEE_MULTIPLIER,

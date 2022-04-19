@@ -3,14 +3,21 @@ pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import "../vaults/Vault.sol";
+import "./../interfaces/IVault.sol";
 
-contract MockStrategy is Vault {
+contract MockStrategy {
+    IVault internal Vault;
+
     constructor(
         address,
-        address _weth,
-        address _registry
-    ) Vault(_weth, _registry) {}
+        address,
+        address,
+        address
+    ) {}
+
+    function setVault(address vault) external {
+        Vault = IVault(vault);
+    }
 
     function purchase(
         bytes memory signature,
@@ -21,7 +28,7 @@ contract MockStrategy is Vault {
         uint256 contractSize,
         bool isCall
     ) external {
-        borrow(
+        Vault.borrow(
             signature,
             deadline,
             maturity,
@@ -33,10 +40,10 @@ contract MockStrategy is Vault {
     }
 
     function harvest() external {
-        _rollover();
+        Vault.harvest();
     }
 
     function transferFundsFromVault(address to, uint256 amount) external {
-        IERC20(vaultParams.asset).transfer(to, amount);
+        IERC20(Vault.asset()).transfer(to, amount);
     }
 }

@@ -7,9 +7,6 @@ contract VaultStorage {
     // @notice Fee recipient for the performance and management fees
     address public feeRecipient;
 
-    // @notice role in charge of weekly vault operations such as rollover, no access to critical vault changes
-    address public keeper;
-
     // @notice Performance fee charged on premiums earned in rollover. Only charged when there is no loss.
     uint256 public performanceFee;
 

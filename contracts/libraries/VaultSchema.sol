@@ -6,12 +6,6 @@ library VaultSchema {
     uint256 public constant LP_TOKEN_ID =
         0x0999999999999999999999999999999999999999999999999999999999999999;
 
-    // // @notice Fees are 6-decimal places. For example: 20 * 10**6 = 20%
-    // uint256 public constant FEE_MULTIPLIER = 10**6;
-
-    // // @notice Placeholder uint value to prevent cold writes
-    // uint256 public constant PLACEHOLDER_UINT = 1;
-
     // TODO: VERIFY assetDecimals, underlyingDecimals, minimumContractSize
 
     struct VaultParams {
@@ -46,8 +40,6 @@ library VaultSchema {
         // 32 byte slot 2
         // @notice Amount withheld for weekly vault deposits
         uint128 queuedDeposits;
-        // @notice Funds witheld for settlement of options expired ITM
-        uint128 queuedPayouts;
         // @notice Shares withheld for scheduled withdrawals during a round
         uint128 queuedWithdrawShares;
         // @notice Amount withheld for scheduled withdrawals
