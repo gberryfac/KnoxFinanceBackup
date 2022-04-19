@@ -2,6 +2,7 @@
 pragma solidity ^0.8.0;
 
 import "./../interfaces/IKnoxToken.sol";
+
 import "../libraries/ShareMath.sol";
 import "../libraries/VaultSchema.sol";
 

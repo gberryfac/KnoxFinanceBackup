@@ -13,13 +13,7 @@ import "./interfaces/IKnoxToken.sol";
 import "hardhat/console.sol";
 
 contract KnoxToken is Initializable, ERC165Upgradeable, ERC1155Upgradeable {
-    address public immutable vault;
-
     mapping(uint256 => uint256) private _totalSupply;
-
-    constructor(address _vault) {
-        vault = _vault;
-    }
 
     function initialize(string memory _tokenName) external initializer {
         __Context_init();
@@ -27,20 +21,12 @@ contract KnoxToken is Initializable, ERC165Upgradeable, ERC1155Upgradeable {
         __ERC1155_init(_tokenName);
     }
 
-    /**
-     * @dev Only pool can call functions marked by this modifier.
-     **/
-    modifier onlyVault() {
-        require(_msgSender() == address(vault), Errors.CALLER_MUST_BE_VAULT);
-        _;
-    }
-
     function mint(
         address to,
         uint256 id,
         uint256 amount,
         bytes memory data
-    ) external onlyVault {
+    ) external {
         _mint(to, id, amount, data);
     }
 
@@ -48,7 +34,7 @@ contract KnoxToken is Initializable, ERC165Upgradeable, ERC1155Upgradeable {
         address from,
         uint256 id,
         uint256 amount
-    ) external onlyVault {
+    ) external {
         _burn(from, id, amount);
     }
 

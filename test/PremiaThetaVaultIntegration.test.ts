@@ -1,9 +1,10 @@
 import { ethers, network } from "hardhat";
 import { BigNumber, Contract } from "ethers";
 
-const { getContractAt, provider } = ethers;
+const { getContractAt, getContractFactory, provider } = ethers;
 const { parseUnits } = ethers.utils;
 
+import moment from "moment-timezone";
 import { fixedFromFloat, formatTokenId, TokenType } from "@premia/utils";
 
 import * as time from "./helpers/time";
@@ -28,16 +29,17 @@ import {
   DAI_DECIMALS,
 } from "../constants";
 
-import { MockRegistry__factory } from "../types";
-
 const chainId = network.config.chainId;
+
+moment.tz.setDefault("UTC");
 
 let block;
 
 describe("PremiaThetaVault Integration", () => {
   behavesLikeRibbonOptionsVault({
     whale: WHALE_ADDRESS[chainId],
-    tokenName: `Knox WETH-DAI Call`,
+    name: `Knox ETH Theta Vault (Call)`,
+    tokenName: `Knox ETH Theta Vault`,
     tokenDecimals: 18,
     pool: WETH_DAI_POOL[chainId],
     depositAsset: WETH_ADDRESS[chainId],
@@ -55,7 +57,8 @@ describe("PremiaThetaVault Integration", () => {
 
   behavesLikeRibbonOptionsVault({
     whale: WHALE_ADDRESS[chainId],
-    tokenName: `Knox WETH-DAI Put`,
+    name: `Knox ETH Theta Vault (Put)`,
+    tokenName: `Knox ETH Theta Vault`,
     tokenDecimals: 18,
     pool: WETH_DAI_POOL[chainId],
     depositAsset: DAI_ADDRESS[chainId],
@@ -74,6 +77,7 @@ describe("PremiaThetaVault Integration", () => {
 
 function behavesLikeRibbonOptionsVault(params: {
   whale: string;
+  name: string;
   tokenName: string;
   tokenDecimals: number;
   pool: string;
@@ -118,13 +122,16 @@ function behavesLikeRibbonOptionsVault(params: {
   let assetContract: Contract;
   let keeperContract: Contract;
   let oracleContract: Contract;
+  let commonLogicLibrary: Contract;
   let vaultDisplayLibrary: Contract;
   let vaultLifecycleLibrary: Contract;
   let vaultLogicLibrary: Contract;
-  let mockPremiaPool: Contract;
   let knoxTokenContract: Contract;
+  let strategyContract: Contract;
 
-  describe.only(`${params.tokenName}`, () => {
+  // TODO: REMOVE VAULT DEPENDENCY, USE MOCK INSTEAD
+
+  describe.only(`${params.name}`, () => {
     let initSnapshotId: string;
 
     before(async () => {
@@ -160,18 +167,20 @@ function behavesLikeRibbonOptionsVault(params: {
 
       assetContract = await getContractAt("IAsset", depositAsset);
 
-      const VaultDisplay = await ethers.getContractFactory("VaultDisplay");
+      const CommonLogic = await getContractFactory("CommonLogic");
+      commonLogicLibrary = await CommonLogic.deploy();
+
+      const VaultDisplay = await getContractFactory("VaultDisplay");
       vaultDisplayLibrary = await VaultDisplay.deploy();
 
-      const VaultLifecycle = await ethers.getContractFactory("VaultLifecycle");
+      const VaultLifecycle = await getContractFactory("VaultLifecycle");
       vaultLifecycleLibrary = await VaultLifecycle.deploy();
 
-      const VaultLogic = await ethers.getContractFactory("VaultLogic");
+      const VaultLogic = await getContractFactory("VaultLogic");
       vaultLogicLibrary = await VaultLogic.deploy();
 
-      mockRegistry = await new MockRegistry__factory(signers.admin).deploy(
-        true
-      );
+      const Registry = await getContractFactory("MockRegistry", signers.admin);
+      mockRegistry = await Registry.deploy(true);
 
       [signers, addresses, assetContract] = await fixtures.impersonateWhale(
         whale,
@@ -182,12 +191,11 @@ function behavesLikeRibbonOptionsVault(params: {
       );
 
       [vaultContract, knoxTokenContract] = await fixtures.getVaultFixture(
-        poolContract,
+        commonLogicLibrary,
         vaultDisplayLibrary,
         vaultLifecycleLibrary,
         vaultLogicLibrary,
         mockRegistry,
-        "PremiaThetaVault",
         tokenName,
         tokenDecimals,
         depositAsset,
@@ -203,6 +211,30 @@ function behavesLikeRibbonOptionsVault(params: {
         signers,
         addresses
       );
+
+      const strategyContractFactory = await getContractFactory(
+        "PremiaThetaVault",
+        signers.owner
+      );
+
+      strategyContract = await strategyContractFactory.deploy(
+        knoxTokenContract.address,
+        addresses.keeper,
+        poolContract.address,
+        WETH_ADDRESS[chainId]
+      );
+
+      strategyContract = await (
+        await getContractAt("PremiaThetaVault", strategyContract.address)
+      ).connect(signers.user);
+
+      await strategyContract
+        .connect(signers.owner)
+        .setVault(vaultContract.address);
+
+      await vaultContract
+        .connect(signers.owner)
+        .setTokenAddress(knoxTokenContract.address);
 
       knoxTokenAddress = knoxTokenContract.address;
     });
@@ -227,7 +259,7 @@ function behavesLikeRibbonOptionsVault(params: {
         const maturity = block.timestamp + EPOCH_SPAN_IN_SECONDS;
         const strike64x64 = fixedFromFloat(strike);
 
-        await vaultContract.purchase(
+        await strategyContract.purchase(
           BYTES_ZERO,
           0,
           maturity,
@@ -250,12 +282,12 @@ function behavesLikeRibbonOptionsVault(params: {
         });
 
         const shortTokenBalance = await poolContract.balanceOf(
-          vaultContract.address,
+          strategyContract.address,
           shortTokenId
         );
 
         const longTokenBalance = await poolContract.balanceOf(
-          vaultContract.address,
+          strategyContract.address,
           longTokenId
         );
 
@@ -264,7 +296,7 @@ function behavesLikeRibbonOptionsVault(params: {
       });
     });
 
-    describe("#rollover", () => {
+    describe("#harvest", () => {
       time.revertToSnapshotAfterEach(async function () {});
 
       it("should return no reserved liquidity when option is OTM", async function () {
@@ -281,7 +313,7 @@ function behavesLikeRibbonOptionsVault(params: {
         const maturity = block.timestamp + EPOCH_SPAN_IN_SECONDS;
         const strike64x64 = fixedFromFloat(strike);
 
-        await vaultContract.purchase(
+        await strategyContract.purchase(
           BYTES_ZERO,
           0,
           maturity,
@@ -292,16 +324,19 @@ function behavesLikeRibbonOptionsVault(params: {
         );
 
         const balanceBeforeExpiredProcessed = await assetContract.balanceOf(
-          vaultContract.address
+          strategyContract.address
         );
 
-        const reservedLiquidityBeforeExpired = await poolContract.balanceOf(
-          vaultContract.address,
-          isCall ? UNDERLYING_RESERVED_LIQ_TOKEN_ID : BASE_RESERVED_LIQ_TOKEN_ID
-        );
+        const reservedLiquidityTokensBeforeExpired =
+          await poolContract.balanceOf(
+            strategyContract.address,
+            isCall
+              ? UNDERLYING_RESERVED_LIQ_TOKEN_ID
+              : BASE_RESERVED_LIQ_TOKEN_ID
+          );
 
         assert.bnEqual(balanceBeforeExpiredProcessed, BigNumber.from(0));
-        assert.bnEqual(reservedLiquidityBeforeExpired, BigNumber.from(0));
+        assert.bnEqual(reservedLiquidityTokensBeforeExpired, BigNumber.from(0));
 
         await time.increaseTo(maturity + 1);
 
@@ -315,31 +350,39 @@ function behavesLikeRibbonOptionsVault(params: {
         await keeperContract.processExpired(longTokenId, size);
 
         const balanceAfterExpiredProcessed = await assetContract.balanceOf(
-          vaultContract.address
+          strategyContract.address
         );
 
         const reservedLiquidityAfterExpired = await poolContract.balanceOf(
-          vaultContract.address,
+          strategyContract.address,
           isCall ? UNDERLYING_RESERVED_LIQ_TOKEN_ID : BASE_RESERVED_LIQ_TOKEN_ID
         );
 
         assert.bnEqual(balanceAfterExpiredProcessed, BigNumber.from(0));
         assert.bnEqual(reservedLiquidityAfterExpired, liquidity);
 
-        await vaultContract.connect(signers.keeper).harvest();
+        await strategyContract.connect(signers.keeper).harvest();
 
-        const balanceAfterHarvest = await assetContract.balanceOf(
+        const vaultBalanceAfterHarvest = await assetContract.balanceOf(
           vaultContract.address
         );
 
-        const reservedLiquidityHarvest = await poolContract.balanceOf(
-          vaultContract.address,
-          isCall ? UNDERLYING_RESERVED_LIQ_TOKEN_ID : BASE_RESERVED_LIQ_TOKEN_ID
+        const strategyBalanceAfterHarvest = await assetContract.balanceOf(
+          strategyContract.address
         );
 
+        const reservedLiquidityTokensAfterExpired =
+          await poolContract.balanceOf(
+            strategyContract.address,
+            isCall
+              ? UNDERLYING_RESERVED_LIQ_TOKEN_ID
+              : BASE_RESERVED_LIQ_TOKEN_ID
+          );
+
         // all collateral locked in Premia should return to Vault
-        assert.bnEqual(balanceAfterHarvest, liquidity);
-        assert.bnEqual(reservedLiquidityHarvest, BigNumber.from(0));
+        assert.bnEqual(vaultBalanceAfterHarvest, liquidity);
+        assert.bnEqual(strategyBalanceAfterHarvest, BigNumber.from(0));
+        assert.bnEqual(reservedLiquidityTokensAfterExpired, BigNumber.from(0));
       });
 
       it("should withdraw reserved liquidity when option is ITM", async function () {
@@ -364,7 +407,7 @@ function behavesLikeRibbonOptionsVault(params: {
         const maturity = block.timestamp + EPOCH_SPAN_IN_SECONDS;
         const strike64x64 = fixedFromFloat(strike);
 
-        await vaultContract.purchase(
+        await strategyContract.purchase(
           BYTES_ZERO,
           0,
           maturity,
@@ -375,16 +418,19 @@ function behavesLikeRibbonOptionsVault(params: {
         );
 
         const balanceBeforeExpiredProcessed = await assetContract.balanceOf(
-          vaultContract.address
+          strategyContract.address
         );
 
-        const reservedLiquidityBeforeExpired = await poolContract.balanceOf(
-          vaultContract.address,
-          isCall ? UNDERLYING_RESERVED_LIQ_TOKEN_ID : BASE_RESERVED_LIQ_TOKEN_ID
-        );
+        const reservedLiquidityTokensBeforeExpired =
+          await poolContract.balanceOf(
+            strategyContract.address,
+            isCall
+              ? UNDERLYING_RESERVED_LIQ_TOKEN_ID
+              : BASE_RESERVED_LIQ_TOKEN_ID
+          );
 
         assert.bnEqual(balanceBeforeExpiredProcessed, BigNumber.from(0));
-        assert.bnEqual(reservedLiquidityBeforeExpired, BigNumber.from(0));
+        assert.bnEqual(reservedLiquidityTokensBeforeExpired, BigNumber.from(0));
 
         await time.increaseTo(maturity + 1);
 
@@ -394,15 +440,15 @@ function behavesLikeRibbonOptionsVault(params: {
           strike64x64: BigNumber.from(strike64x64),
         });
 
-        // Keeper processes expired tokens
+        // Keeper processes expired tokens, short position tokens are sent to the strategy.
         await keeperContract.processExpired(longTokenId, size);
 
         const balanceAfterExpiredProcessed = await assetContract.balanceOf(
-          vaultContract.address
+          strategyContract.address
         );
 
         const reservedLiquidityAfterExpired = await poolContract.balanceOf(
-          vaultContract.address,
+          strategyContract.address,
           isCall ? UNDERLYING_RESERVED_LIQ_TOKEN_ID : BASE_RESERVED_LIQ_TOKEN_ID
         );
 
@@ -434,23 +480,20 @@ function behavesLikeRibbonOptionsVault(params: {
         assert.bnLt(reservedLiquidityAfterExpired, reservedLiquidityUpper);
         assert.bnGt(reservedLiquidityAfterExpired, reservedLiquidityLower);
 
-        await vaultContract.connect(signers.keeper).harvest();
+        // Keeper calls harvest which moves long position (reserved) liquidity to the vault.
+        await strategyContract.connect(signers.keeper).harvest();
 
-        const balanceAfterHarvest = await assetContract.balanceOf(
+        const vaultBalanceAfterHarvest = await assetContract.balanceOf(
           vaultContract.address
         );
 
-        const reservedLiquidityHarvest = await poolContract.balanceOf(
-          vaultContract.address,
+        const reservedLiquidityAfterHarvest = await poolContract.balanceOf(
+          strategyContract.address,
           isCall ? UNDERLYING_RESERVED_LIQ_TOKEN_ID : BASE_RESERVED_LIQ_TOKEN_ID
         );
 
-        // all collateral locked in Premia should return to Vault
-        assert.bnEqual(
-          balanceAfterHarvest,
-          bnBalanceAfterExpiredProcessed.add(reservedLiquidityAfterExpired)
-        );
-        assert.bnEqual(reservedLiquidityHarvest, BigNumber.from(0));
+        assert.bnEqual(vaultBalanceAfterHarvest, reservedLiquidityAfterExpired);
+        assert.bnEqual(reservedLiquidityAfterHarvest, BigNumber.from(0));
       });
     });
   });

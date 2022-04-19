@@ -1,17 +1,21 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
+import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
+
 import "abdk-libraries-solidity/ABDKMath64x64.sol";
 
 import "./../interfaces/IKnoxToken.sol";
 import "./../interfaces/IRegistry.sol";
+import "./../interfaces/IVault.sol";
 import "./../interfaces/IWETH.sol";
 
+import "./../libraries/CommonLogic.sol";
 import "./../libraries/Constants.sol";
 import "./../libraries/Errors.sol";
 import "./../libraries/ShareMath.sol";
@@ -22,11 +26,14 @@ import "./../libraries/VaultSchema.sol";
 
 import "./VaultStorage.sol";
 
-import "../KnoxToken.sol";
-
 import "hardhat/console.sol";
 
-contract Vault is VaultStorage, OwnableUpgradeable, ReentrancyGuardUpgradeable {
+contract Vault is
+    IVault,
+    OwnableUpgradeable,
+    ReentrancyGuardUpgradeable,
+    VaultStorage
+{
     using SafeERC20 for IERC20;
     using SafeMath for uint256;
     using ShareMath for VaultSchema.DepositReceipt;
@@ -36,7 +43,7 @@ contract Vault is VaultStorage, OwnableUpgradeable, ReentrancyGuardUpgradeable {
      *  IMMUTABLES & CONSTANTS
      ***********************************************/
 
-    address public immutable WETH;
+    address public immutable weth;
     address public immutable registry;
     address public token;
 
@@ -89,7 +96,6 @@ contract Vault is VaultStorage, OwnableUpgradeable, ReentrancyGuardUpgradeable {
      */
     struct InitParams {
         address _owner;
-        address _keeper;
         address _feeRecipient;
         uint256 _managementFee;
         uint256 _performanceFee;
@@ -108,7 +114,7 @@ contract Vault is VaultStorage, OwnableUpgradeable, ReentrancyGuardUpgradeable {
         require(_weth != address(0), Errors.ADDRESS_NOT_PROVIDED);
         require(_registry != address(0), Errors.ADDRESS_NOT_PROVIDED);
 
-        WETH = _weth;
+        weth = _weth;
         registry = _registry;
     }
 
@@ -121,7 +127,6 @@ contract Vault is VaultStorage, OwnableUpgradeable, ReentrancyGuardUpgradeable {
     ) external initializer {
         VaultLifecycle.verifyInitializerParams(
             _initParams._owner,
-            _initParams._keeper,
             _initParams._feeRecipient,
             _initParams._managementFee,
             _initParams._performanceFee,
@@ -132,8 +137,6 @@ contract Vault is VaultStorage, OwnableUpgradeable, ReentrancyGuardUpgradeable {
         __ReentrancyGuard_init();
         __Ownable_init();
         transferOwnership(_initParams._owner);
-
-        keeper = _initParams._keeper;
 
         feeRecipient = _initParams._feeRecipient;
         performanceFee = _initParams._performanceFee;
@@ -151,26 +154,9 @@ contract Vault is VaultStorage, OwnableUpgradeable, ReentrancyGuardUpgradeable {
         );
     }
 
-    /**
-     * @dev Throws if called by any account other than the keeper.
-     */
-    modifier onlyKeeper() {
-        require(msg.sender == keeper, Errors.ADDRESS_NOT_KEEPER);
-        _;
-    }
-
     /************************************************
      *  SETTERS
      ***********************************************/
-
-    /**
-     * @notice Sets the new keeper
-     * @param newKeeper is the address of the new keeper
-     */
-    function setNewKeeper(address newKeeper) external onlyOwner {
-        require(newKeeper != address(0), Errors.ADDRESS_NOT_PROVIDED);
-        keeper = newKeeper;
-    }
 
     /**
      * @notice Sets the new fee recipient
@@ -246,15 +232,15 @@ contract Vault is VaultStorage, OwnableUpgradeable, ReentrancyGuardUpgradeable {
      ***********************************************/
 
     /**
-     * @notice Deposits ETH into the contract and mint vault shares. Reverts if the asset is not WETH.
+     * @notice Deposits ETH into the contract and mint vault shares. Reverts if the asset is not weth.
      */
     function depositETH() external payable nonReentrant {
-        require(vaultParams.asset == WETH, Errors.INVALID_ASSET_ADDRESS);
+        require(vaultParams.asset == weth, Errors.INVALID_ASSET_ADDRESS);
         require(msg.value > 0, Errors.VALUE_EXCEEDS_MINIMUM);
 
         _depositFor(msg.value, msg.sender);
 
-        IWETH(WETH).deposit{value: msg.value}();
+        IWETH(weth).deposit{value: msg.value}();
     }
 
     /**
@@ -383,7 +369,7 @@ contract Vault is VaultStorage, OwnableUpgradeable, ReentrancyGuardUpgradeable {
 
         emit InstantWithdraw(msg.sender, amount, currentRound);
 
-        VaultLogic.transferAsset(msg.sender, vaultParams.asset, WETH, amount);
+        CommonLogic.transferAsset(msg.sender, vaultParams.asset, weth, amount);
     }
 
     /**
@@ -481,10 +467,10 @@ contract Vault is VaultStorage, OwnableUpgradeable, ReentrancyGuardUpgradeable {
 
         require(withdrawAmount > 0, Errors.WITHDRAWAL_AMOUNT_EXCEEDS_MINIMUM);
 
-        VaultLogic.transferAsset(
+        CommonLogic.transferAsset(
             msg.sender,
             vaultParams.asset,
-            WETH,
+            weth,
             withdrawAmount
         );
 
@@ -567,30 +553,32 @@ contract Vault is VaultStorage, OwnableUpgradeable, ReentrancyGuardUpgradeable {
     // TODO: `purchaseETH`
     // function purchaseETH() public {}
 
-    function _openPosition(
+    function borrow(
         bytes memory signature,
         uint64 deadline,
         uint64 maturity,
         int128 strike64x64,
         int128 premium64x64,
         uint256 contractSize,
-        bool isCall
-    ) internal returns (uint256 liquidityRequired) {
+        bool _isCall
+    ) external returns (uint256 liquidityRequired) {
+        // TODO: ONLY STRATEGY
+
         {
             require(
                 contractSize >= vaultParams.minimumContractSize,
                 Errors.CONTRACT_SIZE_EXCEEDS_MINIMUM
             );
 
-            uint256 value = strike64x64.mulu(contractSize);
-
             liquidityRequired = vaultParams.isCall
                 ? contractSize
-                : VaultLogic.toBaseDecimals(value, vaultParams);
+                : VaultLogic.toBaseDecimals(
+                    strike64x64.mulu(contractSize),
+                    vaultParams
+                );
 
             uint256 totalFreeLiquidity = IERC20(vaultParams.asset)
                 .balanceOf(address(this))
-                .sub(vaultState.queuedPayouts)
                 .sub(vaultState.queuedDeposits)
                 .sub(vaultState.queuedWithdrawals);
 
@@ -607,18 +595,18 @@ contract Vault is VaultStorage, OwnableUpgradeable, ReentrancyGuardUpgradeable {
                 maturity,
                 strike64x64,
                 premium64x64,
-                isCall
+                _isCall
             ),
             Errors.INVALID_SIGNATURE
         );
 
-        uint256 premiumAmount = premium64x64.mulu(contractSize);
-
         IERC20(vaultParams.asset).safeTransferFrom(
-            msg.sender,
             address(this),
-            premiumAmount
+            msg.sender,
+            liquidityRequired
         );
+
+        vaultState.lockedCollateral += uint104(liquidityRequired);
     }
 
     /************************************************
@@ -629,8 +617,10 @@ contract Vault is VaultStorage, OwnableUpgradeable, ReentrancyGuardUpgradeable {
      * @notice Performs most administrative tasks such as setting next option,
      * minting new shares, getting vault fees, etc.
      */
-    function _rollover() internal {
-        /* After the vaults strategy harvests, the "lockedCollateral" will be returned to the vaultSchema. Therefore everything in the vault minus payouts and withdrawal amount is the free liquidity of the next round. */
+    function harvest() external {
+        // TODO: ONLY STRATEGY
+
+        /* After the vaults strategy harvests, the "lockedCollateral" will be returned to the vaultSchema. Therefore everything in the vault minus claims and withdrawal amount is the free liquidity of the next round. */
 
         address recipient = feeRecipient;
         uint256 queuedWithdrawals;
@@ -644,7 +634,7 @@ contract Vault is VaultStorage, OwnableUpgradeable, ReentrancyGuardUpgradeable {
             /* Vault fees are calculated with queued withdrawals prior to calculating lockedAmount for current round. */
             uint256 currentBalance = IERC20(vaultParams.asset).balanceOf(
                 address(this)
-            ) - vaultState.queuedPayouts;
+            );
 
             uint256 totalSupply = IKnoxToken(token).totalSupply(
                 VaultSchema.LP_TOKEN_ID
@@ -711,7 +701,7 @@ contract Vault is VaultStorage, OwnableUpgradeable, ReentrancyGuardUpgradeable {
             vaultState.queuedDeposits = 0;
             vaultState.queuedWithdrawals = uint128(queuedWithdrawals);
 
-            // Total capital should not include payouts, withdrawals, or vault fees.
+            // Total capital should not include claims, withdrawals, or vault fees.
             // TODO: MOVE `lastTotalCapital` TO VAULTSTATE
             // @notice the vault total capital at the start of the last round
             vaultState.lastTotalCapital = currentBalance.sub(queuedWithdrawals);
@@ -725,10 +715,10 @@ contract Vault is VaultStorage, OwnableUpgradeable, ReentrancyGuardUpgradeable {
         );
 
         if (totalVaultFee > 0) {
-            VaultLogic.transferAsset(
+            CommonLogic.transferAsset(
                 payable(recipient),
                 vaultParams.asset,
-                WETH,
+                weth,
                 totalVaultFee
             );
         }
@@ -743,12 +733,11 @@ contract Vault is VaultStorage, OwnableUpgradeable, ReentrancyGuardUpgradeable {
      * @return total balance of the vault, including the amounts locked in third party protocols
      */
     function totalBalance() public view returns (uint256) {
-        /* The total balance should include new deposits, premiums paid, free/locked liquidity, and withdrawals. It should not include the payouts. */
+        /* The total balance should include new deposits, premiums paid, free/locked liquidity, and withdrawals. It should not include the claims. */
         return
-            IERC20(vaultParams.asset)
-                .balanceOf(address(this))
-                .add(vaultState.lockedCollateral)
-                .sub(vaultState.queuedPayouts);
+            IERC20(vaultParams.asset).balanceOf(address(this)).add(
+                vaultState.lockedCollateral
+            );
     }
 
     /************************************************
@@ -822,6 +811,26 @@ contract Vault is VaultStorage, OwnableUpgradeable, ReentrancyGuardUpgradeable {
                 totalBalance(),
                 token
             );
+    }
+
+    function asset() external view returns (address) {
+        return vaultParams.asset;
+    }
+
+    function expiry() external view returns (uint32) {
+        return vaultState.expiry;
+    }
+
+    function isCall() external view returns (bool) {
+        return vaultParams.isCall;
+    }
+
+    function lockedCollateral() external view returns (uint104) {
+        return vaultState.lockedCollateral;
+    }
+
+    function round() external view returns (uint16) {
+        return vaultState.round;
     }
 
     /**

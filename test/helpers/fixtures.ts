@@ -92,12 +92,11 @@ export async function impersonateWhale(
 }
 
 export async function getVaultFixture(
-  poolContract: Contract,
+  commonLogicLibrary: Contract,
   vaultDisplayLibrary: Contract,
   vaultLifecycleLibrary: Contract,
   vaultLogicLibrary: Contract,
   registryContact: Contract,
-  strategyContractName: string,
   tokenName: string,
   tokenDecimals: number,
   depositAsset: string,
@@ -118,7 +117,6 @@ export async function getVaultFixture(
   const initializeArgs = [
     [
       addresses.owner,
-      addresses.keeper,
       addresses.feeRecipient,
       managementFee,
       performanceFee,
@@ -139,12 +137,13 @@ export async function getVaultFixture(
 
   const vaultContract = (
     await utils.deployProxy(
-      strategyContractName,
+      "Vault",
       signers.admin,
       initializeArgs,
-      [poolContract.address, WETH_ADDRESS[chainId], registryContact.address],
+      [WETH_ADDRESS[chainId], registryContact.address],
       {
         libraries: {
+          CommonLogic: commonLogicLibrary.address,
           VaultDisplay: vaultDisplayLibrary.address,
           VaultLifecycle: vaultLifecycleLibrary.address,
           VaultLogic: vaultLogicLibrary.address,
@@ -154,18 +153,8 @@ export async function getVaultFixture(
   ).connect(signers.user);
 
   const knoxTokenContract = (
-    await utils.deployProxy(
-      "KnoxToken",
-      signers.admin,
-      [tokenName],
-      [vaultContract.address],
-      {}
-    )
+    await utils.deployProxy("KnoxToken", signers.admin, [tokenName], [], {})
   ).connect(signers.user);
-
-  const knoxTokenAddress = knoxTokenContract.address;
-
-  await vaultContract.connect(signers.owner).setTokenAddress(knoxTokenAddress);
 
   return [vaultContract, knoxTokenContract];
 }
