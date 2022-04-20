@@ -3,9 +3,7 @@ pragma solidity ^0.8.0;
 
 import "./../libraries/VaultSchema.sol";
 
-// TODO: FIX VAULTSTORAGE INHERITANCE
-
-contract VaultStorage {
+contract VaultStorageV1 {
     // @notice Performance fee charged on premiums earned in rollover. Only charged when there is no loss.
     uint256 public performanceFee;
 
@@ -36,3 +34,5 @@ contract VaultStorage {
     // @notice Vault's lifecycle state like round and locked amounts.
     VaultSchema.VaultState public vaultState;
 }
+
+contract VaultStorage is VaultStorageV1 {}
