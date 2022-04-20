@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "./../interfaces/IKnoxToken.sol";
-
 import "../libraries/ShareMath.sol";
 import "../libraries/VaultSchema.sol";
 
@@ -11,23 +9,23 @@ import "hardhat/console.sol";
 library VaultDisplay {
     using ShareMath for VaultSchema.DepositReceipt;
 
-    /**
-     * @notice Returns the asset balance held on the vault for the account
-     * @param account is the address to lookup balance for
-     * @return the amount of `asset` custodied by the vault for the user
-     */
+    // /**
+    //  * @notice Returns the asset balance held on the vault for the account
+    //  * @param account is the address to lookup balance for
+    //  * @return the amount of `asset` custodied by the vault for the user
+    //  */
     function accountVaultBalance(
         uint256 round,
         uint256 decimals,
+        uint256 balance,
         uint256 queuedDeposits,
+        uint256 totalSupply,
         uint256 totalBalance,
-        address account,
-        address token,
         VaultSchema.DepositReceipt memory depositReceipt,
         mapping(uint256 => uint256) storage lpTokenPricePerShare
     ) external view returns (uint256) {
         uint256 assetPerShare = ShareMath.pricePerShare(
-            IKnoxToken(token).totalSupply(VaultSchema.LP_TOKEN_ID),
+            totalSupply,
             totalBalance,
             queuedDeposits,
             decimals
@@ -38,8 +36,7 @@ library VaultDisplay {
                 lpShares(
                     round,
                     decimals,
-                    account,
-                    token,
+                    balance,
                     depositReceipt,
                     lpTokenPricePerShare
                 ),
@@ -48,24 +45,22 @@ library VaultDisplay {
             );
     }
 
-    /**
-     * @notice Getter for returning the account's share balance including unredeemed shares
-     * @param account is the account to lookup share balance for
-     * @return the share balance
-     */
+    // /**
+    //  * @notice Getter for returning the account's share balance including unredeemed shares
+    //  * @param account is the account to lookup share balance for
+    //  * @return the share balance
+    //  */
     function lpShares(
         uint256 round,
         uint256 decimals,
-        address account,
-        address token,
+        uint256 balance,
         VaultSchema.DepositReceipt memory depositReceipt,
         mapping(uint256 => uint256) storage lpTokenPricePerShare
     ) public view returns (uint256) {
         (uint256 heldByAccount, uint256 heldByVault) = lpShareBalances(
             round,
             decimals,
-            account,
-            token,
+            balance,
             depositReceipt,
             lpTokenPricePerShare
         );
@@ -73,25 +68,21 @@ library VaultDisplay {
         return heldByAccount + heldByVault;
     }
 
-    /**
-     * @notice Getter for returning the account's share balance split between account and vault holdings
-     * @param account is the account to lookup share balance for
-     * @return heldByAccount is the shares held by account
-     * @return heldByVault is the shares held on the vault (unredeemedShares)
-     */
+    // /**
+    //  * @notice Getter for returning the account's share balance split between account and vault holdings
+    //  * @param account is the account to lookup share balance for
+    //  * @return heldByAccount is the shares held by account
+    //  * @return heldByVault is the shares held on the vault (unredeemedShares)
+    //  */
     function lpShareBalances(
         uint256 round,
         uint256 decimals,
-        address account,
-        address token,
+        uint256 balance,
         VaultSchema.DepositReceipt memory depositReceipt,
         mapping(uint256 => uint256) storage lpTokenPricePerShare
     ) public view returns (uint256 heldByAccount, uint256 heldByVault) {
         if (depositReceipt.round < ShareMath.PLACEHOLDER_UINT) {
-            return (
-                IKnoxToken(token).balanceOf(account, VaultSchema.LP_TOKEN_ID),
-                0
-            );
+            return (balance, 0);
         }
 
         uint256 unredeemedShares = depositReceipt.getSharesFromReceipt(
@@ -100,10 +91,7 @@ library VaultDisplay {
             decimals
         );
 
-        return (
-            IKnoxToken(token).balanceOf(account, VaultSchema.LP_TOKEN_ID),
-            unredeemedShares
-        );
+        return (balance, unredeemedShares);
     }
 
     /**
@@ -112,12 +100,12 @@ library VaultDisplay {
     function lpPricePerShare(
         uint256 decimals,
         uint256 queuedDeposits,
-        uint256 totalBalance,
-        address token
-    ) external view returns (uint256) {
+        uint256 totalSupply,
+        uint256 totalBalance
+    ) external pure returns (uint256) {
         return
             ShareMath.pricePerShare(
-                IKnoxToken(token).totalSupply(VaultSchema.LP_TOKEN_ID),
+                totalSupply,
                 totalBalance,
                 queuedDeposits,
                 decimals
