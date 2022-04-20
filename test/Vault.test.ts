@@ -1,7 +1,7 @@
 import { ethers, network } from "hardhat";
 import { BigNumber, Contract } from "ethers";
 
-const { getContractFactory, getContractAt, provider } = ethers;
+const { getContractFactory, provider } = ethers;
 const { parseUnits, parseEther } = ethers.utils;
 
 import { expect } from "chai";
@@ -41,11 +41,10 @@ describe("Vault", () => {
     tokenName: "Knox ETH Theta Vault",
     tokenSymbol: `kETH-THETA-LP`,
     tokenDecimals: 18,
-    depositAsset: WETH_ADDRESS[chainId],
+    asset: WETH_ADDRESS[chainId],
     depositAssetDecimals: WETH_DECIMALS,
     baseAssetDecimals: DAI_DECIMALS,
     underlyingAssetDecimals: WETH_DECIMALS,
-    underlyingAsset: WETH_ADDRESS[chainId],
     depositAmount: parseEther("10"),
     cap: parseUnits("1000", WETH_DECIMALS),
     minimumSupply: BigNumber.from("10").pow("10").toString(),
@@ -65,11 +64,10 @@ describe("Vault", () => {
     tokenName: "Knox ETH Theta Vault",
     tokenSymbol: `kETH-THETA-LP`,
     tokenDecimals: 18,
-    depositAsset: DAI_ADDRESS[chainId],
+    asset: DAI_ADDRESS[chainId],
     depositAssetDecimals: DAI_DECIMALS,
     baseAssetDecimals: DAI_DECIMALS,
     underlyingAssetDecimals: WETH_DECIMALS,
-    underlyingAsset: WETH_ADDRESS[chainId],
     depositAmount: parseEther("10"),
     cap: parseUnits("5000000", DAI_DECIMALS),
     minimumSupply: BigNumber.from("10").pow("3").toString(),
@@ -121,11 +119,10 @@ function behavesLikeRibbonOptionsVault(params: {
   tokenName: string;
   tokenSymbol: string;
   tokenDecimals: number;
-  depositAsset: string;
+  asset: string;
   depositAssetDecimals: number;
   baseAssetDecimals: number;
   underlyingAssetDecimals: number;
-  underlyingAsset: string;
   depositAmount: BigNumber;
   cap: BigNumber;
   minimumSupply: string;
@@ -140,7 +137,6 @@ function behavesLikeRibbonOptionsVault(params: {
 }) {
   let signers: types.Signers;
   let addresses: types.Addresses;
-  let knoxTokenAddress: string;
 
   let whale = params.whale;
 
@@ -151,11 +147,10 @@ function behavesLikeRibbonOptionsVault(params: {
   let cap = params.cap;
   let minimumSupply = params.minimumSupply;
   let minimumContractSize = params.minimumContractSize;
-  let depositAsset = params.depositAsset;
+  let asset = params.asset;
   let depositAssetDecimals = params.depositAssetDecimals;
   let baseAssetDecimals = params.baseAssetDecimals;
   let underlyingAssetDecimals = params.underlyingAssetDecimals;
-  let underlyingAsset = params.underlyingAsset;
   let depositAmount = params.depositAmount;
   let managementFee = params.managementFee;
   let performanceFee = params.performanceFee;
@@ -167,10 +162,9 @@ function behavesLikeRibbonOptionsVault(params: {
   let vaultLifecycleLibrary: Contract;
   let vaultLogicLibrary: Contract;
   let vaultContract: Contract;
-  let mockRegistry: Contract;
+  let registryContract: Contract;
   let assetContract: Contract;
-  let mockPremiaPool: Contract;
-  let knoxTokenContract: Contract;
+  let premiaPool: Contract;
   let strategyContract: Contract;
 
   describe.only(`${params.name}`, () => {
@@ -196,52 +190,64 @@ function behavesLikeRibbonOptionsVault(params: {
       signers = await fixtures.getSigners();
       addresses = await fixtures.getAddresses(signers);
 
-      let mockPremiaPoolFactory = await getContractFactory("MockPremiaPool");
-
-      mockPremiaPool = await mockPremiaPoolFactory.deploy(
-        depositAssetDecimals,
-        baseAssetDecimals,
-        depositAsset
-      );
-
-      const CommonLogic = await getContractFactory("CommonLogic");
-      commonLogicLibrary = await CommonLogic.deploy();
-
-      const VaultDisplay = await getContractFactory("VaultDisplay");
-      vaultDisplayLibrary = await VaultDisplay.deploy();
-
-      const VaultLifecycle = await getContractFactory("VaultLifecycle");
-      vaultLifecycleLibrary = await VaultLifecycle.deploy();
-
-      const VaultLogic = await getContractFactory("VaultLogic");
-      vaultLogicLibrary = await VaultLogic.deploy();
-
-      const Registry = await getContractFactory("MockRegistry", signers.admin);
-      mockRegistry = await Registry.deploy(true);
-
-      assetContract = await getContractAt("IAsset", depositAsset);
-
       [signers, addresses, assetContract] = await fixtures.impersonateWhale(
         whale,
-        depositAsset,
+        asset,
         depositAssetDecimals,
         signers,
         addresses
       );
 
-      [vaultContract, knoxTokenContract] = await fixtures.getVaultFixture(
-        commonLogicLibrary,
-        vaultDisplayLibrary,
-        vaultLifecycleLibrary,
-        vaultLogicLibrary,
-        mockRegistry,
+      premiaPool = await getContractFactory("MockPremiaPool").then((contract) =>
+        contract.deploy(depositAssetDecimals, baseAssetDecimals, asset)
+      );
+
+      addresses["pool"] = premiaPool.address;
+
+      commonLogicLibrary = await getContractFactory("CommonLogic").then(
+        (contract) => contract.deploy()
+      );
+
+      vaultDisplayLibrary = await getContractFactory("VaultDisplay").then(
+        (contract) => contract.deploy()
+      );
+
+      vaultLifecycleLibrary = await getContractFactory("VaultLifecycle").then(
+        (contract) => contract.deploy()
+      );
+
+      vaultLogicLibrary = await getContractFactory("VaultLogic").then(
+        (contract) => contract.deploy()
+      );
+
+      registryContract = await getContractFactory(
+        "MockRegistry",
+        signers.admin
+      ).then((contract) => contract.deploy(true));
+
+      strategyContract = await getContractFactory("MockStrategy").then(
+        (contract) =>
+          contract.deploy(
+            addresses.keeper,
+            addresses.pool,
+            WETH_ADDRESS[chainId]
+          )
+      );
+
+      addresses["commonLogic"] = commonLogicLibrary.address;
+      addresses["vaultDisplay"] = vaultDisplayLibrary.address;
+      addresses["vaultLifecycle"] = vaultLifecycleLibrary.address;
+      addresses["vaultLogic"] = vaultLogicLibrary.address;
+      addresses["registry"] = registryContract.address;
+      addresses["strategy"] = strategyContract.address;
+
+      vaultContract = await fixtures.getVaultFixture(
         tokenName,
         tokenSymbol,
         tokenDecimals,
-        depositAsset,
+        asset,
         depositAssetDecimals,
         underlyingAssetDecimals,
-        underlyingAsset,
         cap,
         minimumSupply,
         minimumContractSize,
@@ -252,20 +258,9 @@ function behavesLikeRibbonOptionsVault(params: {
         addresses
       );
 
+      addresses["vault"] = vaultContract.address;
+
       // TODO: REMOVE MOCKSTRATEGY FROM TESTS, CAll FUNCTIONS DIRECTLY
-
-      const strategyContractFactory = await getContractFactory("MockStrategy");
-
-      strategyContract = await strategyContractFactory.deploy(
-        knoxTokenContract.address,
-        addresses.keeper,
-        mockPremiaPool.address,
-        WETH_ADDRESS[chainId]
-      );
-
-      await strategyContract.setVault(vaultContract.address);
-
-      knoxTokenAddress = knoxTokenContract.address;
     });
 
     after(async () => {
@@ -277,19 +272,17 @@ function behavesLikeRibbonOptionsVault(params: {
       time.revertToSnapshotAfterEach(async () => {
         const Vault = await getContractFactory("Vault", {
           libraries: {
-            CommonLogic: commonLogicLibrary.address,
-            VaultDisplay: vaultDisplayLibrary.address,
-            VaultLifecycle: vaultLifecycleLibrary.address,
-            VaultLogic: vaultLogicLibrary.address,
+            CommonLogic: addresses.commonLogic,
+            VaultDisplay: addresses.vaultDisplay,
+            VaultLifecycle: addresses.vaultLifecycle,
+            VaultLogic: addresses.vaultLogic,
           },
         });
 
         const wethAddress =
-          depositAsset === WETH_ADDRESS[chainId]
-            ? assetContract.address
-            : WETH_ADDRESS[chainId];
+          asset === WETH_ADDRESS[chainId] ? asset : WETH_ADDRESS[chainId];
 
-        testVault = await Vault.deploy(wethAddress, mockRegistry.address);
+        testVault = await Vault.deploy(wethAddress, addresses.registry);
       });
 
       it("initializes with correct values", async () => {
@@ -312,7 +305,7 @@ function behavesLikeRibbonOptionsVault(params: {
         assert.equal(minimumSupply, params.minimumSupply);
         assert.equal(minimumContractSize, params.minimumContractSize);
         assert.bnEqual(cap, params.cap);
-        assert.equal(asset, assetContract.address);
+        assert.equal(asset, params.asset);
 
         const {
           round,
@@ -337,11 +330,9 @@ function behavesLikeRibbonOptionsVault(params: {
         assert.equal(await vaultContract.owner(), addresses.owner);
         assert.equal(
           await vaultContract.weth(),
-          depositAsset === WETH_ADDRESS[chainId]
-            ? assetContract.address
-            : WETH_ADDRESS[chainId]
+          asset === WETH_ADDRESS[chainId] ? asset : WETH_ADDRESS[chainId]
         );
-        assert.equal(await vaultContract.registry(), mockRegistry.address);
+        assert.equal(await vaultContract.registry(), addresses.registry);
 
         // Check Storage
         assert.equal(
@@ -356,6 +347,8 @@ function behavesLikeRibbonOptionsVault(params: {
           await vaultContract.feeRecipient(),
           addresses.feeRecipient
         );
+        assert.equal(await vaultContract.keeper(), addresses.keeper);
+        assert.equal(await vaultContract.strategy(), addresses.strategy);
       });
 
       it("cannot be initialized twice", async () => {
@@ -364,6 +357,8 @@ function behavesLikeRibbonOptionsVault(params: {
             [
               addresses.owner,
               addresses.feeRecipient,
+              addresses.keeper,
+              addresses.strategy,
               managementFee,
               performanceFee,
               tokenName,
@@ -377,7 +372,7 @@ function behavesLikeRibbonOptionsVault(params: {
               minimumSupply,
               minimumContractSize,
               parseEther("500"),
-              assetContract.address,
+              asset,
             ]
           )
         ).to.be.revertedWith("Initializable: contract is already initialized");
@@ -389,6 +384,8 @@ function behavesLikeRibbonOptionsVault(params: {
             [
               ADDRESS_ZERO,
               addresses.feeRecipient,
+              addresses.keeper,
+              addresses.strategy,
               managementFee,
               performanceFee,
               tokenName,
@@ -402,7 +399,7 @@ function behavesLikeRibbonOptionsVault(params: {
               minimumSupply,
               minimumContractSize,
               parseEther("500"),
-              assetContract.address,
+              asset,
             ]
           )
         ).to.be.revertedWith("0");
@@ -414,6 +411,8 @@ function behavesLikeRibbonOptionsVault(params: {
             [
               addresses.owner,
               ADDRESS_ZERO,
+              addresses.keeper,
+              addresses.strategy,
               managementFee,
               performanceFee,
               tokenName,
@@ -427,7 +426,7 @@ function behavesLikeRibbonOptionsVault(params: {
               minimumSupply,
               minimumContractSize,
               parseEther("500"),
-              assetContract.address,
+              asset,
             ]
           )
         ).to.be.revertedWith("0");
@@ -439,6 +438,8 @@ function behavesLikeRibbonOptionsVault(params: {
             [
               addresses.owner,
               addresses.feeRecipient,
+              addresses.keeper,
+              addresses.strategy,
               managementFee,
               performanceFee,
               tokenName,
@@ -452,7 +453,7 @@ function behavesLikeRibbonOptionsVault(params: {
               minimumSupply,
               minimumContractSize,
               0,
-              assetContract.address,
+              asset,
             ]
           )
         ).to.be.revertedWith("15");
@@ -464,6 +465,8 @@ function behavesLikeRibbonOptionsVault(params: {
             [
               addresses.owner,
               addresses.feeRecipient,
+              addresses.keeper,
+              addresses.strategy,
               managementFee,
               performanceFee,
               tokenName,
@@ -638,7 +641,7 @@ function behavesLikeRibbonOptionsVault(params: {
       it("shows correct share balance after redemptions", async () => {
         await assetContract
           .connect(signers.user)
-          .approve(vaultContract.address, depositAmount);
+          .approve(addresses.vault, depositAmount);
 
         await vaultContract.deposit(depositAmount);
 
@@ -646,7 +649,7 @@ function behavesLikeRibbonOptionsVault(params: {
         let expiry = vaultState.expiry;
 
         await time.increaseTo(expiry);
-        await vaultContract.harvest();
+        await vaultContract.connect(signers.keeper).harvest();
 
         vaultState = await vaultContract.vaultState();
         expiry = vaultState.expiry;
@@ -682,14 +685,14 @@ function behavesLikeRibbonOptionsVault(params: {
       it("returns the total number of shares", async () => {
         await assetContract
           .connect(signers.user)
-          .approve(vaultContract.address, depositAmount);
+          .approve(addresses.vault, depositAmount);
         await vaultContract.deposit(depositAmount);
 
         let vaultState = await vaultContract.vaultState();
         let expiry = vaultState.expiry;
 
         await time.increaseTo(expiry);
-        await vaultContract.harvest();
+        await vaultContract.connect(signers.keeper).harvest();
 
         vaultState = await vaultContract.vaultState();
         expiry = vaultState.expiry;
@@ -715,14 +718,14 @@ function behavesLikeRibbonOptionsVault(params: {
       it("returns the share balances split", async () => {
         await assetContract
           .connect(signers.user)
-          .approve(vaultContract.address, depositAmount);
+          .approve(addresses.vault, depositAmount);
         await vaultContract.deposit(depositAmount);
 
         let vaultState = await vaultContract.vaultState();
         let expiry = vaultState.expiry;
 
         await time.increaseTo(expiry);
-        await vaultContract.harvest();
+        await vaultContract.connect(signers.keeper).harvest();
 
         vaultState = await vaultContract.vaultState();
         expiry = vaultState.expiry;
@@ -757,7 +760,7 @@ function behavesLikeRibbonOptionsVault(params: {
       it("should revert with 0 amount", async () => {
         await assetContract
           .connect(signers.user)
-          .approve(vaultContract.address, depositAmount);
+          .approve(addresses.vault, depositAmount);
         await vaultContract.deposit(depositAmount);
 
         await expect(vaultContract.withdrawInstantly(0)).to.be.revertedWith(
@@ -768,7 +771,7 @@ function behavesLikeRibbonOptionsVault(params: {
       it("should revert when withdrawing more than available", async () => {
         await assetContract
           .connect(signers.user)
-          .approve(vaultContract.address, depositAmount);
+          .approve(addresses.vault, depositAmount);
         await vaultContract.deposit(depositAmount);
 
         await expect(
@@ -779,13 +782,13 @@ function behavesLikeRibbonOptionsVault(params: {
       it("should revert when deposit receipt is processed", async () => {
         await assetContract
           .connect(signers.user)
-          .approve(vaultContract.address, depositAmount);
+          .approve(addresses.vault, depositAmount);
         await vaultContract.deposit(depositAmount);
 
         const { expiry } = await vaultContract.vaultState();
 
         await time.increaseTo(expiry);
-        await vaultContract.harvest();
+        await vaultContract.connect(signers.keeper).harvest();
 
         await vaultContract.maxRedeem();
 
@@ -797,13 +800,13 @@ function behavesLikeRibbonOptionsVault(params: {
       it("should revert when withdrawing next round", async () => {
         await assetContract
           .connect(signers.user)
-          .approve(vaultContract.address, depositAmount);
+          .approve(addresses.vault, depositAmount);
         await vaultContract.deposit(depositAmount);
 
         const { expiry } = await vaultContract.vaultState();
 
         await time.increaseTo(expiry);
-        await vaultContract.harvest();
+        await vaultContract.connect(signers.keeper).harvest();
 
         await expect(
           vaultContract.withdrawInstantly(depositAmount.add(1))
@@ -813,14 +816,14 @@ function behavesLikeRibbonOptionsVault(params: {
       it("withdraws the amount in deposit receipt", async () => {
         await assetContract
           .connect(signers.user)
-          .approve(vaultContract.address, depositAmount);
+          .approve(addresses.vault, depositAmount);
 
         await vaultContract.deposit(depositAmount);
 
         let startBalance: BigNumber;
         let withdrawAmount: BigNumber;
 
-        if (depositAsset === WETH_ADDRESS[chainId]) {
+        if (asset === WETH_ADDRESS[chainId]) {
           startBalance = await provider.getBalance(addresses.user);
         } else {
           startBalance = await assetContract.balanceOf(addresses.user);
@@ -831,7 +834,7 @@ function behavesLikeRibbonOptionsVault(params: {
         });
         const receipt = await tx.wait();
 
-        if (depositAsset === WETH_ADDRESS[chainId]) {
+        if (asset === WETH_ADDRESS[chainId]) {
           const endBalance = await provider.getBalance(addresses.user);
           withdrawAmount = endBalance
             .sub(startBalance)
@@ -865,7 +868,7 @@ function behavesLikeRibbonOptionsVault(params: {
     });
 
     // Only apply to when assets is WETH
-    if (depositAsset === WETH_ADDRESS[chainId]) {
+    if (asset === WETH_ADDRESS[chainId]) {
       describe("#depositETH", () => {
         time.revertToSnapshotAfterEach(async () => {});
 
@@ -942,7 +945,7 @@ function behavesLikeRibbonOptionsVault(params: {
 
           await assetContract
             .connect(signers.admin)
-            .transfer(vaultContract.address, parseEther("10"));
+            .transfer(addresses.vault, parseEther("10"));
 
           await vaultContract
             .connect(signers.user)
@@ -980,7 +983,7 @@ function behavesLikeRibbonOptionsVault(params: {
 
         await assetContract
           .connect(signers.user)
-          .approve(vaultContract.address, depositAmount);
+          .approve(addresses.vault, depositAmount);
 
         const res = await vaultContract.deposit(depositAmount);
 
@@ -1011,7 +1014,7 @@ function behavesLikeRibbonOptionsVault(params: {
 
         await assetContract
           .connect(signers.user)
-          .approve(vaultContract.address, totalDepositAmount);
+          .approve(addresses.vault, totalDepositAmount);
 
         await vaultContract.deposit(depositAmount);
 
@@ -1043,13 +1046,13 @@ function behavesLikeRibbonOptionsVault(params: {
       // it("fits gas budget for deposits [ @skip-on-coverage ]",async () => {
       //   await assetContract
       //     .connect(signers.owner)
-      //     .approve(vaultContract.address, depositAmount);
+      //     .approve(addresses.vault, depositAmount);
 
       //   await vaultContract.connect(signers.owner).deposit(depositAmount);
 
       //   await assetContract
       //     .connect(signers.user)
-      //     .approve(vaultContract.address, depositAmount.mul(2));
+      //     .approve(addresses.vault, depositAmount.mul(2));
 
       //   const tx1 = await vaultContract.deposit(depositAmount);
 
@@ -1076,11 +1079,11 @@ function behavesLikeRibbonOptionsVault(params: {
 
         await assetContract
           .connect(signers.admin)
-          .transfer(vaultContract.address, depositAmount);
+          .transfer(addresses.vault, depositAmount);
 
         await assetContract
           .connect(signers.user)
-          .approve(vaultContract.address, BigNumber.from("10000000000"));
+          .approve(addresses.vault, BigNumber.from("10000000000"));
 
         await vaultContract
           .connect(signers.user)
@@ -1102,7 +1105,7 @@ function behavesLikeRibbonOptionsVault(params: {
       it("should update the previous deposit receipt when multiple deposits are made", async () => {
         await assetContract
           .connect(signers.user)
-          .approve(vaultContract.address, params.depositAmount.mul(2));
+          .approve(addresses.vault, params.depositAmount.mul(2));
 
         await vaultContract.deposit(params.depositAmount);
 
@@ -1119,7 +1122,7 @@ function behavesLikeRibbonOptionsVault(params: {
         const { expiry } = await vaultContract.vaultState();
 
         await time.increaseTo(expiry);
-        await vaultContract.harvest();
+        await vaultContract.connect(signers.keeper).harvest();
 
         const {
           round: round2,
@@ -1134,13 +1137,13 @@ function behavesLikeRibbonOptionsVault(params: {
         await vaultContract.deposit(params.depositAmount);
 
         assert.bnEqual(
-          await assetContract.balanceOf(vaultContract.address),
+          await assetContract.balanceOf(addresses.vault),
           params.depositAmount.mul(2)
         );
 
         // vaultContract will still hold the vaultContract shares
         assert.bnEqual(
-          await vaultContract.balanceOf(vaultContract.address),
+          await vaultContract.balanceOf(addresses.vault),
           params.depositAmount
         );
 
@@ -1169,7 +1172,7 @@ function behavesLikeRibbonOptionsVault(params: {
 
         await assetContract
           .connect(signers.user)
-          .approve(vaultContract.address, depositAmount);
+          .approve(addresses.vault, depositAmount);
 
         const res = await vaultContract.depositFor(depositAmount, creditor);
 
@@ -1209,7 +1212,7 @@ function behavesLikeRibbonOptionsVault(params: {
 
         await assetContract
           .connect(signers.user)
-          .approve(vaultContract.address, totalDepositAmount);
+          .approve(addresses.vault, totalDepositAmount);
 
         await vaultContract.depositFor(depositAmount, creditor);
 
@@ -1237,13 +1240,13 @@ function behavesLikeRibbonOptionsVault(params: {
       // it("fits gas budget for deposits [ @skip-on-coverage ]",async () => {
       //   await assetContract
       //     .connect(signers.owner)
-      //     .approve(vaultContract.address, depositAmount.mul(2));
+      //     .approve(addresses.vault, depositAmount.mul(2));
 
       //   await vaultContract.connect(signers.owner).depositFor(depositAmount, creditor);
 
       //   await assetContract
       //     .connect(signers.user)
-      //     .approve(vaultContract.address, depositAmount.mul(2));
+      //     .approve(addresses.vault, depositAmount.mul(2));
 
       //   const tx1 = await vaultContract.depositFor(depositAmount, creditor);
       //   const receipt1 = await tx1.wait();
@@ -1269,11 +1272,11 @@ function behavesLikeRibbonOptionsVault(params: {
 
         await assetContract
           .connect(signers.admin)
-          .transfer(vaultContract.address, depositAmount);
+          .transfer(addresses.vault, depositAmount);
 
         await assetContract
           .connect(signers.user)
-          .approve(vaultContract.address, BigNumber.from("10000000000"));
+          .approve(addresses.vault, BigNumber.from("10000000000"));
 
         await vaultContract
           .connect(signers.user)
@@ -1298,7 +1301,7 @@ function behavesLikeRibbonOptionsVault(params: {
       it("updates the previous deposit receipt", async () => {
         await assetContract
           .connect(signers.user)
-          .approve(vaultContract.address, params.depositAmount.mul(2));
+          .approve(addresses.vault, params.depositAmount.mul(2));
 
         await vaultContract.depositFor(params.depositAmount, creditor);
 
@@ -1315,7 +1318,7 @@ function behavesLikeRibbonOptionsVault(params: {
         const { expiry } = await vaultContract.vaultState();
 
         await time.increaseTo(expiry);
-        await vaultContract.harvest();
+        await vaultContract.connect(signers.keeper).harvest();
 
         const {
           round: round2,
@@ -1330,13 +1333,13 @@ function behavesLikeRibbonOptionsVault(params: {
         await vaultContract.depositFor(params.depositAmount, creditor);
 
         assert.bnEqual(
-          await assetContract.balanceOf(vaultContract.address),
+          await assetContract.balanceOf(addresses.vault),
           params.depositAmount.mul(2)
         );
 
         // vaultContract shares will not change until next rollover
         assert.bnEqual(
-          await vaultContract.balanceOf(vaultContract.address),
+          await vaultContract.balanceOf(addresses.vault),
           params.depositAmount
         );
 
@@ -1370,13 +1373,13 @@ function behavesLikeRibbonOptionsVault(params: {
       it("should revert when withdrawing more than unredeemed balance", async () => {
         await assetContract
           .connect(signers.user)
-          .approve(vaultContract.address, depositAmount);
+          .approve(addresses.vault, depositAmount);
         await vaultContract.deposit(depositAmount);
 
         const { expiry } = await vaultContract.vaultState();
 
         await time.increaseTo(expiry);
-        await vaultContract.harvest();
+        await vaultContract.connect(signers.keeper).harvest();
 
         await expect(
           vaultContract.initiateWithdraw(depositAmount.add(1))
@@ -1386,13 +1389,13 @@ function behavesLikeRibbonOptionsVault(params: {
       it("should revert when withdrawing more than vaultContract + account balance", async () => {
         await assetContract
           .connect(signers.user)
-          .approve(vaultContract.address, depositAmount);
+          .approve(addresses.vault, depositAmount);
         await vaultContract.deposit(depositAmount);
 
         const { expiry } = await vaultContract.vaultState();
 
         await time.increaseTo(expiry);
-        await vaultContract.harvest();
+        await vaultContract.connect(signers.keeper).harvest();
 
         // Move 1 share into account
         await vaultContract.redeem(1);
@@ -1405,14 +1408,14 @@ function behavesLikeRibbonOptionsVault(params: {
       it("should revert when initiating with past existing withdrawal", async () => {
         await assetContract
           .connect(signers.user)
-          .approve(vaultContract.address, depositAmount);
+          .approve(addresses.vault, depositAmount);
         await vaultContract.deposit(depositAmount);
 
         let vaultState = await vaultContract.vaultState();
         let expiry = vaultState.expiry;
 
         await time.increaseTo(expiry);
-        await vaultContract.harvest();
+        await vaultContract.connect(signers.keeper).harvest();
 
         await vaultContract.initiateWithdraw(depositAmount.div(2));
 
@@ -1420,7 +1423,7 @@ function behavesLikeRibbonOptionsVault(params: {
         expiry = vaultState.expiry;
 
         await time.increaseTo(expiry);
-        await vaultContract.harvest();
+        await vaultContract.connect(signers.keeper).harvest();
 
         await expect(
           vaultContract.initiateWithdraw(depositAmount.div(2))
@@ -1430,13 +1433,13 @@ function behavesLikeRibbonOptionsVault(params: {
       it("should create withdrawal with unredeemed shares when a deposit has already been made", async () => {
         await assetContract
           .connect(signers.user)
-          .approve(vaultContract.address, depositAmount);
+          .approve(addresses.vault, depositAmount);
         await vaultContract.deposit(depositAmount);
 
         const { expiry } = await vaultContract.vaultState();
 
         await time.increaseTo(expiry);
-        await vaultContract.harvest();
+        await vaultContract.connect(signers.keeper).harvest();
 
         const tx = await vaultContract.initiateWithdraw(depositAmount);
 
@@ -1446,7 +1449,7 @@ function behavesLikeRibbonOptionsVault(params: {
 
         await expect(tx)
           .to.emit(vaultContract, "Transfer")
-          .withArgs(vaultContract.address, addresses.user, depositAmount);
+          .withArgs(addresses.vault, addresses.user, depositAmount);
 
         const { round, shares } = await vaultContract.withdrawals(
           addresses.user
@@ -1458,13 +1461,13 @@ function behavesLikeRibbonOptionsVault(params: {
       it("should create withdrawal by debiting user shares when a deposit has already been made", async () => {
         await assetContract
           .connect(signers.user)
-          .approve(vaultContract.address, depositAmount);
+          .approve(addresses.vault, depositAmount);
         await vaultContract.deposit(depositAmount);
 
         const { expiry } = await vaultContract.vaultState();
 
         await time.increaseTo(expiry);
-        await vaultContract.harvest();
+        await vaultContract.connect(signers.keeper).harvest();
 
         await vaultContract.redeem(depositAmount.div(2));
 
@@ -1473,11 +1476,7 @@ function behavesLikeRibbonOptionsVault(params: {
         // First we redeem the leftover amount
         await expect(tx)
           .to.emit(vaultContract, "Transfer")
-          .withArgs(
-            vaultContract.address,
-            addresses.user,
-            depositAmount.div(2)
-          );
+          .withArgs(addresses.vault, addresses.user, depositAmount.div(2));
 
         await expect(tx)
           .to.emit(vaultContract, "InitiateWithdraw")
@@ -1486,14 +1485,14 @@ function behavesLikeRibbonOptionsVault(params: {
         // Then we debit the shares from the user
         await expect(tx)
           .to.emit(vaultContract, "Transfer")
-          .withArgs(addresses.user, vaultContract.address, depositAmount);
+          .withArgs(addresses.user, addresses.vault, depositAmount);
 
         assert.bnEqual(
           await vaultContract.balanceOf(addresses.user),
           BigNumber.from("0")
         );
         assert.bnEqual(
-          await vaultContract.balanceOf(vaultContract.address),
+          await vaultContract.balanceOf(addresses.vault),
           depositAmount
         );
 
@@ -1507,35 +1506,27 @@ function behavesLikeRibbonOptionsVault(params: {
       it("tops up existing withdrawal", async () => {
         await assetContract
           .connect(signers.user)
-          .approve(vaultContract.address, depositAmount);
+          .approve(addresses.vault, depositAmount);
         await vaultContract.deposit(depositAmount);
 
         const { expiry } = await vaultContract.vaultState();
 
         await time.increaseTo(expiry);
-        await vaultContract.harvest();
+        await vaultContract.connect(signers.keeper).harvest();
 
         const tx1 = await vaultContract.initiateWithdraw(depositAmount.div(2));
         // We redeem the full amount on the first initiateWithdraw
         await expect(tx1)
           .to.emit(vaultContract, "Transfer")
-          .withArgs(vaultContract.address, addresses.user, depositAmount);
+          .withArgs(addresses.vault, addresses.user, depositAmount);
         await expect(tx1)
           .to.emit(vaultContract, "Transfer")
-          .withArgs(
-            addresses.user,
-            vaultContract.address,
-            depositAmount.div(2)
-          );
+          .withArgs(addresses.user, addresses.vault, depositAmount.div(2));
 
         const tx2 = await vaultContract.initiateWithdraw(depositAmount.div(2));
         await expect(tx2)
           .to.emit(vaultContract, "Transfer")
-          .withArgs(
-            addresses.user,
-            vaultContract.address,
-            depositAmount.div(2)
-          );
+          .withArgs(addresses.user, addresses.vault, depositAmount.div(2));
 
         const { round, shares } = await vaultContract.withdrawals(
           addresses.user
@@ -1547,13 +1538,13 @@ function behavesLikeRibbonOptionsVault(params: {
       it("should revert when there is insufficient balance over multiple calls", async () => {
         await assetContract
           .connect(signers.user)
-          .approve(vaultContract.address, depositAmount);
+          .approve(addresses.vault, depositAmount);
         await vaultContract.deposit(depositAmount);
 
         const { expiry } = await vaultContract.vaultState();
 
         await time.increaseTo(expiry);
-        await vaultContract.harvest();
+        await vaultContract.connect(signers.keeper).harvest();
 
         await vaultContract.initiateWithdraw(depositAmount.div(2));
 
@@ -1565,14 +1556,14 @@ function behavesLikeRibbonOptionsVault(params: {
       //   it("fits gas budget [ @skip-on-coverage ]",async () => {
       //     await assetContract
       //       .connect(signers.user)
-      //       .approve(vaultContract.address, depositAmount);
+      //       .approve(addresses.vault, depositAmount);
       //     await vaultContract.deposit(depositAmount);
 
       // const vaultParams = await vaultContract.vaultParams();
       // const expiry = vaultParams.expiry;
 
       // await time.increaseTo(expiry);
-      //     await vaultContract.harvest();
+      //     await vaultContract.connect(signers.keeper).harvest();
 
       //     const tx = await vaultContract.initiateWithdraw(depositAmount);
       //     const receipt = await tx.wait();
@@ -1595,7 +1586,7 @@ function behavesLikeRibbonOptionsVault(params: {
       time.revertToSnapshotAfterEach(async () => {
         await assetContract
           .connect(signers.user)
-          .approve(vaultContract.address, userDepositAmount);
+          .approve(addresses.vault, userDepositAmount);
 
         await vaultContract.deposit(userDepositAmount);
 
@@ -1605,14 +1596,14 @@ function behavesLikeRibbonOptionsVault(params: {
 
         await assetContract
           .connect(signers.user2)
-          .approve(vaultContract.address, user2DepositAmount);
+          .approve(addresses.vault, user2DepositAmount);
 
         await vaultContract.connect(signers.user2).deposit(user2DepositAmount);
 
         const { expiry } = await vaultContract.vaultState();
         await time.increaseTo(expiry);
 
-        await vaultContract.harvest();
+        await vaultContract.connect(signers.keeper).harvest();
         await vaultContract.initiateWithdraw(userDepositAmount);
       });
 
@@ -1630,7 +1621,7 @@ function behavesLikeRibbonOptionsVault(params: {
         const { expiry } = await vaultContract.vaultState();
 
         await time.increaseTo(expiry);
-        await vaultContract.harvest();
+        await vaultContract.connect(signers.keeper).harvest();
 
         await vaultContract.completeWithdraw();
         await expect(vaultContract.completeWithdraw()).to.be.revertedWith("22");
@@ -1638,7 +1629,7 @@ function behavesLikeRibbonOptionsVault(params: {
 
       it("should return deposit amount when total capital has remained neutral", async () => {
         await time.increaseTo(await (await vaultContract.vaultState()).expiry);
-        await vaultContract.harvest();
+        await vaultContract.connect(signers.keeper).harvest();
 
         const pricePerShare = await vaultContract.lpTokenPricePerShare(2);
 
@@ -1654,7 +1645,7 @@ function behavesLikeRibbonOptionsVault(params: {
 
         let beforeBalance: BigNumber;
 
-        if (depositAsset === WETH_ADDRESS[chainId]) {
+        if (asset === WETH_ADDRESS[chainId]) {
           beforeBalance = await provider.getBalance(addresses.user);
         } else {
           beforeBalance = await assetContract.balanceOf(addresses.user);
@@ -1694,7 +1685,7 @@ function behavesLikeRibbonOptionsVault(params: {
 
         let actualWithdrawAmount: BigNumber;
 
-        if (depositAsset === WETH_ADDRESS[chainId]) {
+        if (asset === WETH_ADDRESS[chainId]) {
           const afterBalance = await provider.getBalance(addresses.user);
           actualWithdrawAmount = afterBalance.sub(beforeBalance).add(gasFee);
         } else {
@@ -1728,7 +1719,7 @@ function behavesLikeRibbonOptionsVault(params: {
 
         await assetContract
           .connect(signers.user2)
-          .approve(strategyContract.address, premium);
+          .approve(addresses.strategy, premium);
 
         let vaultState = await vaultContract.vaultState();
         let expiry = vaultState.expiry;
@@ -1753,7 +1744,7 @@ function behavesLikeRibbonOptionsVault(params: {
         );
 
         await time.increaseTo(await (await vaultContract.vaultState()).expiry);
-        await vaultContract.harvest();
+        await vaultContract.connect(signers.keeper).harvest();
 
         const pricePerShare = await vaultContract.lpTokenPricePerShare(2);
 
@@ -1769,7 +1760,7 @@ function behavesLikeRibbonOptionsVault(params: {
 
         let beforeBalance: BigNumber;
 
-        if (depositAsset === WETH_ADDRESS[chainId]) {
+        if (asset === WETH_ADDRESS[chainId]) {
           beforeBalance = await provider.getBalance(addresses.user);
         } else {
           beforeBalance = await assetContract.balanceOf(addresses.user);
@@ -1809,7 +1800,7 @@ function behavesLikeRibbonOptionsVault(params: {
 
         let actualWithdrawAmount: BigNumber;
 
-        if (depositAsset === WETH_ADDRESS[chainId]) {
+        if (asset === WETH_ADDRESS[chainId]) {
           const afterBalance = await provider.getBalance(addresses.user);
           actualWithdrawAmount = afterBalance.sub(beforeBalance).add(gasFee);
         } else {
@@ -1825,12 +1816,12 @@ function behavesLikeRibbonOptionsVault(params: {
       it("should return more than deposit amount when total capital increases", async () => {
         await assetContract
           .connect(signers.whale)
-          .transfer(vaultContract.address, depositAmount.mul(2));
+          .transfer(addresses.vault, depositAmount.mul(2));
 
         const { expiry } = await vaultContract.vaultState();
         await time.increaseTo(expiry);
 
-        await vaultContract.harvest();
+        await vaultContract.connect(signers.keeper).harvest();
 
         const pricePerShare = await vaultContract.lpTokenPricePerShare(2);
 
@@ -1846,7 +1837,7 @@ function behavesLikeRibbonOptionsVault(params: {
 
         let beforeBalance: BigNumber;
 
-        if (depositAsset === WETH_ADDRESS[chainId]) {
+        if (asset === WETH_ADDRESS[chainId]) {
           beforeBalance = await provider.getBalance(addresses.user);
         } else {
           beforeBalance = await assetContract.balanceOf(addresses.user);
@@ -1886,7 +1877,7 @@ function behavesLikeRibbonOptionsVault(params: {
 
         let actualWithdrawAmount: BigNumber;
 
-        if (depositAsset === WETH_ADDRESS[chainId]) {
+        if (asset === WETH_ADDRESS[chainId]) {
           const afterBalance = await provider.getBalance(addresses.user);
           actualWithdrawAmount = afterBalance.sub(beforeBalance).add(gasFee);
         } else {
@@ -1904,7 +1895,7 @@ function behavesLikeRibbonOptionsVault(params: {
       //   const expiry = vaultParams.expiry;
 
       //   await time.increaseTo(expiry);
-      //   await vaultContract.harvest();
+      //   await vaultContract.connect(signers.keeper).harvest();
 
       //   const tx = await vaultContract.completeWithdraw({ gasPrice });
       //   const receipt = await tx.wait();
@@ -1924,19 +1915,19 @@ function behavesLikeRibbonOptionsVault(params: {
       it("should remove all unredeemed shares from vault and transfer to user when called", async () => {
         await assetContract
           .connect(signers.user)
-          .approve(vaultContract.address, depositAmount);
+          .approve(addresses.vault, depositAmount);
 
         await vaultContract.deposit(depositAmount);
 
         const { expiry } = await vaultContract.vaultState();
 
         await time.increaseTo(expiry);
-        await vaultContract.harvest();
+        await vaultContract.connect(signers.keeper).harvest();
 
         const tx = await vaultContract.maxRedeem();
 
         assert.bnEqual(
-          await assetContract.balanceOf(vaultContract.address),
+          await assetContract.balanceOf(addresses.vault),
           depositAmount
         );
 
@@ -1946,7 +1937,7 @@ function behavesLikeRibbonOptionsVault(params: {
         );
 
         assert.bnEqual(
-          await vaultContract.balanceOf(vaultContract.address),
+          await vaultContract.balanceOf(addresses.vault),
           BigNumber.from("0")
         );
 
@@ -1965,19 +1956,19 @@ function behavesLikeRibbonOptionsVault(params: {
       it("should change user and vault balances only once when called twice", async () => {
         await assetContract
           .connect(signers.user)
-          .approve(vaultContract.address, depositAmount);
+          .approve(addresses.vault, depositAmount);
 
         await vaultContract.deposit(depositAmount);
 
         const { expiry } = await vaultContract.vaultState();
 
         await time.increaseTo(expiry);
-        await vaultContract.harvest();
+        await vaultContract.connect(signers.keeper).harvest();
 
         await vaultContract.maxRedeem();
 
         assert.bnEqual(
-          await assetContract.balanceOf(vaultContract.address),
+          await assetContract.balanceOf(addresses.vault),
           depositAmount
         );
 
@@ -1986,7 +1977,7 @@ function behavesLikeRibbonOptionsVault(params: {
           depositAmount
         );
         assert.bnEqual(
-          await vaultContract.balanceOf(vaultContract.address),
+          await vaultContract.balanceOf(addresses.vault),
           BigNumber.from("0")
         );
 
@@ -2002,7 +1993,7 @@ function behavesLikeRibbonOptionsVault(params: {
         await expect(res).to.not.emit(vaultContract, "Transfer");
 
         assert.bnEqual(
-          await assetContract.balanceOf(vaultContract.address),
+          await assetContract.balanceOf(addresses.vault),
           depositAmount
         );
         assert.bnEqual(
@@ -2010,7 +2001,7 @@ function behavesLikeRibbonOptionsVault(params: {
           depositAmount
         );
         assert.bnEqual(
-          await vaultContract.balanceOf(vaultContract.address),
+          await vaultContract.balanceOf(addresses.vault),
           BigNumber.from("0")
         );
       });
@@ -2018,14 +2009,14 @@ function behavesLikeRibbonOptionsVault(params: {
       it("should redeem amount from previous amount when a deposit is made in the current round", async () => {
         await assetContract
           .connect(signers.user)
-          .approve(vaultContract.address, depositAmount.mul(2));
+          .approve(addresses.vault, depositAmount.mul(2));
 
         await vaultContract.deposit(depositAmount);
 
         const { expiry } = await vaultContract.vaultState();
 
         await time.increaseTo(expiry);
-        await vaultContract.harvest();
+        await vaultContract.connect(signers.keeper).harvest();
 
         await vaultContract.deposit(depositAmount);
 
@@ -2041,13 +2032,13 @@ function behavesLikeRibbonOptionsVault(params: {
       time.revertToSnapshotAfterEach(async () => {
         await assetContract
           .connect(signers.user)
-          .approve(vaultContract.address, depositAmount);
+          .approve(addresses.vault, depositAmount);
         await vaultContract.deposit(depositAmount);
 
         const { expiry } = await vaultContract.vaultState();
 
         await time.increaseTo(expiry);
-        await vaultContract.harvest();
+        await vaultContract.connect(signers.keeper).harvest();
       });
 
       it("should revert when 0 passed", async () => {
@@ -2099,7 +2090,7 @@ function behavesLikeRibbonOptionsVault(params: {
           addresses.user
         );
         const vaultLPTokenBalanceBefore = await vaultContract.balanceOf(
-          vaultContract.address
+          addresses.vault
         );
 
         const redeemAmount = BigNumber.from("100");
@@ -2110,7 +2101,7 @@ function behavesLikeRibbonOptionsVault(params: {
         );
 
         const vaultLPTokenBalanceAfter = await vaultContract.balanceOf(
-          vaultContract.address
+          addresses.vault
         );
 
         assert.bnEqual(
@@ -2129,7 +2120,7 @@ function behavesLikeRibbonOptionsVault(params: {
       time.revertToSnapshotAfterEach(async () => {
         await assetContract
           .connect(signers.user)
-          .approve(vaultContract.address, depositAmount);
+          .approve(addresses.vault, depositAmount);
         await vaultContract.deposit(depositAmount);
       });
 
@@ -2137,7 +2128,7 @@ function behavesLikeRibbonOptionsVault(params: {
         const { expiry: expiry1 } = await vaultContract.vaultState();
 
         await time.increaseTo(expiry1);
-        let tx = await vaultContract.harvest();
+        let tx = await vaultContract.connect(signers.keeper).harvest();
 
         await expect(tx)
           .to.emit(vaultContract, "CollectVaultFees")
@@ -2152,16 +2143,14 @@ function behavesLikeRibbonOptionsVault(params: {
 
         await assetContract
           .connect(signers.whale)
-          .transfer(vaultContract.address, vaultIncome);
+          .transfer(addresses.vault, vaultIncome);
 
-        const vaultBalance = await assetContract.balanceOf(
-          vaultContract.address
-        );
+        const vaultBalance = await assetContract.balanceOf(addresses.vault);
 
         const { expiry: expiry2 } = await vaultContract.vaultState();
 
         await time.increaseTo(expiry2);
-        tx = await vaultContract.harvest();
+        tx = await vaultContract.connect(signers.keeper).harvest();
 
         const performanceFee = vaultIncome
           .mul(params.performanceFee)
@@ -2189,7 +2178,7 @@ function behavesLikeRibbonOptionsVault(params: {
         const { expiry: expiry1 } = await vaultContract.vaultState();
 
         await time.increaseTo(expiry1);
-        let tx = await vaultContract.harvest();
+        let tx = await vaultContract.connect(signers.keeper).harvest();
 
         await expect(tx)
           .to.emit(vaultContract, "CollectVaultFees")
@@ -2203,7 +2192,7 @@ function behavesLikeRibbonOptionsVault(params: {
         const { expiry: expiry2 } = await vaultContract.vaultState();
 
         await time.increaseTo(expiry2);
-        tx = await vaultContract.harvest();
+        tx = await vaultContract.connect(signers.keeper).harvest();
 
         await expect(tx)
           .to.emit(vaultContract, "CollectVaultFees")
@@ -2219,7 +2208,7 @@ function behavesLikeRibbonOptionsVault(params: {
         const { expiry: expiry1 } = await vaultContract.vaultState();
 
         await time.increaseTo(expiry1);
-        let tx = await vaultContract.harvest();
+        let tx = await vaultContract.connect(signers.keeper).harvest();
 
         await expect(tx)
           .to.emit(vaultContract, "CollectVaultFees")
@@ -2240,7 +2229,7 @@ function behavesLikeRibbonOptionsVault(params: {
         const { expiry: expiry2 } = await vaultContract.vaultState();
 
         await time.increaseTo(expiry2);
-        tx = await vaultContract.harvest();
+        tx = await vaultContract.connect(signers.keeper).harvest();
 
         await expect(tx)
           .to.emit(vaultContract, "CollectVaultFees")

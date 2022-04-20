@@ -57,4 +57,5 @@ library Errors {
     string internal constant VAULT_TOKEN_DECIMALS_INVALID = "26";
     string internal constant VAULT_ASSET_DECIMALS_INVALID = "27";
     string internal constant VAULT_UNDERLYING_DECIMALS_INVALID = "28";
+    string internal constant PURCHASE_WINDOW_HAS_CLOSED = "29";
 }

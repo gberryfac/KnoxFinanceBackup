@@ -8,16 +8,17 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import "abdk-libraries-solidity/ABDKMath64x64.sol";
 
-import "./interfaces/IKnoxToken.sol";
 import "./interfaces/IPremiaPool.sol";
 import "./interfaces/IVault.sol";
 
 import "./libraries/Errors.sol";
 import "./libraries/ShareMath.sol";
 
+import "./KToken.sol";
+
 import "hardhat/console.sol";
 
-contract PremiaThetaVault is Ownable, ReentrancyGuard {
+contract PremiaThetaVault is KToken, Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
     using SafeMath for uint256;
     using ABDKMath64x64 for int128;
@@ -32,15 +33,13 @@ contract PremiaThetaVault is Ownable, ReentrancyGuard {
     uint256 private constant BASE_RESERVED_LIQ_TOKEN_ID =
         0x0300000000000000000000000000000000000000000000000000000000000000;
 
-    address public token;
-
     // @notice role in charge of weekly vault operations such as rollover, no access to critical vault changes
     address public keeper;
 
     address public immutable pool;
     address public immutable weth;
 
-    IVault internal Vault;
+    IVault private Vault;
 
     struct Claim {
         uint256 longTokenId;
@@ -49,18 +48,15 @@ contract PremiaThetaVault is Ownable, ReentrancyGuard {
     }
 
     constructor(
-        address _token,
         address _keeper,
         address _pool,
         address _weth
-    ) Ownable() ReentrancyGuard() {
-        require(_token != address(0), Errors.ADDRESS_NOT_PROVIDED);
+    ) {
         require(_keeper != address(0), Errors.ADDRESS_NOT_PROVIDED);
 
         require(_pool != address(0), Errors.ADDRESS_NOT_PROVIDED);
         require(_weth != address(0), Errors.ADDRESS_NOT_PROVIDED);
 
-        token = _token;
         keeper = _keeper;
 
         pool = _pool;
@@ -85,8 +81,6 @@ contract PremiaThetaVault is Ownable, ReentrancyGuard {
         Vault = IVault(vault);
     }
 
-    // TODO: ADD INIT FUNCTION
-
     function purchase(
         bytes memory signature,
         uint64 deadline,
@@ -96,7 +90,10 @@ contract PremiaThetaVault is Ownable, ReentrancyGuard {
         uint256 contractSize,
         bool isCall
     ) external nonReentrant returns (uint256 longTokenId) {
-        // TODO: PREVENT USERS FROM BUYING 48 HOURS PRIOR TO ROUND CLOSE
+        require(
+            Vault.expiry() - 48 hours >= block.timestamp,
+            Errors.PURCHASE_WINDOW_HAS_CLOSED
+        );
 
         address asset = Vault.asset();
 
@@ -151,7 +148,7 @@ contract PremiaThetaVault is Ownable, ReentrancyGuard {
             "token id does not match round token id"
         );
 
-        IKnoxToken(token).mint(msg.sender, longTokenId, contractSize, "");
+        _mint(msg.sender, longTokenId, contractSize, "");
     }
 
     function claim(
@@ -172,7 +169,7 @@ contract PremiaThetaVault is Ownable, ReentrancyGuard {
 
         claims[round] = _claim;
 
-        IKnoxToken(token).burn(account, longTokenId, shares);
+        _burn(account, longTokenId, shares);
 
         IERC20(Vault.asset()).safeTransfer(account, amount);
     }
@@ -220,7 +217,7 @@ contract PremiaThetaVault is Ownable, ReentrancyGuard {
             _claim.amount = unclaimed;
             _claim.pricePerShare = ABDKMath64x64.divu(
                 unclaimed,
-                IKnoxToken(token).totalSupply(_claim.longTokenId)
+                totalSupply(_claim.longTokenId)
             );
 
             claims[round] = _claim;

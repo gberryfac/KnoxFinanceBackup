@@ -11,7 +11,6 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 
 import "abdk-libraries-solidity/ABDKMath64x64.sol";
 
-import "./../interfaces/IKnoxToken.sol";
 import "./../interfaces/IRegistry.sol";
 import "./../interfaces/IVault.sol";
 import "./../interfaces/IWETH.sol";
@@ -506,7 +505,6 @@ contract Vault is
         uint256 contractSize,
         bool _isCall
     ) external returns (uint256 liquidityRequired) {
-        // TODO: ONLY STRATEGY
         require(msg.sender == strategy);
 
         {
@@ -563,7 +561,6 @@ contract Vault is
      * minting new shares, getting vault fees, etc.
      */
     function harvest() external {
-        // TODO: ONLY STRATEGY
         require(msg.sender == strategy || msg.sender == keeper);
 
         /* After the vaults strategy harvests, the "lockedCollateral" will be returned to the vaultSchema. Therefore everything in the vault minus claims and withdrawal amount is the free liquidity of the next round. */
