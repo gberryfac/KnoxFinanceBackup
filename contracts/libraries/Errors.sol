@@ -52,4 +52,9 @@ library Errors {
     string internal constant CLAIM_NOT_FOUND = "23";
     // @notice withdrawal has not been initiated
     string internal constant CALLER_MUST_BE_VAULT = "24";
+    // @notice valid token symbol must be provided
+    string internal constant VAULT_TOKEN_SYMBOL_INVALID = "25";
+    string internal constant VAULT_TOKEN_DECIMALS_INVALID = "26";
+    string internal constant VAULT_ASSET_DECIMALS_INVALID = "27";
+    string internal constant VAULT_UNDERLYING_DECIMALS_INVALID = "28";
 }

@@ -4,14 +4,14 @@ pragma solidity ^0.8.0;
 import "./../libraries/VaultSchema.sol";
 
 contract VaultStorage {
-    // @notice Fee recipient for the performance and management fees
-    address public feeRecipient;
-
     // @notice Performance fee charged on premiums earned in rollover. Only charged when there is no loss.
     uint256 public performanceFee;
 
     // @notice Management fee charged on entire AUM in rollover. Only charged when there is no loss.
     uint256 public managementFee;
+
+    // @notice Fee recipient for the performance and management fees
+    address public feeRecipient;
 
     // @notice Stores the user's pending deposit for the round
     mapping(address => VaultSchema.DepositReceipt) public depositReceipts;

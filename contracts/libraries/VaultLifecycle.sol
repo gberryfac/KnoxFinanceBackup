@@ -43,6 +43,7 @@ library VaultLifecycle {
         uint256 performanceFee,
         uint256 managementFee,
         string calldata tokenName,
+        string calldata tokenSymbol,
         VaultSchema.VaultParams calldata _vaultParams
     ) external pure {
         require(owner != address(0), Errors.ADDRESS_NOT_PROVIDED);
@@ -56,21 +57,31 @@ library VaultLifecycle {
             Errors.INVALID_FEE_AMOUNT
         );
         require(bytes(tokenName).length > 0, Errors.VAULT_TOKEN_NAME_INVALID);
+        require(
+            bytes(tokenSymbol).length > 0,
+            Errors.VAULT_TOKEN_SYMBOL_INVALID
+        );
 
-        require(_vaultParams.asset != address(0), Errors.ADDRESS_NOT_PROVIDED);
-
-        // TODO: VERIFY assetDecimals, underlyingDecimals, minimumContractSize
-
-        // require(
-        //     _vaultParams.underlying != address(0),
-        //     Errors.ADDRESS_NOT_PROVIDED
-        // );
+        require(_vaultParams.decimals > 0, Errors.VAULT_TOKEN_DECIMALS_INVALID);
+        require(
+            _vaultParams.assetDecimals > 0,
+            Errors.VAULT_ASSET_DECIMALS_INVALID
+        );
+        require(
+            _vaultParams.underlyingDecimals > 0,
+            Errors.VAULT_UNDERLYING_DECIMALS_INVALID
+        );
         require(_vaultParams.minimumSupply > 0, Errors.VALUE_EXCEEDS_MINIMUM);
+        require(
+            _vaultParams.minimumContractSize > 0,
+            Errors.VALUE_EXCEEDS_MINIMUM
+        );
         require(_vaultParams.cap > 0, Errors.VALUE_EXCEEDS_MINIMUM);
         require(
             _vaultParams.cap > _vaultParams.minimumSupply,
             Errors.VAULT_CAP_TOO_LOW
         );
+        require(_vaultParams.asset != address(0), Errors.ADDRESS_NOT_PROVIDED);
     }
 
     // /**

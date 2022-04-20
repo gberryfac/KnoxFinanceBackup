@@ -2,11 +2,20 @@
 pragma solidity ^0.8.0;
 
 library VaultSchema {
-    // @notice
-    uint256 public constant LP_TOKEN_ID =
-        0x0999999999999999999999999999999999999999999999999999999999999999;
-
-    // TODO: VERIFY assetDecimals, underlyingDecimals, minimumContractSize
+    struct InitParams {
+        // @notice _owner is the owner of the vault with critical permissions
+        address _owner;
+        // @notice _feeRecipient is the address to recieve vault performance and management fees
+        address _feeRecipient;
+        // @notice _managementFee is the management fee pct.
+        uint256 _managementFee;
+        // @notice _performanceFee is the perfomance fee pct.
+        uint256 _performanceFee;
+        // @notice _tokenName is the name of the token
+        string _tokenName;
+        // @notice _tokenSymbol is the symbol of the token
+        string _tokenSymbol;
+    }
 
     struct VaultParams {
         // @notice Option type the vault is selling
@@ -15,18 +24,16 @@ library VaultSchema {
         uint8 decimals;
         // @notice Decimals for asset used in vault
         uint8 assetDecimals;
-        // @notice Asset used in vault
-        address asset;
         // @notice Decimals for underlying used in vault
         uint8 underlyingDecimals;
-        // @notice Underlying asset of the options sold by vault
-        address underlying;
         // @notice Minimum supply of the vault shares issued, for ETH it's 10**10
         uint56 minimumSupply;
         // @notice Minimum contract size a vault will sell
-        uint80 minimumContractSize;
+        uint64 minimumContractSize;
         // @notice Maximum amount of assets to be deposited
         uint104 cap;
+        // @notice Asset used in vault
+        address asset;
     }
 
     struct VaultState {
