@@ -98,6 +98,7 @@ export async function getVaultFixture(
   vaultLogicLibrary: Contract,
   registryContact: Contract,
   tokenName: string,
+  tokenSymbol: string,
   tokenDecimals: number,
   depositAsset: string,
   depositAssetDecimals: number,
@@ -121,17 +122,17 @@ export async function getVaultFixture(
       managementFee,
       performanceFee,
       tokenName,
+      tokenSymbol,
     ],
     [
       isCall,
       tokenDecimals,
       depositAssetDecimals,
-      assetContract.address,
       underlyingAssetDecimals,
-      underlyingAsset,
       minimumSupply,
       minimumContractSize,
       cap,
+      assetContract.address,
     ],
   ];
 

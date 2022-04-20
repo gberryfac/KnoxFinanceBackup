@@ -39,6 +39,7 @@ describe("PremiaThetaVault", () => {
     whale: WHALE_ADDRESS[chainId],
     name: `Knox ETH Theta Vault (Call)`,
     tokenName: `Knox ETH Theta Vault`,
+    tokenSymbol: `kETH-THETA-LP`,
     tokenDecimals: 18,
     pool: WETH_DAI_POOL[chainId],
     depositAsset: WETH_ADDRESS[chainId],
@@ -58,6 +59,7 @@ describe("PremiaThetaVault", () => {
     whale: WHALE_ADDRESS[chainId],
     name: `Knox ETH Theta Vault (Call)`,
     tokenName: `Knox ETH Theta Vault`,
+    tokenSymbol: `kETH-THETA-LP`,
     tokenDecimals: 18,
     pool: WETH_DAI_POOL[chainId],
     depositAsset: DAI_ADDRESS[chainId],
@@ -78,6 +80,7 @@ function behavesLikeRibbonOptionsVault(params: {
   whale: string;
   name: string;
   tokenName: string;
+  tokenSymbol: string;
   tokenDecimals: number;
   pool: string;
   depositAsset: string;
@@ -100,6 +103,7 @@ function behavesLikeRibbonOptionsVault(params: {
   // Parameters
   let pool = params.pool;
   let tokenName = params.tokenName;
+  let tokenSymbol = params.tokenSymbol;
   let tokenDecimals = params.tokenDecimals;
   let depositAsset = params.depositAsset;
   let depositAssetDecimals = params.depositAssetDecimals;
@@ -190,6 +194,7 @@ function behavesLikeRibbonOptionsVault(params: {
         vaultLogicLibrary,
         mockRegistry,
         tokenName,
+        tokenSymbol,
         tokenDecimals,
         depositAsset,
         depositAssetDecimals,
@@ -224,10 +229,6 @@ function behavesLikeRibbonOptionsVault(params: {
       await strategyContract
         .connect(signers.owner)
         .setVault(vaultContract.address);
-
-      await vaultContract
-        .connect(signers.owner)
-        .setTokenAddress(knoxTokenContract.address);
     });
 
     after(async () => {
