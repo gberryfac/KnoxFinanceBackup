@@ -14,7 +14,8 @@ library VaultLogic {
     using SafeMath for uint256;
     using ABDKMath64x64 for int128;
 
-    function toBaseDecimals(
+    // @notice adjusts precision of value to asset decimals
+    function toAssetDecimals(
         uint256 value,
         VaultSchema.VaultParams memory vaultParams
     ) external pure returns (uint256) {
