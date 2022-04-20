@@ -170,6 +170,7 @@ function behavesLikeRibbonOptionsVault(params: {
   let mockRegistry: Contract;
   let assetContract: Contract;
   let mockPremiaPool: Contract;
+  let knoxTokenContract: Contract;
   let strategyContract: Contract;
 
   describe.only(`${params.name}`, () => {
@@ -228,7 +229,7 @@ function behavesLikeRibbonOptionsVault(params: {
         addresses
       );
 
-      [vaultContract] = await fixtures.getVaultFixture(
+      [vaultContract, knoxTokenContract] = await fixtures.getVaultFixture(
         commonLogicLibrary,
         vaultDisplayLibrary,
         vaultLifecycleLibrary,
@@ -256,7 +257,7 @@ function behavesLikeRibbonOptionsVault(params: {
       const strategyContractFactory = await getContractFactory("MockStrategy");
 
       strategyContract = await strategyContractFactory.deploy(
-        vaultContract.address,
+        knoxTokenContract.address,
         addresses.keeper,
         mockPremiaPool.address,
         WETH_ADDRESS[chainId]
@@ -264,7 +265,7 @@ function behavesLikeRibbonOptionsVault(params: {
 
       await strategyContract.setVault(vaultContract.address);
 
-      knoxTokenAddress = vaultContract.address;
+      knoxTokenAddress = knoxTokenContract.address;
     });
 
     after(async () => {

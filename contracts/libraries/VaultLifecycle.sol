@@ -13,33 +13,14 @@ import "hardhat/console.sol";
 library VaultLifecycle {
     using SafeMath for uint256;
 
-    // /**
-    //  * @param currentShareSupply is the supply of the shares invoked with totalSupply()
-    //  * @param asset is the address of the vault's asset
-    //  * @param decimals is the decimals of the asset
-    //  * @param queuedWithdrawals is the amount queued for withdrawals from last round
-    //  * @param performanceFee is the perf fee percent to charge on premiums
-    //  * @param managementFee is the management fee percent to charge on the AUM
-    //  */
-    // struct RolloverParams {
-    //     uint256 decimals;
-    //     uint256 currentBalance;
-    //     uint256 currentShareSupply;
-    //     uint256 performanceFee;
-    //     uint256 managementFee;
-    // }
-
     /**
      * @notice Verify the constructor params satisfy requirements
-     * @param owner is the owner of the vault with critical permissions
-     * @param feeRecipient is the address to recieve vault performance and management fees
-     * @param performanceFee is the perfomance fee pct.
-     * @param tokenName is the name of the token
-     * @param _vaultParams is the struct with vault general data
      */
     function verifyInitializerParams(
         address owner,
         address feeRecipient,
+        address keeper,
+        address strategy,
         uint256 performanceFee,
         uint256 managementFee,
         string calldata tokenName,
@@ -48,6 +29,8 @@ library VaultLifecycle {
     ) external pure {
         require(owner != address(0), Errors.ADDRESS_NOT_PROVIDED);
         require(feeRecipient != address(0), Errors.ADDRESS_NOT_PROVIDED);
+        require(keeper != address(0), Errors.ADDRESS_NOT_PROVIDED);
+        require(strategy != address(0), Errors.ADDRESS_NOT_PROVIDED);
         require(
             performanceFee < 100 * Constants.FEE_MULTIPLIER,
             Errors.INVALID_FEE_AMOUNT

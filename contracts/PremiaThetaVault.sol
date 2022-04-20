@@ -68,14 +68,6 @@ contract PremiaThetaVault is Ownable, ReentrancyGuard {
     }
 
     /**
-     * @dev Throws if called by any account other than the keeper.
-     */
-    modifier onlyKeeper() {
-        require(msg.sender == keeper, Errors.ADDRESS_NOT_KEEPER);
-        _;
-    }
-
-    /**
      * @notice Sets the new keeper
      * @param newKeeper is the address of the new keeper
      */
@@ -185,7 +177,9 @@ contract PremiaThetaVault is Ownable, ReentrancyGuard {
         IERC20(Vault.asset()).safeTransfer(account, amount);
     }
 
-    function harvest() external nonReentrant onlyKeeper {
+    function harvest() external nonReentrant {
+        require(msg.sender == keeper, Errors.ADDRESS_NOT_KEEPER);
+
         require(
             block.timestamp >= Vault.expiry(),
             Errors.VAULT_ROUND_NOT_CLOSED

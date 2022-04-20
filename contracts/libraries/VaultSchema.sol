@@ -3,17 +3,21 @@ pragma solidity ^0.8.0;
 
 library VaultSchema {
     struct InitParams {
-        // @notice _owner is the owner of the vault with critical permissions
+        // @notice Owner of the vault with critical permissions.
         address _owner;
-        // @notice _feeRecipient is the address to recieve vault performance and management fees
+        // @notice Address to recieve vault performance and management fees.
         address _feeRecipient;
-        // @notice _managementFee is the management fee pct.
+        // @notice Address of vault keeper.
+        address _keeper;
+        // @notice Address of the strategy contract.
+        address _strategy;
+        // @notice Management fee pct.
         uint256 _managementFee;
-        // @notice _performanceFee is the perfomance fee pct.
+        // @notice Perfomance fee pct.
         uint256 _performanceFee;
-        // @notice _tokenName is the name of the token
+        // @notice Name of the token.
         string _tokenName;
-        // @notice _tokenSymbol is the symbol of the token
+        // @notice Symbol of the token.
         string _tokenSymbol;
     }
 

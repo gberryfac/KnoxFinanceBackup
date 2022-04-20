@@ -74,6 +74,8 @@ contract Vault is
         VaultLifecycle.verifyInitializerParams(
             _initParams._owner,
             _initParams._feeRecipient,
+            _initParams._keeper,
+            _initParams._strategy,
             _initParams._managementFee,
             _initParams._performanceFee,
             _initParams._tokenName,
@@ -86,6 +88,9 @@ contract Vault is
         __Ownable_init();
 
         transferOwnership(_initParams._owner);
+
+        keeper = _initParams._keeper;
+        strategy = _initParams._strategy;
 
         feeRecipient = _initParams._feeRecipient;
         performanceFee = _initParams._performanceFee;
@@ -115,6 +120,25 @@ contract Vault is
         require(newFeeRecipient != address(0), Errors.ADDRESS_NOT_PROVIDED);
         require(newFeeRecipient != feeRecipient, Errors.NEW_ADDRESS_EQUALS_OLD);
         feeRecipient = newFeeRecipient;
+    }
+
+    /**
+     * @notice Sets the new keeper
+     * @param newKeeper is the address of the new keeper
+     */
+    function setNewKeeper(address newKeeper) external onlyOwner {
+        require(newKeeper != address(0), Errors.ADDRESS_NOT_PROVIDED);
+        keeper = newKeeper;
+    }
+
+    /**
+     * @notice Sets the new strategy
+     * @param newStrategy is the address of the new strategy
+     */
+    function setStrategy(address newStrategy) external onlyOwner {
+        require(newStrategy != address(0), Errors.ADDRESS_NOT_PROVIDED);
+        require(newStrategy != strategy, Errors.NEW_ADDRESS_EQUALS_OLD);
+        strategy = newStrategy;
     }
 
     /**
@@ -483,6 +507,7 @@ contract Vault is
         bool _isCall
     ) external returns (uint256 liquidityRequired) {
         // TODO: ONLY STRATEGY
+        require(msg.sender == strategy);
 
         {
             require(
@@ -539,6 +564,7 @@ contract Vault is
      */
     function harvest() external {
         // TODO: ONLY STRATEGY
+        require(msg.sender == strategy || msg.sender == keeper);
 
         /* After the vaults strategy harvests, the "lockedCollateral" will be returned to the vaultSchema. Therefore everything in the vault minus claims and withdrawal amount is the free liquidity of the next round. */
 
