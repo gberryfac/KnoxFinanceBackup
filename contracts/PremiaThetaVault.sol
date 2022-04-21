@@ -23,8 +23,7 @@ contract PremiaThetaVault is KToken, Ownable, ReentrancyGuard {
     using SafeMath for uint256;
     using ABDKMath64x64 for int128;
 
-    mapping(uint256 => uint256) public roundByLongTokenId;
-    mapping(uint256 => Claim) public claims;
+    bool public immutable isCall;
 
     uint256 public totalUnclaimed;
 
@@ -33,12 +32,12 @@ contract PremiaThetaVault is KToken, Ownable, ReentrancyGuard {
     uint256 private constant BASE_RESERVED_LIQ_TOKEN_ID =
         0x0300000000000000000000000000000000000000000000000000000000000000;
 
-    // @notice role in charge of weekly vault operations such as harvest, no access to critical vault changes
     address public keeper;
 
     address public immutable pool;
     address public immutable weth;
 
+    IERC20 private immutable Asset;
     IVault private Vault;
 
     struct Claim {
@@ -47,16 +46,25 @@ contract PremiaThetaVault is KToken, Ownable, ReentrancyGuard {
         int128 pricePerShare;
     }
 
+    mapping(uint256 => uint256) public roundByLongTokenId;
+    mapping(uint256 => Claim) public claims;
+
     constructor(
+        bool _isCall,
+        address _asset,
         address _keeper,
         address _pool,
         address _weth
     ) {
+        require(_asset != address(0), Errors.ADDRESS_NOT_PROVIDED);
         require(_keeper != address(0), Errors.ADDRESS_NOT_PROVIDED);
 
         require(_pool != address(0), Errors.ADDRESS_NOT_PROVIDED);
         require(_weth != address(0), Errors.ADDRESS_NOT_PROVIDED);
 
+        isCall = _isCall;
+
+        Asset = IERC20(_asset);
         keeper = _keeper;
 
         pool = _pool;
@@ -87,17 +95,14 @@ contract PremiaThetaVault is KToken, Ownable, ReentrancyGuard {
         uint64 maturity,
         int128 strike64x64,
         int128 premium64x64,
-        uint256 contractSize,
-        bool isCall
+        uint256 contractSize
     ) external nonReentrant returns (uint256 longTokenId) {
         require(
             Vault.expiry() - 48 hours >= block.timestamp,
             Errors.PURCHASE_WINDOW_HAS_CLOSED
         );
 
-        address asset = Vault.asset();
-
-        IERC20(asset).safeTransferFrom(
+        Asset.safeTransferFrom(
             msg.sender,
             address(Vault),
             premium64x64.mulu(contractSize)
@@ -109,11 +114,10 @@ contract PremiaThetaVault is KToken, Ownable, ReentrancyGuard {
             maturity,
             strike64x64,
             premium64x64,
-            contractSize,
-            isCall
+            contractSize
         );
 
-        IERC20(asset).approve(pool, liquidityRequired);
+        Asset.approve(pool, liquidityRequired);
 
         (longTokenId, ) = IPremiaPool(pool).writeFrom(
             address(this),
@@ -145,7 +149,7 @@ contract PremiaThetaVault is KToken, Ownable, ReentrancyGuard {
 
         require(
             _claim.longTokenId == longTokenId,
-            "token id does not match round token id"
+            "LongTokenId does not match round token id"
         );
 
         _mint(msg.sender, longTokenId, contractSize, "");
@@ -171,7 +175,7 @@ contract PremiaThetaVault is KToken, Ownable, ReentrancyGuard {
 
         _burn(account, longTokenId, shares);
 
-        IERC20(Vault.asset()).safeTransfer(account, amount);
+        Asset.safeTransfer(account, amount);
     }
 
     function harvest() external nonReentrant {
@@ -182,10 +186,7 @@ contract PremiaThetaVault is KToken, Ownable, ReentrancyGuard {
             Errors.VAULT_ROUND_NOT_CLOSED
         );
 
-        bool isCall = Vault.isCall();
-        address asset = Vault.asset();
-
-        uint256 balanceBefore = IERC20(asset).balanceOf(address(this));
+        uint256 balanceBefore = Asset.balanceOf(address(this));
 
         uint256 reservedLiquidity = IPremiaPool(pool).balanceOf(
             address(this),
@@ -196,15 +197,11 @@ contract PremiaThetaVault is KToken, Ownable, ReentrancyGuard {
 
         IPremiaPool(pool).withdraw(reservedLiquidity, isCall);
 
-        uint256 balanceAfter = IERC20(asset).balanceOf(address(this));
+        uint256 balanceAfter = Asset.balanceOf(address(this));
 
         uint256 transferToVault = balanceAfter - balanceBefore;
 
-        IERC20(asset).safeTransferFrom(
-            address(this),
-            address(Vault),
-            transferToVault
-        );
+        Asset.safeTransferFrom(address(this), address(Vault), transferToVault);
 
         uint256 unclaimed = Vault.lockedCollateral() - transferToVault;
 

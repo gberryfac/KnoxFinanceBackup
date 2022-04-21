@@ -118,7 +118,7 @@ function behavesLikeRibbonOptionsVault(params: {
   let premiaPool: Contract;
   let strategyContract: Contract;
 
-  // TODO: REMOVE VAULT DEPENDENCY, USE MOCK INSTEAD
+  // TODO: REMOVE VAULT DEPENDENCY, USE MOCK INSTEAD?
 
   describe.only(`${params.name}`, () => {
     let initSnapshotId: string;
@@ -157,8 +157,8 @@ function behavesLikeRibbonOptionsVault(params: {
 
       addresses["pool"] = premiaPool.address;
 
-      commonLogicLibrary = await getContractFactory("CommonLogic").then(
-        (contract) => contract.deploy()
+      commonLogicLibrary = await getContractFactory("Common").then((contract) =>
+        contract.deploy()
       );
 
       vaultDisplayLibrary = await getContractFactory("VaultDisplay").then(
@@ -182,7 +182,13 @@ function behavesLikeRibbonOptionsVault(params: {
         "PremiaThetaVault",
         signers.owner
       ).then((contract) =>
-        contract.deploy(addresses.keeper, addresses.pool, WETH_ADDRESS[chainId])
+        contract.deploy(
+          isCall,
+          asset,
+          addresses.keeper,
+          addresses.pool,
+          WETH_ADDRESS[chainId]
+        )
       );
 
       addresses["commonLogic"] = commonLogicLibrary.address;
@@ -280,8 +286,7 @@ function behavesLikeRibbonOptionsVault(params: {
           maturity,
           strike64x64,
           premium64x64,
-          size,
-          isCall
+          size
         );
 
         const vaultBalanceAfter = await assetContract.balanceOf(
@@ -348,8 +353,7 @@ function behavesLikeRibbonOptionsVault(params: {
           maturity,
           strike64x64,
           0,
-          size,
-          isCall
+          size
         );
 
         const balanceAfter = await assetContract.balanceOf(addresses.vault);
@@ -380,8 +384,7 @@ function behavesLikeRibbonOptionsVault(params: {
           maturity,
           strike64x64,
           0,
-          size,
-          isCall
+          size
         );
 
         const userWrappedTokenBalance = await strategyContract.balanceOf(
@@ -422,8 +425,7 @@ function behavesLikeRibbonOptionsVault(params: {
           maturity,
           strike64x64,
           0,
-          size,
-          isCall
+          size
         );
 
         vaultState = await vaultContract.vaultState();
@@ -438,8 +440,7 @@ function behavesLikeRibbonOptionsVault(params: {
           maturity,
           strike64x64,
           0,
-          size,
-          isCall
+          size
         );
 
         // current token id should not change
@@ -474,8 +475,7 @@ function behavesLikeRibbonOptionsVault(params: {
           maturity,
           strike64x64,
           0,
-          size,
-          isCall
+          size
         );
 
         // current token id should be different from last round
@@ -523,8 +523,7 @@ function behavesLikeRibbonOptionsVault(params: {
           maturity,
           strike64x64,
           0,
-          size,
-          isCall
+          size
         );
 
         vaultState = await vaultContract.vaultState();
@@ -573,8 +572,7 @@ function behavesLikeRibbonOptionsVault(params: {
           expiry,
           strike64x64,
           0,
-          size,
-          isCall
+          size
         );
       });
 
@@ -640,7 +638,7 @@ function behavesLikeRibbonOptionsVault(params: {
 
         await strategyContract
           .connect(signers.user2)
-          .purchase(BYTES_ZERO, 0, expiry, strike64x64, 0, size, isCall);
+          .purchase(BYTES_ZERO, 0, expiry, strike64x64, 0, size);
 
         await premiaPool.processExpired(
           addresses.strategy,
@@ -767,7 +765,7 @@ function behavesLikeRibbonOptionsVault(params: {
 
         await strategyContract
           .connect(signers.user2)
-          .purchase(BYTES_ZERO, 0, expiry, strike64x64, 0, size2, isCall);
+          .purchase(BYTES_ZERO, 0, expiry, strike64x64, 0, size2);
 
         let user2LongHolderBalance = isCall
           ? bnSpot.sub(bnStrike).mul(size2).div(bnSpot)
@@ -879,8 +877,7 @@ function behavesLikeRibbonOptionsVault(params: {
           expiry,
           strike64x64,
           0,
-          size,
-          isCall
+          size
         );
       });
 
@@ -981,8 +978,7 @@ function behavesLikeRibbonOptionsVault(params: {
           expiry,
           strike64x64,
           0,
-          size,
-          isCall
+          size
         );
 
         bnSpot = BigNumber.from(isCall ? 3500 : 2500);

@@ -10,7 +10,7 @@ import "./Errors.sol";
 
 import "hardhat/console.sol";
 
-library CommonLogic {
+library Common {
     using SafeERC20 for IERC20;
 
     /**

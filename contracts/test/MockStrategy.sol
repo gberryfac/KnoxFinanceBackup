@@ -9,6 +9,8 @@ contract MockStrategy {
     IVault private Vault;
 
     constructor(
+        bool,
+        address,
         address,
         address,
         address
@@ -24,8 +26,7 @@ contract MockStrategy {
         uint64 maturity,
         int128 strike64x64,
         int128 premium64x64,
-        uint256 contractSize,
-        bool isCall
+        uint256 contractSize
     ) external {
         Vault.borrow(
             signature,
@@ -33,8 +34,7 @@ contract MockStrategy {
             maturity,
             strike64x64,
             premium64x64,
-            contractSize,
-            isCall
+            contractSize
         );
     }
 }

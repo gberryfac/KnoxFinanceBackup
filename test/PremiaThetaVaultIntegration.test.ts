@@ -125,7 +125,7 @@ function behavesLikeRibbonOptionsVault(params: {
   let premiaPool: Contract;
   let strategyContract: Contract;
 
-  // TODO: REMOVE VAULT DEPENDENCY, USE MOCK INSTEAD
+  // TODO: REMOVE VAULT DEPENDENCY, USE MOCK INSTEAD?
 
   describe.only(`${params.name}`, () => {
     let initSnapshotId: string;
@@ -171,8 +171,8 @@ function behavesLikeRibbonOptionsVault(params: {
         ETH_PRICE_ORACLE[chainId]
       );
 
-      commonLogicLibrary = await getContractFactory("CommonLogic").then(
-        (contract) => contract.deploy()
+      commonLogicLibrary = await getContractFactory("Common").then((contract) =>
+        contract.deploy()
       );
 
       vaultDisplayLibrary = await getContractFactory("VaultDisplay").then(
@@ -196,7 +196,13 @@ function behavesLikeRibbonOptionsVault(params: {
         "PremiaThetaVault",
         signers.owner
       ).then((contract) =>
-        contract.deploy(addresses.keeper, addresses.pool, WETH_ADDRESS[chainId])
+        contract.deploy(
+          isCall,
+          asset,
+          addresses.keeper,
+          addresses.pool,
+          WETH_ADDRESS[chainId]
+        )
       );
 
       addresses["commonLogic"] = commonLogicLibrary.address;
@@ -255,8 +261,7 @@ function behavesLikeRibbonOptionsVault(params: {
           maturity,
           strike64x64,
           0,
-          size,
-          isCall
+          size
         );
 
         const shortTokenId = formatTokenId({
@@ -309,8 +314,7 @@ function behavesLikeRibbonOptionsVault(params: {
           maturity,
           strike64x64,
           0,
-          size,
-          isCall
+          size
         );
 
         const balanceBeforeExpiredProcessed = await assetContract.balanceOf(
@@ -397,8 +401,7 @@ function behavesLikeRibbonOptionsVault(params: {
           maturity,
           strike64x64,
           0,
-          size,
-          isCall
+          size
         );
 
         const balanceBeforeExpiredProcessed = await assetContract.balanceOf(

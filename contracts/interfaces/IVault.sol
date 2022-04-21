@@ -57,13 +57,10 @@ interface IVault {
         uint64 maturity,
         int128 strike64x64,
         int128 premium64x64,
-        uint256 contractSize,
-        bool isCall
+        uint256 contractSize
     ) external returns (uint256);
 
     function harvest() external;
-
-    function asset() external view returns (address);
 
     function expiry() external view returns (uint32);
 

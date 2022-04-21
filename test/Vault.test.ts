@@ -204,8 +204,8 @@ function behavesLikeRibbonOptionsVault(params: {
 
       addresses["pool"] = premiaPool.address;
 
-      commonLogicLibrary = await getContractFactory("CommonLogic").then(
-        (contract) => contract.deploy()
+      commonLogicLibrary = await getContractFactory("Common").then((contract) =>
+        contract.deploy()
       );
 
       vaultDisplayLibrary = await getContractFactory("VaultDisplay").then(
@@ -228,6 +228,8 @@ function behavesLikeRibbonOptionsVault(params: {
       strategyContract = await getContractFactory("MockStrategy").then(
         (contract) =>
           contract.deploy(
+            isCall,
+            asset,
             addresses.keeper,
             addresses.pool,
             WETH_ADDRESS[chainId]
@@ -261,7 +263,6 @@ function behavesLikeRibbonOptionsVault(params: {
       addresses["vault"] = vaultContract.address;
 
       await strategyContract.setVault(addresses.vault);
-      // TODO: REMOVE MOCKSTRATEGY FROM TESTS, CAll FUNCTIONS DIRECTLY
     });
 
     after(async () => {
@@ -273,7 +274,7 @@ function behavesLikeRibbonOptionsVault(params: {
       time.revertToSnapshotAfterEach(async () => {
         const Vault = await getContractFactory("Vault", {
           libraries: {
-            CommonLogic: addresses.commonLogic,
+            Common: addresses.commonLogic,
             VaultDisplay: addresses.vaultDisplay,
             VaultLifecycle: addresses.vaultLifecycle,
             VaultLogic: addresses.vaultLogic,
@@ -1731,8 +1732,7 @@ function behavesLikeRibbonOptionsVault(params: {
             expiry,
             strike64x64,
             premium,
-            user2PurchaseSize,
-            isCall
+            user2PurchaseSize
           );
 
         await time.increaseTo(await (await vaultContract.vaultState()).expiry);
@@ -2221,8 +2221,7 @@ function behavesLikeRibbonOptionsVault(params: {
             expiry2,
             depositAmount,
             0,
-            parseUnits("1", depositAssetDecimals),
-            isCall
+            parseUnits("1", depositAssetDecimals)
           );
 
         await time.increaseTo(expiry2);

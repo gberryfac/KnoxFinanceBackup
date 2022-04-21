@@ -138,7 +138,7 @@ export async function getVaultFixture(
       [WETH_ADDRESS[chainId], addresses.registry],
       {
         libraries: {
-          CommonLogic: addresses.commonLogic,
+          Common: addresses.commonLogic,
           VaultDisplay: addresses.vaultDisplay,
           VaultLifecycle: addresses.vaultLifecycle,
           VaultLogic: addresses.vaultLogic,

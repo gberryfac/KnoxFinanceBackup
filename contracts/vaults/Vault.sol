@@ -15,7 +15,7 @@ import "./../interfaces/IRegistry.sol";
 import "./../interfaces/IVault.sol";
 import "./../interfaces/IWETH.sol";
 
-import "./../libraries/CommonLogic.sol";
+import "./../libraries/Common.sol";
 import "./../libraries/Constants.sol";
 import "./../libraries/Errors.sol";
 import "./../libraries/ShareMath.sol";
@@ -336,7 +336,7 @@ contract Vault is
 
         emit InstantWithdraw(msg.sender, amount, currentRound);
 
-        CommonLogic.transferAsset(msg.sender, vaultParams.asset, weth, amount);
+        Common.transferAsset(msg.sender, vaultParams.asset, weth, amount);
     }
 
     /**
@@ -346,7 +346,7 @@ contract Vault is
     function initiateWithdraw(uint256 numShares) external nonReentrant {
         require(numShares > 0, Errors.VALUE_EXCEEDS_MINIMUM);
 
-        /* We do a max redeem before initiating a withdrawal. But we check if they must first have unredeemed shares */
+        // We do a max redeem before initiating a withdrawal. But we check if they must first have unredeemed shares.
         if (
             depositReceipts[msg.sender].amount > 0 ||
             depositReceipts[msg.sender].unredeemedShares > 0
@@ -424,7 +424,7 @@ contract Vault is
 
         require(withdrawAmount > 0, Errors.WITHDRAWAL_AMOUNT_EXCEEDS_MINIMUM);
 
-        CommonLogic.transferAsset(
+        Common.transferAsset(
             msg.sender,
             vaultParams.asset,
             weth,
@@ -466,7 +466,7 @@ contract Vault is
             msg.sender
         ];
 
-        /* This handles the null case when depositReceipt.round = 0 Because we start with round = 1 at `initialize` */
+        // This handles the null case when depositReceipt.round = 0 Because we start with round = 1 at `initialize`.
         uint256 currentRound = vaultState.round;
 
         uint256 unredeemedShares = depositReceipt.getSharesFromReceipt(
@@ -486,7 +486,7 @@ contract Vault is
             Errors.REDEEMED_SHARES_EXCEEDS_BALANCE
         );
 
-        /* If we have a depositReceipt on the same round, BUT we have some unredeemed shares we debit from the unredeemedShares, but leave the amount field intact If the round has past, with no new deposits, we just zero it out for new deposits. */
+        // If we have a depositReceipt on the same round, BUT we have some unredeemed shares we debit from the unredeemedShares, but leave the amount field intact If the round has past, with no new deposits, we just zero it out for new deposits.
         if (depositReceipt.round < currentRound) {
             depositReceipts[msg.sender].amount = 0;
         }
@@ -511,8 +511,7 @@ contract Vault is
         uint64 maturity,
         int128 strike64x64,
         int128 premium64x64,
-        uint256 contractSize,
-        bool _isCall
+        uint256 contractSize
     ) external returns (uint256 liquidityRequired) {
         require(msg.sender == strategy);
 
@@ -547,7 +546,7 @@ contract Vault is
                 maturity,
                 strike64x64,
                 premium64x64,
-                _isCall
+                vaultParams.isCall
             ),
             Errors.INVALID_SIGNATURE
         );
@@ -572,7 +571,7 @@ contract Vault is
     function harvest() external {
         require(msg.sender == strategy || msg.sender == keeper);
 
-        /* After the vaults strategy harvests, the "lockedCollateral" will be returned to the vaultSchema. Therefore everything in the vault minus claims and withdrawal amount is the free liquidity of the next round. */
+        // After the vaults strategy harvests, the "lockedCollateral" will be returned to the vault. Everything in the vault minus claims and withdrawal amount is the free liquidity of the next round.
 
         address recipient = feeRecipient;
         uint256 queuedWithdrawals;
@@ -583,7 +582,7 @@ contract Vault is
         uint256 totalVaultFee;
 
         {
-            /* Vault fees are calculated with queued withdrawals prior to calculating lockedAmount for current round. */
+            // Vault fees are calculated with queued withdrawals prior to calculating lockedAmount for current round.
             uint256 currentBalance = IERC20(vaultParams.asset).balanceOf(
                 address(this)
             );
@@ -636,7 +635,7 @@ contract Vault is
 
             uint256 nextRound = currentRound + 1;
 
-            /* Writing `1` into the map makes subsequent writes warm, reducing the gas from 20k to 5k. Having 1 initialized beforehand will not be an issue as long as we round down share calculations to 0. */
+            // Writing `1` into the map makes subsequent writes warm, reducing the gas from 20k to 5k. Having 1 initialized beforehand will not be an issue as long as we round down share calculations to 0.
             if (lpTokenPricePerShare[nextRound] == 0) {
                 lpTokenPricePerShare[nextRound] = ShareMath.PLACEHOLDER_UINT;
             }
@@ -651,16 +650,13 @@ contract Vault is
             vaultState.queuedDeposits = 0;
             vaultState.queuedWithdrawals = uint128(queuedWithdrawals);
 
-            // Total capital should not include claims, withdrawals, or vault fees.
-            // TODO: MOVE `lastTotalCapital` TO VAULTSTATE
-            // @notice the vault total capital at the start of the last round
             vaultState.lastTotalCapital = currentBalance.sub(queuedWithdrawals);
         }
 
         _mint(address(this), mintShares);
 
         if (totalVaultFee > 0) {
-            CommonLogic.transferAsset(
+            Common.transferAsset(
                 payable(recipient),
                 vaultParams.asset,
                 weth,
@@ -678,7 +674,7 @@ contract Vault is
      * @return total balance of the vault, including the amounts locked in third party protocols
      */
     function totalBalance() public view returns (uint256) {
-        /* The total balance should include new deposits, premiums paid, free/locked liquidity, and withdrawals. It should not include the claims. */
+        // The total balance should include new deposits, premiums paid, free/locked liquidity, and withdrawals.
         return
             IERC20(vaultParams.asset).balanceOf(address(this)).add(
                 vaultState.lockedCollateral
@@ -755,10 +751,6 @@ contract Vault is
     /************************************************
      *  GETTERS
      ***********************************************/
-
-    function asset() external view returns (address) {
-        return vaultParams.asset;
-    }
 
     function expiry() external view returns (uint32) {
         return vaultState.expiry;

@@ -8,7 +8,6 @@ library Constants {
     // @notice Placeholder uint value to prevent cold writes
     uint256 public constant PLACEHOLDER_UINT = 1;
 
-    // Number of weeks per year = 52.142857 weeks * FEE_MULTIPLIER = 52142857
-    // Dividing by weeks per year requires doing num.mul(FEE_MULTIPLIER).div(WEEKS_PER_YEAR)
+    // @notice Number of weeks per year = 52.142857 weeks * FEE_MULTIPLIER = 52142857. Dividing by weeks per year requires doing num.mul(FEE_MULTIPLIER).div(WEEKS_PER_YEAR)
     uint256 public constant WEEKS_PER_YEAR = 52142857;
 }
