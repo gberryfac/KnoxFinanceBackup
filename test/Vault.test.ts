@@ -68,7 +68,7 @@ describe("Vault", () => {
     depositAssetDecimals: DAI_DECIMALS,
     baseAssetDecimals: DAI_DECIMALS,
     underlyingAssetDecimals: WETH_DECIMALS,
-    depositAmount: parseEther("10"),
+    depositAmount: parseUnits("100000", DAI_DECIMALS),
     cap: parseUnits("5000000", DAI_DECIMALS),
     minimumSupply: BigNumber.from("10").pow("3").toString(),
     minimumContractSize: BigNumber.from("10").pow("17").toString(),
@@ -260,6 +260,7 @@ function behavesLikeRibbonOptionsVault(params: {
 
       addresses["vault"] = vaultContract.address;
 
+      await strategyContract.setVault(addresses.vault);
       // TODO: REMOVE MOCKSTRATEGY FROM TESTS, CAll FUNCTIONS DIRECTLY
     });
 
@@ -1337,7 +1338,7 @@ function behavesLikeRibbonOptionsVault(params: {
           params.depositAmount.mul(2)
         );
 
-        // vaultContract shares will not change until next rollover
+        // vaultContract shares will not change until next harvest
         assert.bnEqual(
           await vaultContract.balanceOf(addresses.vault),
           params.depositAmount
@@ -1715,8 +1716,6 @@ function behavesLikeRibbonOptionsVault(params: {
 
         let premium = user2PurchaseAmount.div(10);
 
-        // TODO: REMOVE CALLS TO STRATEGY CONTRACT
-
         await assetContract
           .connect(signers.user2)
           .approve(addresses.strategy, premium);
@@ -1735,13 +1734,6 @@ function behavesLikeRibbonOptionsVault(params: {
             user2PurchaseSize,
             isCall
           );
-
-        // TODO: FIGURE OUT HOW TO TRANSFER FUNDS FROM VAULT WITHOUT A MOCK
-
-        await strategyContract.transferFundsFromVault(
-          ADDRESS_ZERO,
-          longHolderBalance
-        );
 
         await time.increaseTo(await (await vaultContract.vaultState()).expiry);
         await vaultContract.connect(signers.keeper).harvest();
@@ -2116,7 +2108,7 @@ function behavesLikeRibbonOptionsVault(params: {
       });
     });
 
-    describe("#rollover", () => {
+    describe("#harvest", () => {
       time.revertToSnapshotAfterEach(async () => {
         await assetContract
           .connect(signers.user)
@@ -2219,14 +2211,19 @@ function behavesLikeRibbonOptionsVault(params: {
             addresses.feeRecipient
           );
 
-        // TODO: FIGURE OUT HOW TO TRANSFER FUNDS FROM VAULT WITHOUT A MOCK
-
-        await strategyContract.transferFundsFromVault(
-          ADDRESS_ZERO,
-          BigNumber.from("100")
-        );
-
         const { expiry: expiry2 } = await vaultContract.vaultState();
+
+        await strategyContract
+          .connect(signers.user2)
+          .purchase(
+            BYTES_ZERO,
+            0,
+            expiry2,
+            depositAmount,
+            0,
+            parseUnits("1", depositAssetDecimals),
+            isCall
+          );
 
         await time.increaseTo(expiry2);
         tx = await vaultContract.connect(signers.keeper).harvest();

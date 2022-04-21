@@ -4,10 +4,10 @@ pragma solidity ^0.8.0;
 import "./../libraries/VaultSchema.sol";
 
 contract VaultStorageV1 {
-    // @notice Performance fee charged on premiums earned in rollover. Only charged when there is no loss.
+    // @notice Performance fee charged on premiums earned in round. Only charged when there is no loss.
     uint256 public performanceFee;
 
-    // @notice Management fee charged on entire AUM in rollover. Only charged when there is no loss.
+    // @notice Management fee charged on entire AUM in round. Only charged when there is no loss.
     uint256 public managementFee;
 
     // @notice Fee recipient for the performance and management fees.

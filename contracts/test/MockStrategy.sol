@@ -14,7 +14,27 @@ contract MockStrategy {
         address
     ) {}
 
-    function transferFundsFromVault(address to, uint256 amount) external {
-        IERC20(Vault.asset()).transfer(to, amount);
+    function setVault(address vault) external {
+        Vault = IVault(vault);
+    }
+
+    function purchase(
+        bytes memory signature,
+        uint64 deadline,
+        uint64 maturity,
+        int128 strike64x64,
+        int128 premium64x64,
+        uint256 contractSize,
+        bool isCall
+    ) external {
+        Vault.borrow(
+            signature,
+            deadline,
+            maturity,
+            strike64x64,
+            premium64x64,
+            contractSize,
+            isCall
+        );
     }
 }

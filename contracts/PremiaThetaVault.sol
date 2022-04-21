@@ -33,7 +33,7 @@ contract PremiaThetaVault is KToken, Ownable, ReentrancyGuard {
     uint256 private constant BASE_RESERVED_LIQ_TOKEN_ID =
         0x0300000000000000000000000000000000000000000000000000000000000000;
 
-    // @notice role in charge of weekly vault operations such as rollover, no access to critical vault changes
+    // @notice role in charge of weekly vault operations such as harvest, no access to critical vault changes
     address public keeper;
 
     address public immutable pool;
