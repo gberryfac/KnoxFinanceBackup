@@ -1,7 +1,7 @@
 import { ethers, network } from "hardhat";
 import { BigNumber, Contract } from "ethers";
 
-const { getContractAt } = ethers;
+const { getContractAt, getContractFactory } = ethers;
 const { parseUnits, parseEther } = ethers.utils;
 
 import * as utils from "./utils";
@@ -92,17 +92,12 @@ export async function impersonateWhale(
 }
 
 export async function getVaultFixture(
-  commonLogicLibrary: Contract,
-  vaultDisplayLibrary: Contract,
-  vaultLifecycleLibrary: Contract,
-  vaultLogicLibrary: Contract,
-  registryContact: Contract,
   tokenName: string,
+  tokenSymbol: string,
   tokenDecimals: number,
   depositAsset: string,
   depositAssetDecimals: number,
   underlyingAssetDecimals: number,
-  underlyingAsset: string,
   cap: BigNumber,
   minimumSupply: string,
   minimumContractSize: string,
@@ -111,27 +106,27 @@ export async function getVaultFixture(
   isCall: boolean,
   signers: types.Signers,
   addresses: types.Addresses
-): Promise<[Contract, Contract]> {
-  const assetContract = await getContractAt("IAsset", depositAsset);
-
+): Promise<Contract> {
   const initializeArgs = [
     [
       addresses.owner,
       addresses.feeRecipient,
+      addresses.keeper,
+      addresses.strategy,
       managementFee,
       performanceFee,
       tokenName,
+      tokenSymbol,
     ],
     [
       isCall,
       tokenDecimals,
       depositAssetDecimals,
-      assetContract.address,
       underlyingAssetDecimals,
-      underlyingAsset,
       minimumSupply,
       minimumContractSize,
       cap,
+      depositAsset,
     ],
   ];
 
@@ -140,21 +135,17 @@ export async function getVaultFixture(
       "Vault",
       signers.admin,
       initializeArgs,
-      [WETH_ADDRESS[chainId], registryContact.address],
+      [WETH_ADDRESS[chainId], addresses.registry],
       {
         libraries: {
-          CommonLogic: commonLogicLibrary.address,
-          VaultDisplay: vaultDisplayLibrary.address,
-          VaultLifecycle: vaultLifecycleLibrary.address,
-          VaultLogic: vaultLogicLibrary.address,
+          CommonLogic: addresses.commonLogic,
+          VaultDisplay: addresses.vaultDisplay,
+          VaultLifecycle: addresses.vaultLifecycle,
+          VaultLogic: addresses.vaultLogic,
         },
       }
     )
   ).connect(signers.user);
 
-  const knoxTokenContract = (
-    await utils.deployProxy("KnoxToken", signers.admin, [tokenName], [], {})
-  ).connect(signers.user);
-
-  return [vaultContract, knoxTokenContract];
+  return vaultContract;
 }

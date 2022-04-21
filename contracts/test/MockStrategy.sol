@@ -6,10 +6,9 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./../interfaces/IVault.sol";
 
 contract MockStrategy {
-    IVault internal Vault;
+    IVault private Vault;
 
     constructor(
-        address,
         address,
         address,
         address
@@ -37,13 +36,5 @@ contract MockStrategy {
             contractSize,
             isCall
         );
-    }
-
-    function harvest() external {
-        Vault.harvest();
-    }
-
-    function transferFundsFromVault(address to, uint256 amount) external {
-        IERC20(Vault.asset()).transfer(to, amount);
     }
 }

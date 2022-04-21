@@ -7,10 +7,10 @@ import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 
 import "abdk-libraries-solidity/ABDKMath64x64.sol";
 
-import "./../interfaces/IKnoxToken.sol";
 import "./../interfaces/IRegistry.sol";
 import "./../interfaces/IVault.sol";
 import "./../interfaces/IWETH.sol";
@@ -29,6 +29,7 @@ import "./VaultStorage.sol";
 import "hardhat/console.sol";
 
 contract Vault is
+    ERC20Upgradeable,
     IVault,
     OwnableUpgradeable,
     ReentrancyGuardUpgradeable,
@@ -45,62 +46,6 @@ contract Vault is
 
     address public immutable weth;
     address public immutable registry;
-    address public token;
-
-    /************************************************
-     *  EVENTS
-     ***********************************************/
-
-    event Deposit(address indexed account, uint256 amount, uint256 round);
-
-    event InitiateWithdraw(
-        address indexed account,
-        uint256 shares,
-        uint256 round
-    );
-
-    event Redeem(address indexed account, uint256 share, uint256 round);
-
-    event ManagementFeeSet(uint256 managementFee, uint256 newManagementFee);
-
-    event PerformanceFeeSet(uint256 performanceFee, uint256 newPerformanceFee);
-
-    event CapSet(uint256 oldCap, uint256 newCap);
-
-    event Withdraw(address indexed account, uint256 amount, uint256 shares);
-
-    event CollectVaultFees(
-        uint256 performanceFee,
-        uint256 vaultFee,
-        uint256 round,
-        address indexed feeRecipient
-    );
-
-    event InstantWithdraw(
-        address indexed account,
-        uint256 amount,
-        uint256 round
-    );
-
-    /************************************************
-     *  STRUCTS
-     ***********************************************/
-
-    /**
-     * @notice Initialization parameters for the vaultSchema.
-     * @param _owner is the owner of the vault with critical permissions
-     * @param _feeRecipient is the address to recieve vault performance and management fees
-     * @param _managementFee is the management fee pct.
-     * @param _performanceFee is the perfomance fee pct.
-     * @param _tokenName is the name of the token
-     */
-    struct InitParams {
-        address _owner;
-        address _feeRecipient;
-        uint256 _managementFee;
-        uint256 _performanceFee;
-        string _tokenName;
-    }
 
     /************************************************
      *  CONSTRUCTOR & INITIALIZATION
@@ -119,24 +64,32 @@ contract Vault is
     }
 
     /**
-     * @notice Initializes the OptionVault contract with storage variables.
+     * @notice Initializes the vault contract with storage variables.
      */
     function initialize(
-        InitParams calldata _initParams,
+        VaultSchema.InitParams calldata _initParams,
         VaultSchema.VaultParams calldata _vaultParams
     ) external initializer {
         VaultLifecycle.verifyInitializerParams(
             _initParams._owner,
             _initParams._feeRecipient,
+            _initParams._keeper,
+            _initParams._strategy,
             _initParams._managementFee,
             _initParams._performanceFee,
             _initParams._tokenName,
+            _initParams._tokenSymbol,
             _vaultParams
         );
 
+        __ERC20_init(_initParams._tokenName, _initParams._tokenSymbol);
         __ReentrancyGuard_init();
         __Ownable_init();
+
         transferOwnership(_initParams._owner);
+
+        keeper = _initParams._keeper;
+        strategy = _initParams._strategy;
 
         feeRecipient = _initParams._feeRecipient;
         performanceFee = _initParams._performanceFee;
@@ -166,6 +119,25 @@ contract Vault is
         require(newFeeRecipient != address(0), Errors.ADDRESS_NOT_PROVIDED);
         require(newFeeRecipient != feeRecipient, Errors.NEW_ADDRESS_EQUALS_OLD);
         feeRecipient = newFeeRecipient;
+    }
+
+    /**
+     * @notice Sets the new keeper
+     * @param newKeeper is the address of the new keeper
+     */
+    function setNewKeeper(address newKeeper) external onlyOwner {
+        require(newKeeper != address(0), Errors.ADDRESS_NOT_PROVIDED);
+        keeper = newKeeper;
+    }
+
+    /**
+     * @notice Sets the new strategy
+     * @param newStrategy is the address of the new strategy
+     */
+    function setStrategy(address newStrategy) external onlyOwner {
+        require(newStrategy != address(0), Errors.ADDRESS_NOT_PROVIDED);
+        require(newStrategy != strategy, Errors.NEW_ADDRESS_EQUALS_OLD);
+        strategy = newStrategy;
     }
 
     /**
@@ -213,19 +185,6 @@ contract Vault is
         emit CapSet(vaultParams.cap, newCap);
         vaultParams.cap = uint104(newCap);
     }
-
-    /**
-     * @notice
-     * @param
-     */
-    function setTokenAddress(address newTokenAddress) external onlyOwner {
-        require(newTokenAddress != address(0), Errors.ADDRESS_NOT_PROVIDED);
-        require(newTokenAddress != token, Errors.NEW_ADDRESS_EQUALS_OLD);
-        token = newTokenAddress;
-    }
-
-    // function setRegistry() external onlyOwner {}
-    // function setExpiry() external onlyOwner {}
 
     /************************************************
      *  DEPOSIT & WITHDRAWALS
@@ -418,14 +377,8 @@ contract Vault is
         ShareMath.assertUint128(newQueuedWithdrawShares);
         vaultState.queuedWithdrawShares = uint128(newQueuedWithdrawShares);
 
-        // setApprovalForAll() by the msg.sender is required beforehand
-        IKnoxToken(token).safeTransferFrom(
-            msg.sender,
-            address(this),
-            VaultSchema.LP_TOKEN_ID,
-            numShares,
-            ""
-        );
+        //approve() by the msg.sender is required beforehand
+        _transfer(msg.sender, address(this), numShares);
     }
 
     /**
@@ -459,11 +412,7 @@ contract Vault is
 
         emit Withdraw(msg.sender, withdrawAmount, withdrawalShares);
 
-        IKnoxToken(token).burn(
-            address(this),
-            VaultSchema.LP_TOKEN_ID,
-            withdrawalShares
-        );
+        _burn(address(this), withdrawalShares);
 
         require(withdrawAmount > 0, Errors.WITHDRAWAL_AMOUNT_EXCEEDS_MINIMUM);
 
@@ -537,13 +486,7 @@ contract Vault is
 
         emit Redeem(msg.sender, numShares, depositReceipt.round);
 
-        IKnoxToken(token).safeTransferFrom(
-            address(this),
-            msg.sender,
-            VaultSchema.LP_TOKEN_ID,
-            numShares,
-            ""
-        );
+        _transfer(address(this), msg.sender, numShares);
     }
 
     /************************************************
@@ -562,7 +505,7 @@ contract Vault is
         uint256 contractSize,
         bool _isCall
     ) external returns (uint256 liquidityRequired) {
-        // TODO: ONLY STRATEGY
+        require(msg.sender == strategy);
 
         {
             require(
@@ -572,7 +515,7 @@ contract Vault is
 
             liquidityRequired = vaultParams.isCall
                 ? contractSize
-                : VaultLogic.toBaseDecimals(
+                : VaultLogic.toAssetDecimals(
                     strike64x64.mulu(contractSize),
                     vaultParams
                 );
@@ -618,7 +561,7 @@ contract Vault is
      * minting new shares, getting vault fees, etc.
      */
     function harvest() external {
-        // TODO: ONLY STRATEGY
+        require(msg.sender == strategy || msg.sender == keeper);
 
         /* After the vaults strategy harvests, the "lockedCollateral" will be returned to the vaultSchema. Therefore everything in the vault minus claims and withdrawal amount is the free liquidity of the next round. */
 
@@ -636,9 +579,7 @@ contract Vault is
                 address(this)
             );
 
-            uint256 totalSupply = IKnoxToken(token).totalSupply(
-                VaultSchema.LP_TOKEN_ID
-            );
+            uint256 totalSupply = totalSupply();
 
             uint256 balanceForVaultFees = VaultLifecycle.getBalanceForVaultFees(
                 currentBalance,
@@ -707,12 +648,7 @@ contract Vault is
             vaultState.lastTotalCapital = currentBalance.sub(queuedWithdrawals);
         }
 
-        IKnoxToken(token).mint(
-            address(this),
-            VaultSchema.LP_TOKEN_ID,
-            mintShares,
-            ""
-        );
+        _mint(address(this), mintShares);
 
         if (totalVaultFee > 0) {
             CommonLogic.transferAsset(
@@ -753,10 +689,10 @@ contract Vault is
             VaultDisplay.accountVaultBalance(
                 vaultState.round,
                 vaultParams.decimals,
+                balanceOf(account),
                 vaultState.queuedDeposits,
+                totalSupply(),
                 totalBalance(),
-                account,
-                token,
                 depositReceipts[account],
                 lpTokenPricePerShare
             );
@@ -772,8 +708,7 @@ contract Vault is
             VaultDisplay.lpShares(
                 vaultState.round,
                 vaultParams.decimals,
-                account,
-                token,
+                balanceOf(account),
                 depositReceipts[account],
                 lpTokenPricePerShare
             );
@@ -793,8 +728,7 @@ contract Vault is
         (heldByAccount, heldByVault) = VaultDisplay.lpShareBalances(
             vaultState.round,
             vaultParams.decimals,
-            account,
-            token,
+            balanceOf(account),
             depositReceipts[account],
             lpTokenPricePerShare
         );
@@ -808,8 +742,8 @@ contract Vault is
             VaultDisplay.lpPricePerShare(
                 vaultParams.decimals,
                 vaultState.queuedDeposits,
-                totalBalance(),
-                token
+                totalSupply(),
+                totalBalance()
             );
     }
 

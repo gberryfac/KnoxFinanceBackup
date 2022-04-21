@@ -18,4 +18,12 @@ export type Addresses = {
   keeper: string;
   feeRecipient: string;
   whale?: string;
+  pool?: string;
+  commonLogic?: string;
+  vaultDisplay?: string;
+  vaultLifecycle?: string;
+  vaultLogic?: string;
+  registry?: string;
+  strategy?: string;
+  vault?: string;
 };
