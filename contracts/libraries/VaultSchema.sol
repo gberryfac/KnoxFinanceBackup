@@ -44,6 +44,8 @@ library VaultSchema {
         // 32 byte slot 1
         // @notice  Current round number. `round` represents the number of `period`s elapsed.
         uint16 round;
+        // @notice The timestamp when the current round ends
+        uint32 expiry;
         // @notice Amount of collateral currently used to underwrite options
         uint104 lockedCollateral;
         //
@@ -55,8 +57,6 @@ library VaultSchema {
         uint128 queuedWithdrawShares;
         // @notice Amount withheld for scheduled withdrawals
         uint128 queuedWithdrawals;
-        // @notice The timestamp when the current round ends
-        uint32 expiry;
     }
 
     struct DepositReceipt {
