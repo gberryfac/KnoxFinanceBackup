@@ -41,14 +41,14 @@ contract Vault is
     using ABDKMath64x64 for int128;
 
     /************************************************
-     *  IMMUTABLES & CONSTANTS
+     *  IMMUTABLES
      ***********************************************/
 
     address public immutable weth;
     address public immutable registry;
 
     /************************************************
-     *  CONSTRUCTOR & INITIALIZATION
+     *  CONSTRUCTOR
      ***********************************************/
 
     /**
@@ -62,6 +62,10 @@ contract Vault is
         weth = _weth;
         registry = _registry;
     }
+
+    /************************************************
+     *  INITIALIZATION
+     ***********************************************/
 
     /**
      * @notice Initializes the vault contract with storage variables.
@@ -187,7 +191,7 @@ contract Vault is
     }
 
     /************************************************
-     *  DEPOSIT & WITHDRAWALS
+     *  DEPOSIT
      ***********************************************/
 
     /**
@@ -296,6 +300,10 @@ contract Vault is
         ShareMath.assertUint128(newQueuedDeposits);
         vaultState.queuedDeposits = uint128(newQueuedDeposits);
     }
+
+    /************************************************
+     *  WITHDRAWALS
+     ***********************************************/
 
     /**
      * @notice Withdraws the assets on the vault using the outstanding `DepositReceipt.amount`
@@ -428,6 +436,10 @@ contract Vault is
         );
     }
 
+    /************************************************
+     *  REDEMPTION
+     ***********************************************/
+
     /**
      * @notice Redeems shares that are owed to the account
      * @param numShares is the number of shares to redeem
@@ -490,11 +502,8 @@ contract Vault is
     }
 
     /************************************************
-     *  PURCHASE & CLAIM
+     *  BORROW
      ***********************************************/
-
-    // TODO: `purchaseETH`
-    // function purchaseETH() public {}
 
     function borrow(
         bytes memory signature,
@@ -553,7 +562,7 @@ contract Vault is
     }
 
     /************************************************
-     *  VAULT OPERATIONS
+     *  HARVEST
      ***********************************************/
 
     /*
@@ -661,7 +670,7 @@ contract Vault is
     }
 
     /************************************************
-     *  GETTERS
+     *  HELPERS
      ***********************************************/
 
     /**
@@ -675,10 +684,6 @@ contract Vault is
                 vaultState.lockedCollateral
             );
     }
-
-    /************************************************
-     *  HELPERS
-     ***********************************************/
 
     function accountVaultBalance(address account)
         external
@@ -747,6 +752,10 @@ contract Vault is
             );
     }
 
+    /************************************************
+     *  GETTERS
+     ***********************************************/
+
     function asset() external view returns (address) {
         return vaultParams.asset;
     }
@@ -765,32 +774,6 @@ contract Vault is
 
     function round() external view returns (uint16) {
         return vaultState.round;
-    }
-
-    /**
-     * @dev See {IERC1155Receiver-onERC1155Received}.
-     */
-    function onERC1155Received(
-        address,
-        address,
-        uint256,
-        uint256,
-        bytes memory
-    ) public virtual returns (bytes4) {
-        return this.onERC1155Received.selector;
-    }
-
-    /**
-     * @dev See {IERC1155Receiver-onERC1155BatchReceived}.
-     */
-    function onERC1155BatchReceived(
-        address,
-        address,
-        uint256[] memory,
-        uint256[] memory,
-        bytes memory
-    ) public virtual returns (bytes4) {
-        return this.onERC1155BatchReceived.selector;
     }
 
     // TODO: CALCULATE CORRECT STORAGE GAP SIZE
