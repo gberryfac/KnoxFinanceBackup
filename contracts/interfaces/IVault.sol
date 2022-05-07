@@ -51,14 +51,9 @@ interface IVault {
 
     function maxRedeem() external;
 
-    function borrow(
-        bytes memory signature,
-        uint64 deadline,
-        uint64 maturity,
-        int128 strike64x64,
-        int128 premium64x64,
-        uint256 contractSize
-    ) external returns (uint256);
+    function borrow(int128 strike64x64, uint256 contractSize)
+        external
+        returns (uint256);
 
     function harvest() external;
 

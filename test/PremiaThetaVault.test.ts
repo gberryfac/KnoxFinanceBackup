@@ -113,7 +113,6 @@ function behavesLikeRibbonOptionsVault(params: {
   let vaultLifecycleLibrary: Contract;
   let vaultLogicLibrary: Contract;
   let vaultContract: Contract;
-  let registryContract: Contract;
   let assetContract: Contract;
   let premiaPool: Contract;
   let strategyContract: Contract;
@@ -173,11 +172,6 @@ function behavesLikeRibbonOptionsVault(params: {
         (contract) => contract.deploy()
       );
 
-      registryContract = await getContractFactory(
-        "MockRegistry",
-        signers.admin
-      ).then((contract) => contract.deploy(true));
-
       strategyContract = await getContractFactory(
         "PremiaThetaVault",
         signers.owner
@@ -195,7 +189,6 @@ function behavesLikeRibbonOptionsVault(params: {
       addresses["vaultDisplay"] = vaultDisplayLibrary.address;
       addresses["vaultLifecycle"] = vaultLifecycleLibrary.address;
       addresses["vaultLogic"] = vaultLogicLibrary.address;
-      addresses["registry"] = registryContract.address;
       addresses["strategy"] = strategyContract.address;
 
       vaultContract = await fixtures.getVaultFixture(
@@ -281,8 +274,6 @@ function behavesLikeRibbonOptionsVault(params: {
           .approve(addresses.strategy, premium);
 
         await strategyContract.purchase(
-          BYTES_ZERO,
-          0,
           maturity,
           strike64x64,
           premium64x64,
@@ -347,14 +338,7 @@ function behavesLikeRibbonOptionsVault(params: {
         const maturity = expiry;
         const strike64x64 = fixedFromFloat(strike);
 
-        await strategyContract.purchase(
-          BYTES_ZERO,
-          0,
-          maturity,
-          strike64x64,
-          0,
-          size
-        );
+        await strategyContract.purchase(maturity, strike64x64, 0, size);
 
         const balanceAfter = await assetContract.balanceOf(addresses.vault);
 
@@ -378,14 +362,7 @@ function behavesLikeRibbonOptionsVault(params: {
         const maturity = expiry;
         const strike64x64 = fixedFromFloat(strike);
 
-        await strategyContract.purchase(
-          BYTES_ZERO,
-          0,
-          maturity,
-          strike64x64,
-          0,
-          size
-        );
+        await strategyContract.purchase(maturity, strike64x64, 0, size);
 
         const userWrappedTokenBalance = await strategyContract.balanceOf(
           addresses.user,
@@ -419,14 +396,7 @@ function behavesLikeRibbonOptionsVault(params: {
         const maturity = expiry;
         const strike64x64 = fixedFromFloat(strike);
 
-        await strategyContract.purchase(
-          BYTES_ZERO,
-          0,
-          maturity,
-          strike64x64,
-          0,
-          size
-        );
+        await strategyContract.purchase(maturity, strike64x64, 0, size);
 
         vaultState = await vaultContract.vaultState();
         round = vaultState.round;
@@ -434,14 +404,7 @@ function behavesLikeRibbonOptionsVault(params: {
         claim = await strategyContract.claims(round);
         assert.bnEqual(claim.longTokenId, BigNumber.from(LONG_TOKEN_ID));
 
-        await strategyContract.purchase(
-          BYTES_ZERO,
-          0,
-          maturity,
-          strike64x64,
-          0,
-          size
-        );
+        await strategyContract.purchase(maturity, strike64x64, 0, size);
 
         // current token id should not change
         claim = await strategyContract.claims(round);
@@ -469,14 +432,7 @@ function behavesLikeRibbonOptionsVault(params: {
         claim = await strategyContract.claims(round);
         assert.bnEqual(claim.longTokenId, BigNumber.from("0"));
 
-        await strategyContract.purchase(
-          BYTES_ZERO,
-          0,
-          maturity,
-          strike64x64,
-          0,
-          size
-        );
+        await strategyContract.purchase(maturity, strike64x64, 0, size);
 
         // current token id should be different from last round
         claim = await strategyContract.claims(round);
@@ -517,14 +473,7 @@ function behavesLikeRibbonOptionsVault(params: {
         const maturity = expiry;
         const strike64x64 = fixedFromFloat(strike);
 
-        await strategyContract.purchase(
-          BYTES_ZERO,
-          0,
-          maturity,
-          strike64x64,
-          0,
-          size
-        );
+        await strategyContract.purchase(maturity, strike64x64, 0, size);
 
         vaultState = await vaultContract.vaultState();
         balance = await assetContract.balanceOf(addresses.vault);
@@ -566,14 +515,7 @@ function behavesLikeRibbonOptionsVault(params: {
           .connect(signers.admin)
           .transfer(addresses.vault, liquidity);
 
-        await strategyContract.purchase(
-          BYTES_ZERO,
-          0,
-          expiry,
-          strike64x64,
-          0,
-          size
-        );
+        await strategyContract.purchase(expiry, strike64x64, 0, size);
       });
 
       it("should revert when claim amount is 0", async () => {
@@ -638,7 +580,7 @@ function behavesLikeRibbonOptionsVault(params: {
 
         await strategyContract
           .connect(signers.user2)
-          .purchase(BYTES_ZERO, 0, expiry, strike64x64, 0, size);
+          .purchase(expiry, strike64x64, 0, size);
 
         await premiaPool.processExpired(
           addresses.strategy,
@@ -765,7 +707,7 @@ function behavesLikeRibbonOptionsVault(params: {
 
         await strategyContract
           .connect(signers.user2)
-          .purchase(BYTES_ZERO, 0, expiry, strike64x64, 0, size2);
+          .purchase(expiry, strike64x64, 0, size2);
 
         let user2LongHolderBalance = isCall
           ? bnSpot.sub(bnStrike).mul(size2).div(bnSpot)
@@ -871,14 +813,7 @@ function behavesLikeRibbonOptionsVault(params: {
           .connect(signers.admin)
           .transfer(addresses.vault, liquidity);
 
-        await strategyContract.purchase(
-          BYTES_ZERO,
-          0,
-          expiry,
-          strike64x64,
-          0,
-          size
-        );
+        await strategyContract.purchase(expiry, strike64x64, 0, size);
       });
 
       it("should revert when round has not expired", async () => {
@@ -972,14 +907,7 @@ function behavesLikeRibbonOptionsVault(params: {
           .connect(signers.admin)
           .transfer(addresses.vault, liquidity);
 
-        await strategyContract.purchase(
-          BYTES_ZERO,
-          0,
-          expiry,
-          strike64x64,
-          0,
-          size
-        );
+        await strategyContract.purchase(expiry, strike64x64, 0, size);
 
         bnSpot = BigNumber.from(isCall ? 3500 : 2500);
         bnStrike = BigNumber.from(strike);

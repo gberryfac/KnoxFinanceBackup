@@ -21,20 +21,11 @@ contract MockStrategy {
     }
 
     function purchase(
-        bytes memory signature,
-        uint64 deadline,
-        uint64 maturity,
+        uint64,
         int128 strike64x64,
-        int128 premium64x64,
+        int128,
         uint256 contractSize
     ) external {
-        Vault.borrow(
-            signature,
-            deadline,
-            maturity,
-            strike64x64,
-            premium64x64,
-            contractSize
-        );
+        Vault.borrow(strike64x64, contractSize);
     }
 }

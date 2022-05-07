@@ -90,13 +90,11 @@ contract PremiaThetaVault is KToken, Ownable, ReentrancyGuard {
     }
 
     function purchase(
-        bytes memory signature,
-        uint64 deadline,
         uint64 maturity,
         int128 strike64x64,
         int128 premium64x64,
         uint256 contractSize
-    ) external nonReentrant returns (uint256 longTokenId) {
+    ) external nonReentrant {
         require(
             Vault.expiry() - 48 hours >= block.timestamp,
             Errors.PURCHASE_WINDOW_HAS_CLOSED
@@ -108,18 +106,11 @@ contract PremiaThetaVault is KToken, Ownable, ReentrancyGuard {
             premium64x64.mulu(contractSize)
         );
 
-        uint256 liquidityRequired = Vault.borrow(
-            signature,
-            deadline,
-            maturity,
-            strike64x64,
-            premium64x64,
-            contractSize
-        );
+        uint256 liquidityRequired = Vault.borrow(strike64x64, contractSize);
 
         Asset.approve(pool, liquidityRequired);
 
-        (longTokenId, ) = IPremiaPool(pool).writeFrom(
+        (uint256 longTokenId, ) = IPremiaPool(pool).writeFrom(
             address(this),
             address(this),
             maturity,

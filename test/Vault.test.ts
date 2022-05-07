@@ -162,7 +162,6 @@ function behavesLikeRibbonOptionsVault(params: {
   let vaultLifecycleLibrary: Contract;
   let vaultLogicLibrary: Contract;
   let vaultContract: Contract;
-  let registryContract: Contract;
   let assetContract: Contract;
   let premiaPool: Contract;
   let strategyContract: Contract;
@@ -220,11 +219,6 @@ function behavesLikeRibbonOptionsVault(params: {
         (contract) => contract.deploy()
       );
 
-      registryContract = await getContractFactory(
-        "MockRegistry",
-        signers.admin
-      ).then((contract) => contract.deploy(true));
-
       strategyContract = await getContractFactory("MockStrategy").then(
         (contract) =>
           contract.deploy(
@@ -240,7 +234,6 @@ function behavesLikeRibbonOptionsVault(params: {
       addresses["vaultDisplay"] = vaultDisplayLibrary.address;
       addresses["vaultLifecycle"] = vaultLifecycleLibrary.address;
       addresses["vaultLogic"] = vaultLogicLibrary.address;
-      addresses["registry"] = registryContract.address;
       addresses["strategy"] = strategyContract.address;
 
       vaultContract = await fixtures.getVaultFixture(
@@ -284,7 +277,7 @@ function behavesLikeRibbonOptionsVault(params: {
         const wethAddress =
           asset === WETH_ADDRESS[chainId] ? asset : WETH_ADDRESS[chainId];
 
-        testVault = await Vault.deploy(wethAddress, addresses.registry);
+        testVault = await Vault.deploy(wethAddress);
       });
 
       it("initializes with correct values", async () => {
@@ -334,7 +327,6 @@ function behavesLikeRibbonOptionsVault(params: {
           await vaultContract.weth(),
           asset === WETH_ADDRESS[chainId] ? asset : WETH_ADDRESS[chainId]
         );
-        assert.equal(await vaultContract.registry(), addresses.registry);
 
         // Check Storage
         assert.equal(
@@ -1701,19 +1693,12 @@ function behavesLikeRibbonOptionsVault(params: {
       it("should return less than deposit amount when vault total capital decreases", async () => {
         let strike = 2500;
         let strike64x64 = fixedFromFloat(strike);
-        let bnSpot = BigNumber.from(isCall ? 3000 : 2000);
-        let bnStrike = BigNumber.from(strike);
 
         let user2PurchaseSize = parseUnits("10", depositAssetDecimals);
 
         let user2PurchaseAmount = isCall
           ? user2PurchaseSize
           : user2PurchaseSize.mul(strike);
-
-        // this is the amount of funds sent back to the vault as "free liquidity"
-        let longHolderBalance = isCall
-          ? bnSpot.sub(bnStrike).mul(user2PurchaseSize).div(bnSpot)
-          : bnStrike.sub(bnSpot).mul(user2PurchaseSize);
 
         let premium = user2PurchaseAmount.div(10);
 
@@ -1726,14 +1711,7 @@ function behavesLikeRibbonOptionsVault(params: {
 
         await strategyContract
           .connect(signers.user2)
-          .purchase(
-            BYTES_ZERO,
-            0,
-            expiry,
-            strike64x64,
-            premium,
-            user2PurchaseSize
-          );
+          .purchase(expiry, strike64x64, premium, user2PurchaseSize);
 
         await time.increaseTo(await (await vaultContract.vaultState()).expiry);
         await vaultContract.connect(signers.keeper).harvest();
@@ -2216,8 +2194,6 @@ function behavesLikeRibbonOptionsVault(params: {
         await strategyContract
           .connect(signers.user2)
           .purchase(
-            BYTES_ZERO,
-            0,
             expiry2,
             depositAmount,
             0,
