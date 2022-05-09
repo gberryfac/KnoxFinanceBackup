@@ -6,6 +6,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 
@@ -31,6 +32,7 @@ contract Vault is
     ERC20Upgradeable,
     IVault,
     OwnableUpgradeable,
+    PausableUpgradeable,
     ReentrancyGuardUpgradeable,
     VaultStorage
 {
@@ -107,6 +109,24 @@ contract Vault is
     }
 
     /************************************************
+     *  SAFETY
+     ***********************************************/
+
+    /**
+     * @notice Pauses the vault during an emergency preventing deposits and borrowing.
+     */
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    /**
+     * @notice Unpauses the vault during following an emergency allowing deposits and borrowing.
+     */
+    function unpause() external onlyOwner {
+        _unpause();
+    }
+
+    /************************************************
      *  SETTERS
      ***********************************************/
 
@@ -126,6 +146,7 @@ contract Vault is
      */
     function setNewKeeper(address newKeeper) external onlyOwner {
         require(newKeeper != address(0), Errors.ADDRESS_NOT_PROVIDED);
+        require(newKeeper != keeper, Errors.NEW_ADDRESS_EQUALS_OLD);
         keeper = newKeeper;
     }
 
@@ -192,7 +213,7 @@ contract Vault is
     /**
      * @notice Deposits ETH into the contract and mint vault shares. Reverts if the asset is not weth.
      */
-    function depositETH() external payable nonReentrant {
+    function depositETH() external payable nonReentrant whenNotPaused {
         require(vaultParams.asset == weth, Errors.INVALID_ASSET_ADDRESS);
         require(msg.value > 0, Errors.VALUE_EXCEEDS_MINIMUM);
 
@@ -205,7 +226,7 @@ contract Vault is
      * @notice Deposits the `asset` from msg.sender.
      * @param amount is the amount of `asset` to deposit
      */
-    function deposit(uint256 amount) external nonReentrant {
+    function deposit(uint256 amount) external nonReentrant whenNotPaused {
         require(amount > 0, Errors.VALUE_EXCEEDS_MINIMUM);
 
         _depositFor(amount, msg.sender);
@@ -227,6 +248,7 @@ contract Vault is
     function depositFor(uint256 amount, address creditor)
         external
         nonReentrant
+        whenNotPaused
     {
         require(amount > 0, Errors.VALUE_EXCEEDS_MINIMUM);
         require(creditor != address(0), Errors.ADDRESS_NOT_PROVIDED);
@@ -246,7 +268,10 @@ contract Vault is
      * @param amount is the amount of `asset` deposited
      * @param creditor is the address to receieve the deposit
      */
-    function _depositFor(uint256 amount, address creditor) private {
+    function _depositFor(uint256 amount, address creditor)
+        private
+        whenNotPaused
+    {
         uint256 currentRound = vaultState.round;
         uint256 totalWithDepositedAmount = totalBalance().add(amount);
 
@@ -502,6 +527,8 @@ contract Vault is
 
     function borrow(int128 strike64x64, uint256 contractSize)
         external
+        nonReentrant
+        whenNotPaused
         returns (uint256 liquidityRequired)
     {
         require(msg.sender == strategy);
