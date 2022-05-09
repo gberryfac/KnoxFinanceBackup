@@ -30,7 +30,7 @@ export async function deployProxy(
 
   const proxy = await AdminUpgradeabilityProxy.deploy(
     logic.address,
-    await adminSigner.getAddress(),
+    adminSigner.address,
     initBytes
   );
 

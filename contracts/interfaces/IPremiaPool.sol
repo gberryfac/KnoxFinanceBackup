@@ -2,6 +2,12 @@
 pragma solidity ^0.8.0;
 
 interface IPremiaPool {
+    function exerciseFrom(
+        address holder,
+        uint256 longTokenId,
+        uint256 contractSize
+    ) external;
+
     function writeFrom(
         address underwriter,
         address longReceiver,
@@ -19,4 +25,14 @@ interface IPremiaPool {
         external
         view
         returns (uint256);
+
+    function accountsByToken(uint256 id)
+        external
+        view
+        returns (address[] memory);
+
+    function tokensByAccount(address account)
+        external
+        view
+        returns (uint256[] memory);
 }

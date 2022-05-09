@@ -1,7 +1,7 @@
 import { ethers, network } from "hardhat";
 import { BigNumber, Contract } from "ethers";
 
-const { getContractAt, getContractFactory } = ethers;
+const { getContractAt } = ethers;
 const { parseUnits, parseEther } = ethers.utils;
 
 import * as utils from "./utils";
@@ -16,15 +16,16 @@ export async function getSigners(): Promise<types.Signers> {
     adminSigner,
     userSigner,
     user2Signer,
+    user3Signer,
     ownerSigner,
     keeperSigner,
     feeRecipientSigner,
   ] = await ethers.getSigners();
-
   const signers = {
     admin: adminSigner,
     user: userSigner,
     user2: user2Signer,
+    user3: user3Signer,
     owner: ownerSigner,
     keeper: keeperSigner,
     feeRecipient: feeRecipientSigner,
@@ -40,6 +41,7 @@ export async function getAddresses(
     admin: signers.admin.address,
     user: signers.user.address,
     user2: signers.user2.address,
+    user3: signers.user3.address,
     owner: signers.owner.address,
     keeper: signers.keeper.address,
     feeRecipient: signers.feeRecipient.address,
@@ -96,14 +98,10 @@ export async function getVaultFixture(
   tokenSymbol: string,
   tokenDecimals: number,
   depositAsset: string,
-  depositAssetDecimals: number,
-  underlyingAssetDecimals: number,
   cap: BigNumber,
   minimumSupply: string,
-  minimumContractSize: string,
   managementFee: BigNumber,
   performanceFee: BigNumber,
-  isCall: boolean,
   signers: types.Signers,
   addresses: types.Addresses
 ): Promise<Contract> {
@@ -118,16 +116,7 @@ export async function getVaultFixture(
       tokenName,
       tokenSymbol,
     ],
-    [
-      isCall,
-      tokenDecimals,
-      depositAssetDecimals,
-      underlyingAssetDecimals,
-      minimumSupply,
-      minimumContractSize,
-      cap,
-      depositAsset,
-    ],
+    [tokenDecimals, minimumSupply, cap, depositAsset],
   ];
 
   const vaultContract = (
@@ -141,7 +130,6 @@ export async function getVaultFixture(
           Common: addresses.commonLogic,
           VaultDisplay: addresses.vaultDisplay,
           VaultLifecycle: addresses.vaultLifecycle,
-          VaultLogic: addresses.vaultLogic,
         },
       }
     )

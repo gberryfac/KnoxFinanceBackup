@@ -21,7 +21,6 @@ import "./../libraries/Errors.sol";
 import "./../libraries/ShareMath.sol";
 import "./../libraries/VaultDisplay.sol";
 import "./../libraries/VaultLifecycle.sol";
-import "./../libraries/VaultLogic.sol";
 import "./../libraries/VaultSchema.sol";
 
 import "./VaultStorage.sol";
@@ -103,9 +102,7 @@ contract Vault is
         vaultParams = _vaultParams;
 
         vaultState.round = 1;
-        vaultState.expiry = uint32(
-            VaultLifecycle.getNextFriday(block.timestamp)
-        );
+        vaultState.expiry = Common.getNextFriday(block.timestamp);
     }
 
     /************************************************
@@ -144,7 +141,7 @@ contract Vault is
      * @notice Sets the new keeper
      * @param newKeeper is the address of the new keeper
      */
-    function setNewKeeper(address newKeeper) external onlyOwner {
+    function setKeeper(address newKeeper) external onlyOwner {
         require(newKeeper != address(0), Errors.ADDRESS_NOT_PROVIDED);
         require(newKeeper != keeper, Errors.NEW_ADDRESS_EQUALS_OLD);
         keeper = newKeeper;
@@ -525,37 +522,23 @@ contract Vault is
      *  BORROW
      ***********************************************/
 
-    function borrow(int128 strike64x64, uint256 contractSize)
+    function borrow(address asset, uint256 liquidityRequired)
         external
         nonReentrant
         whenNotPaused
-        returns (uint256 liquidityRequired)
     {
-        require(msg.sender == strategy);
+        require(msg.sender == strategy, "unauthorized");
+        require(asset == vaultParams.asset, "!asset");
 
-        {
-            require(
-                contractSize >= vaultParams.minimumContractSize,
-                Errors.CONTRACT_SIZE_EXCEEDS_MINIMUM
-            );
+        uint256 totalFreeLiquidity = IERC20(vaultParams.asset)
+            .balanceOf(address(this))
+            .sub(vaultState.queuedDeposits)
+            .sub(vaultState.queuedWithdrawals);
 
-            liquidityRequired = vaultParams.isCall
-                ? contractSize
-                : VaultLogic.toAssetDecimals(
-                    strike64x64.mulu(contractSize),
-                    vaultParams
-                );
-
-            uint256 totalFreeLiquidity = IERC20(vaultParams.asset)
-                .balanceOf(address(this))
-                .sub(vaultState.queuedDeposits)
-                .sub(vaultState.queuedWithdrawals);
-
-            require(
-                totalFreeLiquidity >= liquidityRequired,
-                Errors.FREE_LIQUIDTY_EXCEEDED
-            );
-        }
+        require(
+            totalFreeLiquidity >= liquidityRequired,
+            Errors.FREE_LIQUIDTY_EXCEEDED
+        );
 
         IERC20(vaultParams.asset).safeTransferFrom(
             address(this),
@@ -574,8 +557,13 @@ contract Vault is
      * @notice Performs most administrative tasks such as setting next option,
      * minting new shares, getting vault fees, etc.
      */
-    function harvest() external {
-        require(msg.sender == strategy || msg.sender == keeper);
+    function harvest(uint256 expiry) external {
+        require(msg.sender == strategy || msg.sender == keeper, "unauthorized");
+
+        require(
+            block.timestamp >= vaultState.expiry,
+            Errors.VAULT_ROUND_NOT_CLOSED
+        );
 
         // After the vaults strategy harvests, the "lockedCollateral" will be returned to the vault. Everything in the vault minus claims and withdrawal amount is the free liquidity of the next round.
 
@@ -647,10 +635,7 @@ contract Vault is
             }
 
             vaultState.round = uint16(nextRound);
-
-            vaultState.expiry = uint32(
-                VaultLifecycle.getNextFriday(block.timestamp)
-            );
+            vaultState.expiry = expiry;
 
             vaultState.lockedCollateral = 0;
             vaultState.queuedDeposits = 0;
@@ -672,7 +657,7 @@ contract Vault is
     }
 
     /************************************************
-     *  HELPERS
+     *  GETTERS
      ***********************************************/
 
     /**
@@ -754,28 +739,8 @@ contract Vault is
             );
     }
 
-    /************************************************
-     *  GETTERS
-     ***********************************************/
-
-    function expiry() external view returns (uint32) {
-        return vaultState.expiry;
-    }
-
-    function isCall() external view returns (bool) {
-        return vaultParams.isCall;
-    }
-
-    function lockedCollateral() external view returns (uint104) {
-        return vaultState.lockedCollateral;
-    }
-
-    function round() external view returns (uint16) {
-        return vaultState.round;
-    }
-
     // TODO: CALCULATE CORRECT STORAGE GAP SIZE
 
-    // Gap is left to avoid storage collisions. Though RibbonVault is not upgradeable, we add this as a safety measure.
+    // Gap is left to avoid storage collisions. Though Vault is not upgradeable, we add this as a safety measure.
     uint256[30] private ____gap;
 }
