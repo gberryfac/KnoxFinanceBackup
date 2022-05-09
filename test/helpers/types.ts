@@ -23,7 +23,6 @@ export type Addresses = {
   vaultDisplay?: string;
   vaultLifecycle?: string;
   vaultLogic?: string;
-  registry?: string;
   strategy?: string;
   vault?: string;
 };

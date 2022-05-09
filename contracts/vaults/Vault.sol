@@ -11,7 +11,6 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 
 import "abdk-libraries-solidity/ABDKMath64x64.sol";
 
-import "./../interfaces/IRegistry.sol";
 import "./../interfaces/IVault.sol";
 import "./../interfaces/IWETH.sol";
 
@@ -45,7 +44,6 @@ contract Vault is
      ***********************************************/
 
     address public immutable weth;
-    address public immutable registry;
 
     /************************************************
      *  CONSTRUCTOR
@@ -55,12 +53,9 @@ contract Vault is
      * @notice Initializes the contract with immutable variables
      * @param _weth is the Wrapped Ether contract
      */
-    constructor(address _weth, address _registry) {
+    constructor(address _weth) {
         require(_weth != address(0), Errors.ADDRESS_NOT_PROVIDED);
-        require(_registry != address(0), Errors.ADDRESS_NOT_PROVIDED);
-
         weth = _weth;
-        registry = _registry;
     }
 
     /************************************************
@@ -505,14 +500,10 @@ contract Vault is
      *  BORROW
      ***********************************************/
 
-    function borrow(
-        bytes memory signature,
-        uint64 deadline,
-        uint64 maturity,
-        int128 strike64x64,
-        int128 premium64x64,
-        uint256 contractSize
-    ) external returns (uint256 liquidityRequired) {
+    function borrow(int128 strike64x64, uint256 contractSize)
+        external
+        returns (uint256 liquidityRequired)
+    {
         require(msg.sender == strategy);
 
         {
@@ -538,18 +529,6 @@ contract Vault is
                 Errors.FREE_LIQUIDTY_EXCEEDED
             );
         }
-
-        require(
-            IRegistry(registry).authenticate(
-                signature,
-                deadline,
-                maturity,
-                strike64x64,
-                premium64x64,
-                vaultParams.isCall
-            ),
-            Errors.INVALID_SIGNATURE
-        );
 
         IERC20(vaultParams.asset).safeTransferFrom(
             address(this),

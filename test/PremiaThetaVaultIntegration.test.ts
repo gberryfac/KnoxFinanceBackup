@@ -120,7 +120,6 @@ function behavesLikeRibbonOptionsVault(params: {
   let vaultLifecycleLibrary: Contract;
   let vaultLogicLibrary: Contract;
   let vaultContract: Contract;
-  let registryContract: Contract;
   let assetContract: Contract;
   let premiaPool: Contract;
   let strategyContract: Contract;
@@ -187,11 +186,6 @@ function behavesLikeRibbonOptionsVault(params: {
         (contract) => contract.deploy()
       );
 
-      registryContract = await getContractFactory(
-        "MockRegistry",
-        signers.admin
-      ).then((contract) => contract.deploy(true));
-
       strategyContract = await getContractFactory(
         "PremiaThetaVault",
         signers.owner
@@ -209,7 +203,6 @@ function behavesLikeRibbonOptionsVault(params: {
       addresses["vaultDisplay"] = vaultDisplayLibrary.address;
       addresses["vaultLifecycle"] = vaultLifecycleLibrary.address;
       addresses["vaultLogic"] = vaultLogicLibrary.address;
-      addresses["registry"] = registryContract.address;
       addresses["strategy"] = strategyContract.address;
 
       vaultContract = await fixtures.getVaultFixture(
@@ -255,14 +248,7 @@ function behavesLikeRibbonOptionsVault(params: {
         const maturity = block.timestamp + EPOCH_SPAN_IN_SECONDS;
         const strike64x64 = fixedFromFloat(strike);
 
-        await strategyContract.purchase(
-          BYTES_ZERO,
-          0,
-          maturity,
-          strike64x64,
-          0,
-          size
-        );
+        await strategyContract.purchase(maturity, strike64x64, 0, size);
 
         const shortTokenId = formatTokenId({
           tokenType: isCall ? TokenType.ShortCall : TokenType.ShortPut,
@@ -308,14 +294,7 @@ function behavesLikeRibbonOptionsVault(params: {
         const maturity = block.timestamp + EPOCH_SPAN_IN_SECONDS;
         const strike64x64 = fixedFromFloat(strike);
 
-        await strategyContract.purchase(
-          BYTES_ZERO,
-          0,
-          maturity,
-          strike64x64,
-          0,
-          size
-        );
+        await strategyContract.purchase(maturity, strike64x64, 0, size);
 
         const balanceBeforeExpiredProcessed = await assetContract.balanceOf(
           addresses.strategy
@@ -395,14 +374,7 @@ function behavesLikeRibbonOptionsVault(params: {
         const maturity = block.timestamp + EPOCH_SPAN_IN_SECONDS;
         const strike64x64 = fixedFromFloat(strike);
 
-        await strategyContract.purchase(
-          BYTES_ZERO,
-          0,
-          maturity,
-          strike64x64,
-          0,
-          size
-        );
+        await strategyContract.purchase(maturity, strike64x64, 0, size);
 
         const balanceBeforeExpiredProcessed = await assetContract.balanceOf(
           addresses.strategy
