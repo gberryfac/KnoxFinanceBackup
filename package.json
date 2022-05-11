@@ -42,6 +42,8 @@
     "hardhat-deploy": "^0.10.6",
     "hardhat-gas-reporter": "^1.0.8",
     "hardhat-tracer": "^1.0.0-alpha.6",
+    "husky": "^8.0.1",
+    "lint-staged": "^12.4.1",
     "moment-timezone": "^0.5.34",
     "prettier": "^2.2.1",
     "prettier-plugin-solidity": "1.0.0-beta.10",
