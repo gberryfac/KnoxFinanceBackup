@@ -6,11 +6,12 @@
     "test:arb": "CHAINID=42161 npx hardhat test test/*.ts",
     "compile:arb": "CHAINID=42161 npx hardhat compile",
     "prettier:sol": "npm run prettier --write contracts/*",
-    "lint:ts": "eslint '**/*.ts'",
+    "lint-staged": "npx lint-staged",
+    "lint:ts": "npx eslint '**/*.ts'",
     "lint:ts:fix": "npm run lint:ts --fix",
-    "lint:ts:prettier": "prettier --write '**/*.ts'",
-    "lint:sol": "solhint -f table contracts/**/*.sol",
-    "lint:sol:prettier": "prettier --write \"contracts/**/*.sol\"",
+    "lint:ts:prettier": "npx prettier --write '**/*.ts'",
+    "lint:sol": "npx solhint -f table contracts/**/*.sol",
+    "lint:sol:prettier": "npx prettier --write \"contracts/**/*.sol\"",
     "coverage": "npx hardhat coverage",
     "sizer": "npx hardhat size-contracts"
   },
@@ -54,6 +55,10 @@
     "ts-node": "^9.1.1",
     "typechain": "^7.0.0",
     "typescript": "^4.2.4"
+  },
+  "lint-staged": {
+      "*.ts": "npm run lint:ts",
+      "*.sol": "npm run lint:sol"
   },
   "mocha": {
     "timeout": 20000
