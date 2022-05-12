@@ -105,6 +105,12 @@ contract Vault is
         vaultState.expiry = Common.getNextFriday(block.timestamp);
     }
 
+    // function _sync() internal onlyStrategy {
+    //     // return asset from Vault
+    //     // Set Vault expiry
+    //     // Sync other shared state variables
+    // }
+
     /************************************************
      *  SAFETY
      ***********************************************/
@@ -559,6 +565,8 @@ contract Vault is
      */
     function harvest(uint256 expiry) external {
         require(msg.sender == strategy || msg.sender == keeper, "unauthorized");
+
+        // TODO: Check new expiry is in the future
 
         require(
             block.timestamp >= vaultState.expiry,

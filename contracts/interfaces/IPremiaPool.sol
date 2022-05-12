@@ -1,6 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+library PoolStorage {
+    struct PoolSettings {
+        address underlying;
+        address base;
+        address underlyingOracle;
+        address baseOracle;
+    }
+}
+
 interface IPremiaPool {
     function exerciseFrom(
         address holder,
@@ -20,6 +29,11 @@ interface IPremiaPool {
     function withdraw(uint256 amount, bool isCallPool) external;
 
     function setDivestmentTimestamp(uint64 timestamp, bool isCallPool) external;
+
+    function getPoolSettings()
+        external
+        view
+        returns (PoolStorage.PoolSettings memory);
 
     function balanceOf(address account, uint256 id)
         external

@@ -24,6 +24,7 @@ contract Storage {
     IPremiaPool public Pool;
     IVault public Vault;
 
-    Schema.Option public option;
     Schema.AssetProperties public assetProperties;
+    Schema.Option public option;
+    Schema.Oracles public oracles;
 }

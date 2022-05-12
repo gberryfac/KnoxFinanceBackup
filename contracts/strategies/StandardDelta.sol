@@ -7,7 +7,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import "abdk-libraries-solidity/ABDKMath64x64.sol";
 
-import "./../interfaces/IPremiaPool.sol";
+import {IPremiaPool, PoolStorage} from "./../interfaces/IPremiaPool.sol";
 import "./../interfaces/IStandardDelta.sol";
 
 import "./../libraries/Common.sol";
@@ -21,6 +21,7 @@ import "hardhat/console.sol";
 contract StandardDelta is IStandardDelta, Ownable, Storage, ReentrancyGuard {
     using SafeERC20 for IERC20;
     using ABDKMath64x64 for int128;
+    using ABDKMath64x64 for uint256;
 
     /************************************************
      *  CONSTRUCTOR
@@ -31,21 +32,52 @@ contract StandardDelta is IStandardDelta, Ownable, Storage, ReentrancyGuard {
         uint8 _baseDecimals,
         uint8 _underlyingDecimals,
         uint64 _minimumContractSize,
+        uint256 _delta,
         address _asset,
-        address _pool
+        address _pool,
+        address _volatilityOracle
     ) {
         require(_asset != address(0), Errors.ADDRESS_NOT_PROVIDED);
         require(_pool != address(0), Errors.ADDRESS_NOT_PROVIDED);
+        require(_volatilityOracle != address(0), Errors.ADDRESS_NOT_PROVIDED);
+
+        require(_delta <= 10**18, "Exceeds maximum allowable value");
 
         option.isCall = _isCall;
         option.minimumContractSize = _minimumContractSize;
+        option.delta64x64 = (_delta.fromUInt()).div(10**18);
 
         assetProperties.baseDecimals = _baseDecimals;
         assetProperties.underlyingDecimals = _underlyingDecimals;
 
+        // TODO: Move to initialize function, read asset from Vault using `sync` function.
+
         Asset = IERC20(_asset);
         Pool = IPremiaPool(_pool);
+
+        PoolStorage.PoolSettings memory settings = Pool.getPoolSettings();
+
+        assetProperties.base = settings.base;
+        assetProperties.underlying = settings.underlying;
+
+        if (_asset == settings.base) {
+            oracles.spot = settings.baseOracle;
+        } else if (_asset == settings.underlying) {
+            oracles.spot = settings.underlyingOracle;
+        } else revert();
+
+        oracles.volatility = _volatilityOracle;
     }
+
+    // function sync() external onlyKeeper {}
+
+    // function _sync() internal {
+    //     // Get asset from Vault
+    //     // Set Vault expiry
+    //     // Sync other shared state variables
+    // }
+
+    // Note, onlyStrategy should be able to call Vault.sync()
 
     /************************************************
      *  INITIALIZATION
@@ -64,6 +96,8 @@ contract StandardDelta is IStandardDelta, Ownable, Storage, ReentrancyGuard {
 
         _setSaleWindow();
         _setNextOption();
+
+        // _sync()
 
         keeper = _keeper;
         Vault = IVault(_vault);
@@ -248,7 +282,7 @@ contract StandardDelta is IStandardDelta, Ownable, Storage, ReentrancyGuard {
     function _setNextOption() internal {
         option.expiry = _getNextFriday();
 
-        // TODO: Set next option strike price
+        // TODO: option.strike64x64 = DeltaStrikeSelection.getPrice();
 
         emit OptionSet(option.isCall, option.expiry, option.strike64x64);
     }
@@ -290,11 +324,7 @@ contract StandardDelta is IStandardDelta, Ownable, Storage, ReentrancyGuard {
         uint256 value,
         Schema.AssetProperties memory assetProperties
     ) internal pure returns (uint256) {
-        int128 value64x64 = ABDKMath64x64.divu(
-            value,
-            10**assetProperties.underlyingDecimals
-        );
-
+        int128 value64x64 = value.divu(10**assetProperties.underlyingDecimals);
         return value64x64.mulu(10**assetProperties.baseDecimals);
     }
 }
