@@ -51,17 +51,9 @@ interface IVault {
 
     function maxRedeem() external;
 
-    function borrow(int128 strike64x64, uint256 contractSize)
-        external
-        returns (uint256);
+    function borrow(uint256 liquidityRequired) external;
 
-    function harvest() external;
+    function harvest(uint256 expiry) external;
 
-    function expiry() external view returns (uint32);
-
-    function isCall() external view returns (bool);
-
-    function lockedCollateral() external view returns (uint104);
-
-    function round() external view returns (uint16);
+    function sync(uint256 expiry) external returns (address);
 }

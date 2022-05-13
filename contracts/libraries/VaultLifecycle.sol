@@ -46,31 +46,21 @@ library VaultLifecycle {
         );
 
         require(_vaultParams.decimals > 0, Errors.VAULT_TOKEN_DECIMALS_INVALID);
-        require(
-            _vaultParams.assetDecimals > 0,
-            Errors.VAULT_ASSET_DECIMALS_INVALID
-        );
-        require(
-            _vaultParams.underlyingDecimals > 0,
-            Errors.VAULT_UNDERLYING_DECIMALS_INVALID
-        );
         require(_vaultParams.minimumSupply > 0, Errors.VALUE_EXCEEDS_MINIMUM);
-        require(
-            _vaultParams.minimumContractSize > 0,
-            Errors.VALUE_EXCEEDS_MINIMUM
-        );
+
         require(_vaultParams.cap > 0, Errors.VALUE_EXCEEDS_MINIMUM);
         require(
             _vaultParams.cap > _vaultParams.minimumSupply,
             Errors.VAULT_CAP_TOO_LOW
         );
+
         require(_vaultParams.asset != address(0), Errors.ADDRESS_NOT_PROVIDED);
     }
 
     // /**
     //  * @notice Calculate the shares to mint, new price per share, and
     //   amount of funds to re-allocate as collateral for the new round
-    //  * @param vaultState is the storage variable vaultState passed from RibbonVault
+    //  * @param vaultState is the storage variable vaultState passed from Vault
     //  * @param params is the rollover parameters passed to compute the next state
     //  * @return queuedWithdrawals is the amount of funds set aside for withdrawal
     //  * @return newPricePerShare is the price per share of the new round
@@ -86,20 +76,22 @@ library VaultLifecycle {
         uint256 queuedWithdrawShares,
         uint256 lastQueuedWithdrawals
     ) external pure returns (uint256 balanceForVaultFees) {
-        uint256 pricePerShareBeforeFee = ShareMath.pricePerShare(
-            currentShareSupply,
-            currentBalance,
-            queuedDeposits,
-            decimals
-        );
-
-        uint256 queuedWithdrawalsBeforeFee = currentShareSupply > 0
-            ? ShareMath.sharesToAsset(
-                queuedWithdrawShares,
-                pricePerShareBeforeFee,
+        uint256 pricePerShareBeforeFee =
+            ShareMath.pricePerShare(
+                currentShareSupply,
+                currentBalance,
+                queuedDeposits,
                 decimals
-            )
-            : 0;
+            );
+
+        uint256 queuedWithdrawalsBeforeFee =
+            currentShareSupply > 0
+                ? ShareMath.sharesToAsset(
+                    queuedWithdrawShares,
+                    pricePerShareBeforeFee,
+                    decimals
+                )
+                : 0;
 
         /*
          * Deduct the difference between the newly scheduled withdrawals
@@ -138,9 +130,10 @@ library VaultLifecycle {
     {
         /* At the first round, balanceForVaultFees=0, queuedDeposits>0
         so we just do not charge anything on the first round */
-        uint256 lockedBalanceSansPending = balanceForVaultFees > queuedDeposits
-            ? balanceForVaultFees.sub(queuedDeposits)
-            : 0;
+        uint256 lockedBalanceSansPending =
+            balanceForVaultFees > queuedDeposits
+                ? balanceForVaultFees.sub(queuedDeposits)
+                : 0;
 
         /* Take performance fee and management fee ONLY if difference between 
         last week and this week's vault deposits, taking into account pending 
@@ -169,7 +162,7 @@ library VaultLifecycle {
     // /**
     //  * @notice Calculate the shares to mint, new price per share, and
     //   amount of funds to re-allocate as collateral for the new round
-    //  * @param vaultState is the storage variable vaultState passed from RibbonVault
+    //  * @param vaultState is the storage variable vaultState passed from Vault
     //  * @param params is the rollover parameters passed to compute the next state
     //  * @return queuedWithdrawals is the amount of funds set aside for withdrawal
     //  * @return newPricePerShare is the price per share of the new round
@@ -217,27 +210,5 @@ library VaultLifecycle {
                 decimals
             )
             : 0;
-    }
-
-    /**
-     * @notice Gets the next options expiry timestamp
-     * @param timestamp is the expiry timestamp of the current option
-     * Reference: https://codereview.stackexchange.com/a/33532
-     * Examples:
-     * getNextFriday(week 1 thursday) -> week 1 friday
-     * getNextFriday(week 1 friday) -> week 2 friday
-     * getNextFriday(week 1 saturday) -> week 2 friday
-     */
-    function getNextFriday(uint256 timestamp) external pure returns (uint256) {
-        // dayOfWeek = 0 (sunday) - 6 (saturday)
-        uint256 dayOfWeek = ((timestamp / 1 days) + 4) % 7;
-        uint256 nextFriday = timestamp + ((7 + 5 - dayOfWeek) % 7) * 1 days;
-        uint256 friday8am = nextFriday - (nextFriday % (24 hours)) + (8 hours);
-
-        // If the passed timestamp is day=Friday hour>8am, we simply increment it by a week to next Friday
-        if (timestamp >= friday8am) {
-            friday8am += 7 days;
-        }
-        return friday8am;
     }
 }

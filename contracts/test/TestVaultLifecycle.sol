@@ -72,12 +72,4 @@ contract TestVaultLifecycle {
                 queuedWithdrawShares
             );
     }
-
-    function getNextFriday(uint256 currentExpiry)
-        external
-        pure
-        returns (uint256 nextFriday)
-    {
-        return VaultLifecycle.getNextFriday(currentExpiry);
-    }
 }

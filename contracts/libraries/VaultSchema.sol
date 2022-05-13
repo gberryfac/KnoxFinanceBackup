@@ -22,18 +22,10 @@ library VaultSchema {
     }
 
     struct VaultParams {
-        // @notice Option type the vault is selling
-        bool isCall;
         // @notice Token decimals for vault shares
         uint8 decimals;
-        // @notice Decimals for asset used in vault
-        uint8 assetDecimals;
-        // @notice Decimals for underlying used in vault
-        uint8 underlyingDecimals;
         // @notice Minimum supply of the vault shares issued, for ETH it's 10**10
         uint56 minimumSupply;
-        // @notice Minimum contract size a vault will sell
-        uint64 minimumContractSize;
         // @notice Maximum amount of assets to be deposited
         uint104 cap;
         // @notice Asset used in vault
@@ -42,21 +34,21 @@ library VaultSchema {
 
     struct VaultState {
         // 32 byte slot 1
-        // @notice  Current round number. `round` represents the number of `period`s elapsed.
+        // @notice Current round number, represents the number of periods elapsed.
         uint16 round;
-        // @notice The timestamp when the current round ends
-        uint32 expiry;
         // @notice Amount of collateral currently used to underwrite options
         uint104 lockedCollateral;
-        //
-        uint256 lastTotalCapital;
-        // 32 byte slot 2
         // @notice Amount withheld for weekly vault deposits
         uint128 queuedDeposits;
+        // 32 byte slot 2
         // @notice Shares withheld for scheduled withdrawals during a round
         uint128 queuedWithdrawShares;
         // @notice Amount withheld for scheduled withdrawals
         uint128 queuedWithdrawals;
+        // @notice Net assets under management at the end of the round
+        uint256 lastTotalCapital;
+        // @notice Timestamp when the current option expires
+        uint256 expiry;
     }
 
     struct DepositReceipt {

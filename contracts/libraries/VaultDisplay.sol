@@ -24,12 +24,13 @@ library VaultDisplay {
         VaultSchema.DepositReceipt memory depositReceipt,
         mapping(uint256 => uint256) storage lpTokenPricePerShare
     ) external view returns (uint256) {
-        uint256 assetPerShare = ShareMath.pricePerShare(
-            totalSupply,
-            totalBalance,
-            queuedDeposits,
-            decimals
-        );
+        uint256 assetPerShare =
+            ShareMath.pricePerShare(
+                totalSupply,
+                totalBalance,
+                queuedDeposits,
+                decimals
+            );
 
         return
             ShareMath.sharesToAsset(
@@ -57,13 +58,14 @@ library VaultDisplay {
         VaultSchema.DepositReceipt memory depositReceipt,
         mapping(uint256 => uint256) storage lpTokenPricePerShare
     ) public view returns (uint256) {
-        (uint256 heldByAccount, uint256 heldByVault) = lpShareBalances(
-            round,
-            decimals,
-            balance,
-            depositReceipt,
-            lpTokenPricePerShare
-        );
+        (uint256 heldByAccount, uint256 heldByVault) =
+            lpShareBalances(
+                round,
+                decimals,
+                balance,
+                depositReceipt,
+                lpTokenPricePerShare
+            );
 
         return heldByAccount + heldByVault;
     }
@@ -85,11 +87,12 @@ library VaultDisplay {
             return (balance, 0);
         }
 
-        uint256 unredeemedShares = depositReceipt.getSharesFromReceipt(
-            round,
-            lpTokenPricePerShare[depositReceipt.round],
-            decimals
-        );
+        uint256 unredeemedShares =
+            depositReceipt.getSharesFromReceipt(
+                round,
+                lpTokenPricePerShare[depositReceipt.round],
+                decimals
+            );
 
         return (balance, unredeemedShares);
     }
