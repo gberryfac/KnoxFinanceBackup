@@ -12,7 +12,7 @@
     "lint:ts:prettier": "npx prettier --write '**/*.ts'",
     "lint:sol": "npx solhint -f table contracts/**/*.sol",
     "lint:sol:prettier": "npx prettier --write \"contracts/**/*.sol\"",
-    "coverage": "npx hardhat coverage",
+    "coverage": "rm -rf ./coverage.json ./coverage/ && npx hardhat coverage || exit 0",
     "sizer": "npx hardhat size-contracts"
   },
   "license": "MIT",
