@@ -280,6 +280,10 @@ function behavesLikeOptionsVault(params: {
         assert.bnEqual(queuedWithdrawShares, BigNumber.from("0"));
         assert.bnEqual(queuedWithdrawals, BigNumber.from("0"));
         assert.bnNotEqual(expiry, BigNumber.from("0"));
+        assert.bnEqual(
+            await vaultContract.totalBalance(),
+            BigNumber.from("0")
+        );
 
         // Check State Variables
         assert.equal(await vaultContract.owner(), addresses.owner);
@@ -745,6 +749,42 @@ function behavesLikeOptionsVault(params: {
 
         assert.bnEqual(heldByAccount2, BigNumber.from(1));
         assert.bnEqual(heldByVault2, depositAmount.sub(1));
+      });
+    });
+
+    describe("#totalBalance", () => {
+      time.revertToSnapshotAfterEach(async () => {});
+
+      it("should return correct amount with no locked capital ", async () => {
+        await assetContract
+            .connect(signers.user)
+            .transfer(addresses.vault, depositAmount.div(2));
+        assert.bnEqual(await vaultContract.totalBalance(), depositAmount.div(2));
+
+        await assetContract
+            .connect(signers.user)
+            .transfer(addresses.vault, depositAmount.div(2));
+        assert.bnEqual(await vaultContract.totalBalance(), depositAmount);
+      });
+
+      it("should return correct amount with locked capital ", async () => {
+        await assetContract
+          .connect(signers.user)
+          .transfer(addresses.vault, depositAmount);
+
+        let lockedCapitalAmount = depositAmount.div(2);
+
+        await vaultContract.connect(signers.strategy).borrow(lockedCapitalAmount);
+        let vaultBalance = await assetContract.balanceOf(addresses.vault);
+
+        assert.bnEqual(vaultBalance, depositAmount.sub(lockedCapitalAmount));
+        assert.bnEqual(await vaultContract.totalBalance(), depositAmount);
+
+        await vaultContract.connect(signers.strategy).borrow(lockedCapitalAmount);
+        vaultBalance = await assetContract.balanceOf(addresses.vault);
+
+        assert.bnEqual(vaultBalance, BigNumber.from(0));
+        assert.bnEqual(await vaultContract.totalBalance(), depositAmount);
       });
     });
 
