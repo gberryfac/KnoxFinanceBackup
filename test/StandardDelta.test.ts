@@ -4,6 +4,8 @@ import { BigNumber, Contract } from "ethers";
 const { getContractFactory, provider } = ethers;
 const { parseUnits } = ethers.utils;
 
+import { fixedFromFloat } from "@premia/utils";
+
 import { expect } from "chai";
 import moment from "moment-timezone";
 
@@ -23,6 +25,10 @@ import {
   WETH_DECIMALS,
   DAI_ADDRESS,
   DAI_DECIMALS,
+  ETH_PRICE_ORACLE,
+  DAI_PRICE_ORACLE,
+  PREMIA_VOLATILITY_SURFACE_ORACLE,
+  SECONDS_PER_WEEK,
 } from "../constants";
 
 const chainId = network.config.chainId;
@@ -37,8 +43,11 @@ describe("Standard Delta Strategy Unit Tests", () => {
     tokenName: `Knox ETH Delta Vault`,
     tokenSymbol: `kETH-DELTA-C`,
     tokenDecimals: 18,
+    spotOracle: ETH_PRICE_ORACLE[chainId],
     asset: WETH_ADDRESS[chainId],
     depositAssetDecimals: WETH_DECIMALS,
+    base: DAI_ADDRESS[chainId],
+    underlying: WETH_ADDRESS[chainId],
     baseDecimals: DAI_DECIMALS,
     underlyingDecimals: WETH_DECIMALS,
     depositAmount: parseUnits("1", WETH_DECIMALS),
@@ -56,8 +65,11 @@ describe("Standard Delta Strategy Unit Tests", () => {
     tokenName: `Knox ETH Delta Vault`,
     tokenSymbol: `kETH-DELTA-P`,
     tokenDecimals: 18,
+    spotOracle: DAI_PRICE_ORACLE[chainId],
     asset: DAI_ADDRESS[chainId],
     depositAssetDecimals: DAI_DECIMALS,
+    base: DAI_ADDRESS[chainId],
+    underlying: WETH_ADDRESS[chainId],
     baseDecimals: DAI_DECIMALS,
     underlyingDecimals: WETH_DECIMALS,
     depositAmount: parseUnits("1000", DAI_DECIMALS),
@@ -76,8 +88,11 @@ function behavesLikeOptionsVault(params: {
   tokenName: string;
   tokenSymbol: string;
   tokenDecimals: number;
+  spotOracle: string;
   asset: string;
   depositAssetDecimals: number;
+  base: string;
+  underlying: string;
   baseDecimals: number;
   underlyingDecimals: number;
   depositAmount: BigNumber;
@@ -91,22 +106,12 @@ function behavesLikeOptionsVault(params: {
   let signers: types.Signers;
   let addresses: types.Addresses;
 
-  let whale = params.whale;
-
-  // Parameters
-  let asset = params.asset;
-  let depositAssetDecimals = params.depositAssetDecimals;
-  let baseDecimals = params.baseDecimals;
-  let underlyingDecimals = params.underlyingDecimals;
-  let depositAmount = params.depositAmount;
-  let minimumContractSize = params.minimumContractSize;
-  let isCall = params.isCall;
-
   // Contracts
   let commonLogicLibrary: Contract;
   let vaultDisplayLibrary: Contract;
   let vaultLifecycleLibrary: Contract;
   let premiaPool: Contract;
+  let vaultContract: Contract;
   let strategyContract: Contract;
 
   describe.only(`${params.name}`, () => {
@@ -133,18 +138,25 @@ function behavesLikeOptionsVault(params: {
       addresses = await fixtures.getAddresses(signers);
 
       [signers, addresses] = await fixtures.impersonateWhale(
-        whale,
-        asset,
-        depositAssetDecimals,
+        params.whale,
+        params.asset,
+        params.depositAssetDecimals,
         signers,
         addresses
       );
 
+      addresses.volatilityOracle = PREMIA_VOLATILITY_SURFACE_ORACLE[chainId];
+
       premiaPool = await getContractFactory("MockPremiaPool").then((contract) =>
-        contract.deploy()
+        contract.deploy(
+          params.underlying,
+          params.base,
+          ADDRESS_ONE,
+          ADDRESS_ONE
+        )
       );
 
-      addresses["pool"] = premiaPool.address;
+      addresses.pool = premiaPool.address;
 
       commonLogicLibrary = await getContractFactory("Common").then((contract) =>
         contract.deploy()
@@ -158,31 +170,36 @@ function behavesLikeOptionsVault(params: {
         (contract) => contract.deploy()
       );
 
-      addresses["commonLogic"] = commonLogicLibrary.address;
-      addresses["vaultDisplay"] = vaultDisplayLibrary.address;
-      addresses["vaultLifecycle"] = vaultLifecycleLibrary.address;
+      vaultContract = await getContractFactory("MockVault").then((contract) =>
+        contract.deploy(params.asset)
+      );
+
+      addresses.commonLogic = commonLogicLibrary.address;
+      addresses.vaultDisplay = vaultDisplayLibrary.address;
+      addresses.vaultLifecycle = vaultLifecycleLibrary.address;
+      addresses.vault = vaultContract.address;
 
       strategyContract = await getContractFactory("StandardDelta", {
         signer: signers.owner,
         libraries: {
           Common: addresses.commonLogic,
         },
-      }).then((contract) =>
-        contract.deploy(
-          isCall,
-          baseDecimals,
-          underlyingDecimals,
-          minimumContractSize,
-          asset,
-          addresses.pool
-        )
+      }).then((contract) => contract.deploy());
+
+      addresses.strategy = strategyContract.address;
+
+      await strategyContract.initialize(
+        params.isCall,
+        params.baseDecimals,
+        params.underlyingDecimals,
+        params.minimumContractSize,
+        fixedFromFloat(0.5),
+        addresses.keeper,
+        addresses.pool,
+        addresses.vault,
+        addresses.volatilityOracle
       );
-
-      addresses["strategy"] = strategyContract.address;
-      addresses["vault"] = ADDRESS_ONE;
-
-      await strategyContract.initialize(addresses.keeper, addresses.vault);
-      strategyContract = await strategyContract.connect(signers.user);
+      strategyContract = await strategyContract.connect(signers.whale);
     });
 
     after(async () => {
@@ -197,16 +214,7 @@ function behavesLikeOptionsVault(params: {
           libraries: {
             Common: addresses.commonLogic,
           },
-        }).then((contract) =>
-          contract.deploy(
-            isCall,
-            baseDecimals,
-            underlyingDecimals,
-            minimumContractSize,
-            asset,
-            addresses.pool
-          )
-        );
+        }).then((contract) => contract.deploy());
       });
 
       it("should initialize with correct values", async () => {
@@ -216,13 +224,19 @@ function behavesLikeOptionsVault(params: {
         assert.equal(await strategyContract.Pool(), addresses.pool);
         assert.equal(await strategyContract.Vault(), addresses.vault);
 
+        const { spot, volatility } = await strategyContract.oracles();
+
+        assert.equal(spot, ADDRESS_ONE);
+        assert.equal(volatility, PREMIA_VOLATILITY_SURFACE_ORACLE[chainId]);
+
         // Check Option
-        const { isCall, minimumContractSize, expiry, strike64x64 } =
+        const { isCall, minimumContractSize, expiry, delta64x64, strike64x64 } =
           await strategyContract.option();
 
         assert.equal(isCall, params.isCall);
         assert.equal(minimumContractSize, params.minimumContractSize);
         assert.bnNotEqual(expiry, BigNumber.from("0"));
+        assert.equal(delta64x64, 0x8000000000000000);
         assert.bnNotEqual(strike64x64, BigNumber.from("0"));
 
         // Check Asset Properties
@@ -244,7 +258,17 @@ function behavesLikeOptionsVault(params: {
 
       it("should revert if already initialized", async () => {
         await expect(
-          strategyContract.initialize(addresses.keeper, addresses.vault)
+          strategyContract.initialize(
+            params.isCall,
+            params.baseDecimals,
+            params.underlyingDecimals,
+            params.minimumContractSize,
+            fixedFromFloat(0.5),
+            addresses.keeper,
+            addresses.pool,
+            addresses.vault,
+            addresses.volatilityOracle
+          )
         ).to.be.revertedWith("initialized");
       });
 
@@ -252,20 +276,114 @@ function behavesLikeOptionsVault(params: {
         await expect(
           testStrategy
             .connect(signers.user)
-            .initialize(addresses.keeper, addresses.vault)
+            .initialize(
+              params.isCall,
+              params.baseDecimals,
+              params.underlyingDecimals,
+              params.minimumContractSize,
+              fixedFromFloat(0.5),
+              addresses.keeper,
+              addresses.pool,
+              addresses.vault,
+              addresses.volatilityOracle
+            )
         ).to.be.revertedWith("Ownable: caller is not the owner");
       });
 
       it("should revert if keeper address is zero", async () => {
         await expect(
-          testStrategy.initialize(ADDRESS_ZERO, addresses.vault)
+          testStrategy.initialize(
+            params.isCall,
+            params.baseDecimals,
+            params.underlyingDecimals,
+            params.minimumContractSize,
+            fixedFromFloat(0.5),
+            ADDRESS_ZERO,
+            addresses.pool,
+            addresses.vault,
+            addresses.volatilityOracle
+          )
+        ).to.be.revertedWith("0");
+      });
+
+      it("should revert if pool address is zero", async () => {
+        await expect(
+          testStrategy.initialize(
+            params.isCall,
+            params.baseDecimals,
+            params.underlyingDecimals,
+            params.minimumContractSize,
+            fixedFromFloat(0.5),
+            addresses.keeper,
+            ADDRESS_ZERO,
+            addresses.vault,
+            addresses.volatilityOracle
+          )
         ).to.be.revertedWith("0");
       });
 
       it("should revert if vault address is zero", async () => {
         await expect(
-          testStrategy.initialize(addresses.keeper, ADDRESS_ZERO)
+          testStrategy.initialize(
+            params.isCall,
+            params.baseDecimals,
+            params.underlyingDecimals,
+            params.minimumContractSize,
+            fixedFromFloat(0.5),
+            addresses.keeper,
+            addresses.pool,
+            ADDRESS_ZERO,
+            addresses.volatilityOracle
+          )
         ).to.be.revertedWith("0");
+      });
+
+      it("should revert if volatility oracle address is zero", async () => {
+        await expect(
+          testStrategy.initialize(
+            params.isCall,
+            params.baseDecimals,
+            params.underlyingDecimals,
+            params.minimumContractSize,
+            fixedFromFloat(0.5),
+            addresses.keeper,
+            addresses.pool,
+            addresses.vault,
+            ADDRESS_ZERO
+          )
+        ).to.be.revertedWith("0");
+      });
+
+      it("should revert if delta is less than 0", async () => {
+        await expect(
+          testStrategy.initialize(
+            params.isCall,
+            params.baseDecimals,
+            params.underlyingDecimals,
+            params.minimumContractSize,
+            fixedFromFloat(-0.1),
+            addresses.keeper,
+            addresses.pool,
+            addresses.vault,
+            addresses.volatilityOracle
+          )
+        ).to.be.revertedWith("Exceeds minimum allowable value");
+      });
+
+      it("should revert if delta is greater than 1", async () => {
+        await expect(
+          testStrategy.initialize(
+            params.isCall,
+            params.baseDecimals,
+            params.underlyingDecimals,
+            params.minimumContractSize,
+            fixedFromFloat(1.1),
+            addresses.keeper,
+            addresses.pool,
+            addresses.vault,
+            addresses.volatilityOracle
+          )
+        ).to.be.revertedWith("Exceeds maximum allowable value");
       });
     });
 
@@ -294,7 +412,10 @@ function behavesLikeOptionsVault(params: {
 
       it("should revert if sale has't started", async () => {
         await expect(
-          strategyContract.purchase(depositAmount)
+          strategyContract.purchase(
+            params.depositAmount,
+            params.depositAmount.div(10)
+          )
         ).to.be.revertedWith("Sale has not started!");
       });
 
@@ -303,7 +424,10 @@ function behavesLikeOptionsVault(params: {
         await time.increaseTo(afterSale);
 
         await expect(
-          strategyContract.purchase(depositAmount)
+          strategyContract.purchase(
+            params.depositAmount,
+            params.depositAmount.div(10)
+          )
         ).to.be.revertedWith("Sale has ended!");
       });
     });
@@ -313,7 +437,7 @@ function behavesLikeOptionsVault(params: {
 
       it("should revert if option hasn't expired", async () => {
         await expect(
-          strategyContract.connect(signers.keeper).setNextSale()
+          strategyContract.connect(signers.keeper).setNextSale(false)
         ).to.be.revertedWith("Option has not expired!");
       });
 
@@ -321,7 +445,26 @@ function behavesLikeOptionsVault(params: {
         const { expiry } = await strategyContract.option();
         await time.increaseTo(expiry);
 
-        await expect(strategyContract.setNextSale()).to.be.revertedWith("1");
+        await expect(strategyContract.setNextSale(false)).to.be.revertedWith(
+          "1"
+        );
+      });
+    });
+
+    describe("#processExpired", () => {
+      time.revertToSnapshotAfterEach(async () => {});
+
+      it("should revert if option hasn't expired", async () => {
+        await expect(
+          strategyContract.connect(signers.keeper).processExpired()
+        ).to.be.revertedWith("Option has not expired!");
+      });
+
+      it("should revert when not keeper", async () => {
+        const { expiry } = await strategyContract.option();
+        await time.increaseTo(expiry);
+
+        await expect(strategyContract.processExpired()).to.be.revertedWith("1");
       });
     });
 
@@ -396,6 +539,36 @@ function behavesLikeOptionsVault(params: {
             blockTimestamp.add(startOffset),
             blockTimestamp.add(endOffset)
           );
+      });
+    });
+
+    describe("#setNextOption", () => {
+      time.revertToSnapshotAfterEach(async () => {});
+
+      it("should revert if option hasn't expired", async () => {
+        await expect(
+          strategyContract.connect(signers.keeper).setNextOption()
+        ).to.be.revertedWith("Option has not expired!");
+      });
+
+      it("should revert when not keeper", async () => {
+        const { expiry } = await strategyContract.option();
+        await time.increaseTo(expiry);
+
+        await expect(strategyContract.setNextOption()).to.be.revertedWith("1");
+      });
+
+      it("should emit SaleWindowSet event when called", async () => {
+        const { expiry } = await strategyContract.option();
+        await time.increaseTo(expiry);
+
+        const tx = await strategyContract
+          .connect(signers.keeper)
+          .setNextOption();
+
+        await expect(tx)
+          .to.emit(strategyContract, "NextOptionSet")
+          .withArgs(params.isCall, expiry.add(SECONDS_PER_WEEK), 0);
       });
     });
   });

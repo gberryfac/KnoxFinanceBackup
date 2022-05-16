@@ -26,6 +26,7 @@ import {
   WETH_DECIMALS,
   DAI_DECIMALS,
   DAI_ADDRESS,
+  NEXT_FRIDAY,
 } from "../constants";
 
 const gasPrice = parseUnits("100", "gwei");
@@ -138,6 +139,7 @@ function behavesLikeOptionsVault(params: {
   let signers: types.Signers;
   let addresses: types.Addresses;
 
+  // TODO: Remove global variables---------
   let whale = params.whale;
 
   // Parameters
@@ -152,6 +154,7 @@ function behavesLikeOptionsVault(params: {
   let managementFee = params.managementFee;
   let performanceFee = params.performanceFee;
   let isCall = params.isCall;
+  // TODO: Remove global variables---------
 
   // Contracts
   let commonLogicLibrary: Contract;
@@ -191,8 +194,8 @@ function behavesLikeOptionsVault(params: {
         addresses
       );
 
-      signers["strategy"] = signers.user3;
-      addresses["strategy"] = addresses.user3;
+      signers.strategy = signers.user3;
+      addresses.strategy = addresses.user3;
 
       commonLogicLibrary = await getContractFactory("Common").then((contract) =>
         contract.deploy()
@@ -206,9 +209,9 @@ function behavesLikeOptionsVault(params: {
         (contract) => contract.deploy()
       );
 
-      addresses["commonLogic"] = commonLogicLibrary.address;
-      addresses["vaultDisplay"] = vaultDisplayLibrary.address;
-      addresses["vaultLifecycle"] = vaultLifecycleLibrary.address;
+      addresses.commonLogic = commonLogicLibrary.address;
+      addresses.vaultDisplay = vaultDisplayLibrary.address;
+      addresses.vaultLifecycle = vaultLifecycleLibrary.address;
 
       vaultContract = await fixtures.getVaultFixture(
         tokenName,
@@ -223,7 +226,9 @@ function behavesLikeOptionsVault(params: {
         addresses
       );
 
-      addresses["vault"] = vaultContract.address;
+      addresses.vault = vaultContract.address;
+
+      await vaultContract.connect(signers.strategy).sync(NEXT_FRIDAY);
     });
 
     after(async () => {
@@ -1596,9 +1601,7 @@ function behavesLikeOptionsVault(params: {
       it("should return less than deposit amount when vault total capital decreases", async () => {
         let liquidityRequired = user2DepositAmount;
 
-        await vaultContract
-          .connect(signers.strategy)
-          .borrow(asset, liquidityRequired);
+        await vaultContract.connect(signers.strategy).borrow(liquidityRequired);
 
         const { expiry } = await vaultContract.vaultState();
         await time.increaseTo(expiry);
@@ -2107,7 +2110,7 @@ function behavesLikeOptionsVault(params: {
         // Half of liquidity is removed from Vault
         await vaultContract
           .connect(signers.strategy)
-          .borrow(asset, depositAmount.div(2));
+          .borrow(depositAmount.div(2));
 
         await time.increaseTo(expiry2);
 

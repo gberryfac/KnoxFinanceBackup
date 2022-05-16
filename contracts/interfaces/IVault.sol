@@ -51,7 +51,9 @@ interface IVault {
 
     function maxRedeem() external;
 
-    function borrow(address asset, uint256 liquidityRequired) external;
+    function borrow(uint256 liquidityRequired) external;
 
     function harvest(uint256 expiry) external;
+
+    function sync(uint256 expiry) external returns (address);
 }

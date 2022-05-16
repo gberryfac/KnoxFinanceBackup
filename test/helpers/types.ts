@@ -28,4 +28,6 @@ export type Addresses = {
   vaultLogic?: string;
   strategy?: string;
   vault?: string;
+  spotOracle?: string;
+  volatilityOracle?: string;
 };

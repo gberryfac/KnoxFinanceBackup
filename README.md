@@ -1,3 +1,5 @@
+[![tests](https://github.com/KnoxFinance/knox-contracts/actions/workflows/test.yaml/badge.svg)](https://codecov.io/gh/KnoxFinance/knox-contracts)
+[![codecov](https://codecov.io/gh/KnoxFinance/knox-contracts/branch/master/graph/badge.svg?token=ZI3OV5TSAV)](https://codecov.io/gh/KnoxFinance/knox-contracts)
 # Knox
 
 ## Getting Started

@@ -35,6 +35,8 @@ interface IPremiaPool {
         view
         returns (PoolStorage.PoolSettings memory);
 
+    function processExpired(uint256 longTokenId, uint256 contractSize) external;
+
     function balanceOf(address account, uint256 id)
         external
         view

@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 interface IStandardDelta {
-    event OptionSet(bool isCall, uint64 expiry, int128 strike64x64);
+    event NextOptionSet(bool isCall, uint64 expiry, int128 strike64x64);
 
     event Purchased(address indexed account, uint256 amount);
 
@@ -14,5 +14,5 @@ interface IStandardDelta {
         uint256 endTimestamp
     );
 
-    function purchase(uint256 contractSize) external;
+    function purchase(uint256 contractSize, uint256 maxCost) external;
 }

@@ -25,7 +25,8 @@ contract VaultStorageV1 {
     // @notice Stores pending user withdrawals.
     mapping(address => VaultSchema.Withdrawal) public withdrawals;
 
-    // @notice On every round's close, the price per share value of an lp token is stored. This is used to determine the number of shares to be returned to a user with their DepositReceipt.depositAmount
+    // @notice On every round's close, the price per share value of an lp token is stored. This is used to
+    // determine the number of shares to be returned to a user with their DepositReceipt.depositAmount
     mapping(uint256 => uint256) public lpTokenPricePerShare;
 
     // @notice Vault's parameters like cap, decimals.

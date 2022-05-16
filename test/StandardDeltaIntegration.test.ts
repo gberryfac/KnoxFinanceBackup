@@ -4,6 +4,8 @@ import { BigNumber, Contract } from "ethers";
 const { getContractAt, getContractFactory, provider } = ethers;
 const { parseUnits } = ethers.utils;
 
+import { fixedFromFloat } from "@premia/utils";
+
 import { expect } from "chai";
 import moment from "moment-timezone";
 
@@ -14,18 +16,17 @@ import * as types from "./helpers/types";
 import { assert } from "./helpers/assertions";
 
 import {
-  UNDERLYING_RESERVED_LIQ_TOKEN_ID,
-  BASE_RESERVED_LIQ_TOKEN_ID,
   TEST_URI,
-  EPOCH_SPAN_IN_SECONDS,
   WHALE_ADDRESS,
-  ETH_PRICE_ORACLE,
   WETH_DAI_POOL,
   BLOCK_NUMBER,
   WETH_ADDRESS,
   WETH_DECIMALS,
   DAI_ADDRESS,
   DAI_DECIMALS,
+  ETH_PRICE_ORACLE,
+  DAI_PRICE_ORACLE,
+  PREMIA_VOLATILITY_SURFACE_ORACLE,
 } from "../constants";
 
 const chainId = network.config.chainId;
@@ -41,10 +42,14 @@ describe("Standard Delta Integration Tests", () => {
     tokenSymbol: `kETH-DELTA-C`,
     tokenDecimals: 18,
     pool: WETH_DAI_POOL[chainId],
+    spotOracle: ETH_PRICE_ORACLE[chainId],
     asset: WETH_ADDRESS[chainId],
     depositAssetDecimals: WETH_DECIMALS,
+    base: DAI_ADDRESS[chainId],
+    underlying: WETH_ADDRESS[chainId],
     baseDecimals: DAI_DECIMALS,
     underlyingDecimals: WETH_DECIMALS,
+    depositAmount: parseUnits("1", WETH_DECIMALS),
     cap: parseUnits("1000", WETH_DECIMALS),
     minimumSupply: BigNumber.from("10").pow("10").toString(),
     minimumContractSize: BigNumber.from("10").pow("17").toString(),
@@ -60,10 +65,14 @@ describe("Standard Delta Integration Tests", () => {
     tokenSymbol: `kETH-DELTA-P`,
     tokenDecimals: 18,
     pool: WETH_DAI_POOL[chainId],
+    spotOracle: DAI_PRICE_ORACLE[chainId],
     asset: DAI_ADDRESS[chainId],
     depositAssetDecimals: DAI_DECIMALS,
+    base: DAI_ADDRESS[chainId],
+    underlying: WETH_ADDRESS[chainId],
     baseDecimals: DAI_DECIMALS,
     underlyingDecimals: WETH_DECIMALS,
+    depositAmount: parseUnits("1000", DAI_DECIMALS),
     cap: parseUnits("5000000", DAI_DECIMALS),
     minimumSupply: BigNumber.from("10").pow("3").toString(),
     minimumContractSize: BigNumber.from("10").pow("17").toString(),
@@ -80,10 +89,14 @@ function behavesLikeOptionsVault(params: {
   tokenSymbol: string;
   tokenDecimals: number;
   pool: string;
+  spotOracle: string;
   asset: string;
   depositAssetDecimals: number;
+  base: string;
+  underlying: string;
   baseDecimals: number;
   underlyingDecimals: number;
+  depositAmount: BigNumber;
   cap: BigNumber;
   minimumSupply: string;
   minimumContractSize: string;
@@ -94,24 +107,6 @@ function behavesLikeOptionsVault(params: {
   let signers: types.Signers;
   let addresses: types.Addresses;
 
-  let whale = params.whale;
-
-  // Parameters
-  let pool = params.pool;
-  let tokenName = params.tokenName;
-  let tokenSymbol = params.tokenSymbol;
-  let tokenDecimals = params.tokenDecimals;
-  let asset = params.asset;
-  let depositAssetDecimals = params.depositAssetDecimals;
-  let baseDecimals = params.baseDecimals;
-  let underlyingDecimals = params.underlyingDecimals;
-  let cap = params.cap;
-  let minimumSupply = params.minimumSupply;
-  let minimumContractSize = params.minimumContractSize;
-  let managementFee = params.managementFee;
-  let performanceFee = params.performanceFee;
-  let isCall = params.isCall;
-
   // Contracts
   let keeperContract: Contract;
   let oracleContract: Contract;
@@ -120,7 +115,7 @@ function behavesLikeOptionsVault(params: {
   let vaultLifecycleLibrary: Contract;
   let vaultContract: Contract;
   let assetContract: Contract;
-  let premiaPool: Contract;
+  let poolContract: Contract;
   let strategyContract: Contract;
 
   describe.only(`${params.name}`, () => {
@@ -147,20 +142,17 @@ function behavesLikeOptionsVault(params: {
       addresses = await fixtures.getAddresses(signers);
 
       [signers, addresses, assetContract] = await fixtures.impersonateWhale(
-        whale,
-        asset,
-        depositAssetDecimals,
+        params.whale,
+        params.asset,
+        params.depositAssetDecimals,
         signers,
         addresses
       );
 
-      premiaPool = await getContractAt("IPremiaPool", pool);
+      addresses.volatilityOracle = PREMIA_VOLATILITY_SURFACE_ORACLE[chainId];
+      addresses.pool = params.pool;
 
-      addresses["pool"] = pool;
-
-      keeperContract = await (
-        await getContractAt("IPremiaKeeper", WETH_DAI_POOL[chainId])
-      ).connect(signers.keeper);
+      poolContract = await getContractAt("IPremiaPool", addresses.pool);
 
       oracleContract = await getContractAt(
         "AggregatorInterface",
@@ -179,49 +171,94 @@ function behavesLikeOptionsVault(params: {
         (contract) => contract.deploy()
       );
 
-      addresses["commonLogic"] = commonLogicLibrary.address;
-      addresses["vaultDisplay"] = vaultDisplayLibrary.address;
-      addresses["vaultLifecycle"] = vaultLifecycleLibrary.address;
+      addresses.commonLogic = commonLogicLibrary.address;
+      addresses.vaultDisplay = vaultDisplayLibrary.address;
+      addresses.vaultLifecycle = vaultLifecycleLibrary.address;
 
       strategyContract = await getContractFactory("StandardDelta", {
         signer: signers.owner,
         libraries: {
           Common: addresses.commonLogic,
         },
-      }).then((contract) =>
-        contract.deploy(
-          isCall,
-          baseDecimals,
-          underlyingDecimals,
-          minimumContractSize,
-          asset,
-          addresses.pool
-        )
-      );
+      }).then((contract) => contract.deploy());
 
-      addresses["strategy"] = strategyContract.address;
+      addresses.strategy = strategyContract.address;
 
       vaultContract = await fixtures.getVaultFixture(
-        tokenName,
-        tokenSymbol,
-        tokenDecimals,
-        asset,
-        cap,
-        minimumSupply,
-        managementFee,
-        performanceFee,
+        params.tokenName,
+        params.tokenSymbol,
+        params.tokenDecimals,
+        params.asset,
+        params.cap,
+        params.minimumSupply,
+        params.managementFee,
+        params.performanceFee,
         signers,
         addresses
       );
 
-      addresses["vault"] = vaultContract.address;
+      addresses.vault = vaultContract.address;
 
-      await strategyContract.initialize(addresses.keeper, addresses.vault);
-      strategyContract = await strategyContract.connect(signers.user);
+      await strategyContract.initialize(
+        params.isCall,
+        params.baseDecimals,
+        params.underlyingDecimals,
+        params.minimumContractSize,
+        fixedFromFloat(0.5),
+        addresses.keeper,
+        addresses.pool,
+        addresses.vault,
+        addresses.volatilityOracle
+      );
+
+      strategyContract = await strategyContract.connect(signers.whale);
     });
 
     after(async () => {
       await time.revertToSnapShot(initSnapshotId);
+    });
+
+    describe("#initialize", () => {
+      time.revertToSnapshotAfterEach(async () => {});
+
+      it("should initialize with correct values", async () => {
+        // Check Addresses
+        assert.equal(await strategyContract.Asset(), params.asset);
+        assert.equal(await strategyContract.keeper(), addresses.keeper);
+        assert.equal(await strategyContract.Pool(), addresses.pool);
+        assert.equal(await strategyContract.Vault(), addresses.vault);
+
+        const { spot, volatility } = await strategyContract.oracles();
+
+        assert.equal(spot, params.spotOracle);
+        assert.equal(volatility, PREMIA_VOLATILITY_SURFACE_ORACLE[chainId]);
+
+        // Check Option
+        const { isCall, minimumContractSize, expiry, delta64x64, strike64x64 } =
+          await strategyContract.option();
+
+        assert.equal(isCall, params.isCall);
+        assert.equal(minimumContractSize, params.minimumContractSize);
+        assert.bnNotEqual(expiry, BigNumber.from("0"));
+        assert.equal(delta64x64, 0x8000000000000000);
+        assert.bnNotEqual(strike64x64, BigNumber.from("0"));
+
+        // Check Asset Properties
+        const { baseDecimals, underlyingDecimals } =
+          await strategyContract.assetProperties();
+
+        assert.equal(baseDecimals, params.baseDecimals);
+        assert.equal(underlyingDecimals, params.underlyingDecimals);
+
+        // Check Strategy Properties
+        assert.equal(await strategyContract.startOffset(), 7200);
+        assert.equal(await strategyContract.endOffset(), 14400);
+
+        const saleWindowStart = await strategyContract.saleWindow(0);
+        const saleWindowEnd = await strategyContract.saleWindow(1);
+
+        assert.equal(saleWindowEnd.sub(saleWindowStart), 7200);
+      });
     });
   });
 }

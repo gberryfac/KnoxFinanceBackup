@@ -9,8 +9,6 @@ import * as time from "../helpers/time";
 
 moment.tz.setDefault("UTC");
 
-const provider = ethers.provider;
-
 describe.only("VaultLifecycle", () => {
   let lifecycle: Contract;
 

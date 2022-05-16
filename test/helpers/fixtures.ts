@@ -57,10 +57,10 @@ export async function impersonateWhale(
   signers: types.Signers,
   addresses: types.Addresses
 ): Promise<[types.Signers, types.Addresses, Contract]> {
-  addresses["whale"] = whale;
+  addresses.whale = whale;
 
   const whaleSigner = await utils.impersonateWhale(addresses.whale, "1500");
-  signers["whale"] = whaleSigner;
+  signers.whale = whaleSigner;
 
   const assetContract = await getContractAt("IAsset", depositAsset);
 

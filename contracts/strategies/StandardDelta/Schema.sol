@@ -7,10 +7,6 @@ library Schema {
         uint8 baseDecimals;
         // @notice Decimals for underlying asset used in vault
         uint8 underlyingDecimals;
-        // @notice Address for base asset used in vault
-        address base;
-        // @notice Address for base asset used in vault
-        address underlying;
     }
 
     struct Option {

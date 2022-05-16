@@ -24,72 +24,64 @@ contract StandardDelta is IStandardDelta, Ownable, Storage, ReentrancyGuard {
     using ABDKMath64x64 for uint256;
 
     /************************************************
-     *  CONSTRUCTOR
+     *  INITIALIZATION
      ***********************************************/
 
-    constructor(
+    /**
+     * @notice Initializes the vault contract with storage variables.
+     * @dev Vault contracts must be deployed and initialized.
+     */
+    function initialize(
         bool _isCall,
         uint8 _baseDecimals,
         uint8 _underlyingDecimals,
         uint64 _minimumContractSize,
-        uint256 _delta,
-        address _asset,
+        int128 _delta64x64,
+        address _keeper,
         address _pool,
+        address _vault,
         address _volatilityOracle
-    ) {
-        require(_asset != address(0), Errors.ADDRESS_NOT_PROVIDED);
+    ) external isInitialized onlyOwner {
+        require(_keeper != address(0), Errors.ADDRESS_NOT_PROVIDED);
         require(_pool != address(0), Errors.ADDRESS_NOT_PROVIDED);
+
+        require(_vault != address(0), Errors.ADDRESS_NOT_PROVIDED);
         require(_volatilityOracle != address(0), Errors.ADDRESS_NOT_PROVIDED);
 
-        require(_delta <= 10**18, "Exceeds maximum allowable value");
+        require(
+            _delta64x64 >= 0x00000000000000000,
+            "Exceeds minimum allowable value"
+        );
+
+        require(
+            _delta64x64 <= 0x010000000000000000,
+            "Exceeds maximum allowable value"
+        );
 
         option.isCall = _isCall;
         option.minimumContractSize = _minimumContractSize;
-        option.delta64x64 = (_delta.fromUInt()).div(10**18);
+        option.delta64x64 = _delta64x64;
 
         assetProperties.baseDecimals = _baseDecimals;
         assetProperties.underlyingDecimals = _underlyingDecimals;
 
-        // TODO: Move to initialize function, read asset from Vault using `sync` function.
-
-        Asset = IERC20(_asset);
+        keeper = _keeper;
+        Vault = IVault(_vault);
         Pool = IPremiaPool(_pool);
+
+        _sync();
 
         PoolStorage.PoolSettings memory settings = Pool.getPoolSettings();
 
-        assetProperties.base = settings.base;
-        assetProperties.underlying = settings.underlying;
+        address asset = address(Asset);
 
-        if (_asset == settings.base) {
+        if (asset == settings.base) {
             oracles.spot = settings.baseOracle;
-        } else if (_asset == settings.underlying) {
+        } else if (asset == settings.underlying) {
             oracles.spot = settings.underlyingOracle;
         } else revert();
 
         oracles.volatility = _volatilityOracle;
-    }
-
-    // function sync() external onlyKeeper {}
-
-    // function _sync() internal {
-    //     // Get asset from Vault
-    //     // Set Vault expiry
-    //     // Sync other shared state variables
-    // }
-
-    // Note, onlyStrategy should be able to call Vault.sync()
-
-    /************************************************
-     *  INITIALIZATION
-     ***********************************************/
-
-    function initialize(address _keeper, address _vault)
-        external
-        isInitialized
-        onlyOwner
-    {
-        require(_keeper != address(0), Errors.ADDRESS_NOT_PROVIDED);
-        require(_vault != address(0), Errors.ADDRESS_NOT_PROVIDED);
 
         startOffset = 2 hours;
         endOffset = 4 hours;
@@ -97,12 +89,16 @@ contract StandardDelta is IStandardDelta, Ownable, Storage, ReentrancyGuard {
         _setSaleWindow();
         _setNextOption();
 
-        // _sync()
-
-        keeper = _keeper;
-        Vault = IVault(_vault);
-
         initialized = true;
+    }
+
+    function sync() external onlyKeeper {
+        _sync();
+    }
+
+    function _sync() internal {
+        address asset = Vault.sync(option.expiry);
+        Asset = IERC20(asset);
     }
 
     /************************************************
@@ -165,33 +161,43 @@ contract StandardDelta is IStandardDelta, Ownable, Storage, ReentrancyGuard {
      *  PURCHASE
      ***********************************************/
 
-    function purchase(uint256 contractSize) external isActive nonReentrant {
+    /**
+     * @notice Initiates the option sale
+     */
+    function purchase(uint256 contractSize, uint256 maxCost)
+        external
+        isActive
+        nonReentrant
+    {
         require(
             contractSize >= option.minimumContractSize,
             Errors.CONTRACT_SIZE_EXCEEDS_MINIMUM
         );
 
-        _purchase(contractSize);
+        // TODO: query price curve to get premium
 
-        // TODO: query price curve to get Premium
+        // TODO: require(premium <= maxCost, "slippage too high!");
 
-        // Asset.safeTransferFrom(
+        // TODO: Asset.safeTransferFrom(
         //     msg.sender,
         //     address(Vault),
-        //     premium64x64.mulu(contractSize)
+        //     premium.mulu(contractSize)
         // );
+
+        _purchase(contractSize);
     }
 
     function _purchase(uint256 contractSize) internal {
-        uint256 liquidityRequired = option.isCall
-            ? contractSize
-            : _fromUnderlyingtoBaseDecimals(
-                option.strike64x64.mulu(contractSize),
-                assetProperties
-            );
+        uint256 amount =
+            option.isCall
+                ? contractSize
+                : _fromUnderlyingtoBaseDecimals(
+                    option.strike64x64.mulu(contractSize),
+                    assetProperties
+                );
 
-        Vault.borrow(address(Asset), liquidityRequired);
-        Asset.approve(address(Pool), liquidityRequired);
+        Vault.borrow(amount);
+        Asset.approve(address(Pool), amount);
 
         Pool.writeFrom(
             address(this),
@@ -211,6 +217,9 @@ contract StandardDelta is IStandardDelta, Ownable, Storage, ReentrancyGuard {
      *  EXERCISE
      ***********************************************/
 
+    /**
+     * @notice Exercises In-The-Money options
+     */
     function exercise(
         address holder,
         uint256 longTokenId,
@@ -231,16 +240,38 @@ contract StandardDelta is IStandardDelta, Ownable, Storage, ReentrancyGuard {
      *  OPERATIONS
      ***********************************************/
 
-    function setNextSale() external isExpired nonReentrant onlyKeeper {
+    /**
+     * @notice Prepares the strategy and initiates the next round of option sales
+     */
+    function setNextSale(bool process)
+        external
+        isExpired
+        nonReentrant
+        onlyKeeper
+    {
+        if (process) _processExpired();
         _withdrawAndRepay();
         _setSaleWindow();
         _setNextOption();
     }
 
+    /**
+     * @notice Processes expired options
+     */
+    function processExpired() external isExpired nonReentrant onlyKeeper {
+        _processExpired();
+    }
+
+    /**
+     * @notice Removes liquidity from option pool, returns borrowed funds to vault
+     */
     function withdrawAndRepay() external isExpired nonReentrant onlyKeeper {
         _withdrawAndRepay();
     }
 
+    /**
+     * @notice Sets a range of times in which a purchase can be completed
+     */
     function setSaleWindow(uint16 start, uint16 end)
         external
         isExpired
@@ -252,15 +283,39 @@ contract StandardDelta is IStandardDelta, Ownable, Storage, ReentrancyGuard {
         _setSaleWindow();
     }
 
-    function _withdrawAndRepay() internal {
-        // TODO: Check that options have been processed
+    /**
+     * @notice Sets the parameters for the next option to be sold
+     */
+    function setNextOption() external isExpired onlyKeeper {
+        _setNextOption();
+    }
 
-        uint256 reservedLiquidity = Pool.balanceOf(
-            address(this),
-            option.isCall
-                ? Constants.UNDERLYING_RESERVED_LIQ_TOKEN_ID
-                : Constants.BASE_RESERVED_LIQ_TOKEN_ID
-        );
+    function _processExpired() internal {
+        uint256[] memory tokenIds = Pool.tokensByAccount(address(this));
+
+        for (uint256 i; i < tokenIds.length; i++) {
+            if (
+                tokenIds[i] != Constants.UNDERLYING_RESERVED_LIQ_TOKEN_ID &&
+                tokenIds[i] != Constants.BASE_RESERVED_LIQ_TOKEN_ID
+            ) {
+                uint256 tokenBalance =
+                    Pool.balanceOf(address(this), tokenIds[i]);
+
+                if (tokenBalance >= option.minimumContractSize) {
+                    Pool.processExpired(tokenIds[i], tokenBalance);
+                }
+            }
+        }
+    }
+
+    function _withdrawAndRepay() internal {
+        uint256 reservedLiquidity =
+            Pool.balanceOf(
+                address(this),
+                option.isCall
+                    ? Constants.UNDERLYING_RESERVED_LIQ_TOKEN_ID
+                    : Constants.BASE_RESERVED_LIQ_TOKEN_ID
+            );
 
         Pool.withdraw(reservedLiquidity, option.isCall);
 
@@ -282,9 +337,9 @@ contract StandardDelta is IStandardDelta, Ownable, Storage, ReentrancyGuard {
     function _setNextOption() internal {
         option.expiry = _getNextFriday();
 
-        // TODO: option.strike64x64 = DeltaStrikeSelection.getPrice();
+        // TODO: option.strike64x64 = DeltaStrikeSelection.getDeltaStrikePrice();
 
-        emit OptionSet(option.isCall, option.expiry, option.strike64x64);
+        emit NextOptionSet(option.isCall, option.expiry, option.strike64x64);
     }
 
     /************************************************

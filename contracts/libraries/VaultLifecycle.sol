@@ -76,20 +76,22 @@ library VaultLifecycle {
         uint256 queuedWithdrawShares,
         uint256 lastQueuedWithdrawals
     ) external pure returns (uint256 balanceForVaultFees) {
-        uint256 pricePerShareBeforeFee = ShareMath.pricePerShare(
-            currentShareSupply,
-            currentBalance,
-            queuedDeposits,
-            decimals
-        );
-
-        uint256 queuedWithdrawalsBeforeFee = currentShareSupply > 0
-            ? ShareMath.sharesToAsset(
-                queuedWithdrawShares,
-                pricePerShareBeforeFee,
+        uint256 pricePerShareBeforeFee =
+            ShareMath.pricePerShare(
+                currentShareSupply,
+                currentBalance,
+                queuedDeposits,
                 decimals
-            )
-            : 0;
+            );
+
+        uint256 queuedWithdrawalsBeforeFee =
+            currentShareSupply > 0
+                ? ShareMath.sharesToAsset(
+                    queuedWithdrawShares,
+                    pricePerShareBeforeFee,
+                    decimals
+                )
+                : 0;
 
         /*
          * Deduct the difference between the newly scheduled withdrawals
@@ -128,9 +130,10 @@ library VaultLifecycle {
     {
         /* At the first round, balanceForVaultFees=0, queuedDeposits>0
         so we just do not charge anything on the first round */
-        uint256 lockedBalanceSansPending = balanceForVaultFees > queuedDeposits
-            ? balanceForVaultFees.sub(queuedDeposits)
-            : 0;
+        uint256 lockedBalanceSansPending =
+            balanceForVaultFees > queuedDeposits
+                ? balanceForVaultFees.sub(queuedDeposits)
+                : 0;
 
         /* Take performance fee and management fee ONLY if difference between 
         last week and this week's vault deposits, taking into account pending 
