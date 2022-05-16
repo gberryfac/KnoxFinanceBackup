@@ -53,7 +53,7 @@ export async function getAddresses(
 export async function impersonateWhale(
   whale: string,
   depositAsset: string,
-  depositAssetDecimals: number,
+  depositAmount: BigNumber,
   signers: types.Signers,
   addresses: types.Addresses
 ): Promise<[types.Signers, types.Addresses, Contract]> {
@@ -71,23 +71,23 @@ export async function impersonateWhale(
 
     await assetContract
       .connect(signers.whale)
-      .transfer(addresses.admin, parseEther("100"));
+      .transfer(addresses.admin, depositAmount.mul(10));
     await assetContract
       .connect(signers.whale)
-      .transfer(addresses.user, parseEther("200"));
+      .transfer(addresses.user, depositAmount.mul(10));
     await assetContract
       .connect(signers.whale)
-      .transfer(addresses.user2, parseEther("200"));
+      .transfer(addresses.user2, depositAmount.mul(10));
   } else {
     await assetContract
       .connect(signers.whale)
-      .transfer(addresses.admin, parseUnits("1000000", depositAssetDecimals));
+      .transfer(addresses.admin, depositAmount.mul(10));
     await assetContract
       .connect(signers.whale)
-      .transfer(addresses.user, parseUnits("1000000", depositAssetDecimals));
+      .transfer(addresses.user, depositAmount.mul(10));
     await assetContract
       .connect(signers.whale)
-      .transfer(addresses.user2, parseUnits("1000000", depositAssetDecimals));
+      .transfer(addresses.user2, depositAmount.mul(10));
   }
 
   return [signers, addresses, assetContract];

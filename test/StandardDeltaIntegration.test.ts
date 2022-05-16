@@ -17,14 +17,24 @@ import { assert } from "./helpers/assertions";
 
 import {
   TEST_URI,
-  WHALE_ADDRESS,
+  DAI_WHALE_ADDRESS,
+  WBTC_WHALE_ADDRESS,
+  LINK_WHALE_ADDRESS,
   WETH_DAI_POOL,
+  WBTC_DAI_POOL,
+  LINK_DAI_POOL,
   BLOCK_NUMBER,
   WETH_ADDRESS,
   WETH_DECIMALS,
+  WBTC_ADDRESS,
+  WBTC_DECIMALS,
+  LINK_ADDRESS,
+  LINK_DECIMALS,
   DAI_ADDRESS,
   DAI_DECIMALS,
   ETH_PRICE_ORACLE,
+  BTC_PRICE_ORACLE,
+  LINK_PRICE_ORACLE,
   DAI_PRICE_ORACLE,
   PREMIA_VOLATILITY_SURFACE_ORACLE,
 } from "../constants";
@@ -36,7 +46,30 @@ moment.tz.setDefault("UTC");
 let block;
 describe("Standard Delta Integration Tests", () => {
   behavesLikeOptionsVault({
-    whale: WHALE_ADDRESS[chainId],
+    whale: DAI_WHALE_ADDRESS[chainId],
+    name: `Knox ETH Delta Vault (Put)`,
+    tokenName: `Knox ETH Delta Vault`,
+    tokenSymbol: `kETH-DELTA-P`,
+    tokenDecimals: 18,
+    pool: WETH_DAI_POOL[chainId],
+    spotOracle: DAI_PRICE_ORACLE[chainId],
+    asset: DAI_ADDRESS[chainId],
+    depositAssetDecimals: DAI_DECIMALS,
+    base: DAI_ADDRESS[chainId],
+    underlying: WETH_ADDRESS[chainId],
+    baseDecimals: DAI_DECIMALS,
+    underlyingDecimals: WETH_DECIMALS,
+    depositAmount: parseUnits("1000", DAI_DECIMALS),
+    cap: parseUnits("5000000", DAI_DECIMALS),
+    minimumSupply: BigNumber.from("10").pow("3").toString(),
+    minimumContractSize: BigNumber.from("10").pow("17").toString(),
+    managementFee: BigNumber.from("2000000"),
+    performanceFee: BigNumber.from("20000000"),
+    isCall: false,
+  });
+
+  behavesLikeOptionsVault({
+    whale: DAI_WHALE_ADDRESS[chainId],
     name: `Knox ETH Delta Vault (Call)`,
     tokenName: `Knox ETH Delta Vault`,
     tokenSymbol: `kETH-DELTA-C`,
@@ -59,26 +92,49 @@ describe("Standard Delta Integration Tests", () => {
   });
 
   behavesLikeOptionsVault({
-    whale: WHALE_ADDRESS[chainId],
-    name: `Knox ETH Delta Vault (Put)`,
-    tokenName: `Knox ETH Delta Vault`,
-    tokenSymbol: `kETH-DELTA-P`,
+    whale: WBTC_WHALE_ADDRESS[chainId],
+    name: `Knox BTC Delta Vault (Call)`,
+    tokenName: `Knox BTC Delta Vault`,
+    tokenSymbol: `kBTC-DELTA-C`,
     tokenDecimals: 18,
-    pool: WETH_DAI_POOL[chainId],
-    spotOracle: DAI_PRICE_ORACLE[chainId],
-    asset: DAI_ADDRESS[chainId],
-    depositAssetDecimals: DAI_DECIMALS,
+    pool: WBTC_DAI_POOL[chainId],
+    spotOracle: BTC_PRICE_ORACLE[chainId],
+    asset: WBTC_ADDRESS[chainId],
+    depositAssetDecimals: WBTC_DECIMALS,
     base: DAI_ADDRESS[chainId],
-    underlying: WETH_ADDRESS[chainId],
+    underlying: WBTC_ADDRESS[chainId],
     baseDecimals: DAI_DECIMALS,
-    underlyingDecimals: WETH_DECIMALS,
-    depositAmount: parseUnits("1000", DAI_DECIMALS),
-    cap: parseUnits("5000000", DAI_DECIMALS),
+    underlyingDecimals: WBTC_DECIMALS,
+    depositAmount: parseUnits("0.1", WBTC_DECIMALS),
+    cap: parseUnits("100", WBTC_DECIMALS),
     minimumSupply: BigNumber.from("10").pow("3").toString(),
-    minimumContractSize: BigNumber.from("10").pow("17").toString(),
+    minimumContractSize: BigNumber.from("10").pow("7").toString(),
     managementFee: BigNumber.from("2000000"),
     performanceFee: BigNumber.from("20000000"),
-    isCall: false,
+    isCall: true,
+  });
+
+  behavesLikeOptionsVault({
+    whale: LINK_WHALE_ADDRESS[chainId],
+    name: `Knox LINK Delta Vault (Call)`,
+    tokenName: `Knox LINK Delta Vault`,
+    tokenSymbol: `kLINK-DELTA-C`,
+    tokenDecimals: 18,
+    pool: LINK_DAI_POOL[chainId],
+    spotOracle: LINK_PRICE_ORACLE[chainId],
+    asset: LINK_ADDRESS[chainId],
+    depositAssetDecimals: LINK_DECIMALS,
+    base: DAI_ADDRESS[chainId],
+    underlying: LINK_ADDRESS[chainId],
+    baseDecimals: DAI_DECIMALS,
+    underlyingDecimals: LINK_DECIMALS,
+    depositAmount: parseUnits("100", LINK_DECIMALS),
+    cap: parseUnits("100000", LINK_DECIMALS),
+    minimumSupply: BigNumber.from("10").pow("10").toString(),
+    minimumContractSize: BigNumber.from("10").pow("17").toString(),
+    managementFee: BigNumber.from("1000000"),
+    performanceFee: BigNumber.from("30000000"),
+    isCall: true,
   });
 });
 
@@ -144,7 +200,7 @@ function behavesLikeOptionsVault(params: {
       [signers, addresses, assetContract] = await fixtures.impersonateWhale(
         params.whale,
         params.asset,
-        params.depositAssetDecimals,
+        params.depositAmount,
         signers,
         addresses
       );
@@ -156,7 +212,7 @@ function behavesLikeOptionsVault(params: {
 
       oracleContract = await getContractAt(
         "AggregatorInterface",
-        ETH_PRICE_ORACLE[chainId]
+        params.spotOracle
       );
 
       commonLogicLibrary = await getContractFactory("Common").then((contract) =>

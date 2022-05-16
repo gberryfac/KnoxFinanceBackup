@@ -555,12 +555,7 @@ contract Vault is
 
         require(totalFreeLiquidity >= amount, Errors.FREE_LIQUIDTY_EXCEEDED);
 
-        IERC20(vaultParams.asset).safeTransferFrom(
-            address(this),
-            msg.sender,
-            amount
-        );
-
+        IERC20(vaultParams.asset).safeTransfer(msg.sender, amount);
         vaultState.lockedCollateral += uint104(amount);
     }
 

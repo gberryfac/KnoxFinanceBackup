@@ -85,12 +85,28 @@ export const DAI_ADDRESS = {
 export const DAI_NAME = "DAI";
 export const DAI_DECIMALS = 18;
 
+export const LINK_ADDRESS = {
+  [CHAINID.ETH_MAINNET]: "0x514910771AF9Ca656af840dff83E8264EcF986CA",
+  [CHAINID.ETH_RINKEBY]: "",
+  [CHAINID.ARB_MAINNET]: "",
+  [CHAINID.ARB_RINKEBY]: "",
+};
+
+export const LINK_NAME = "LINK";
+export const LINK_DECIMALS = 18;
+
 /**
  * Whales
  */
-export const WHALE_ADDRESS = {
+export const DAI_WHALE_ADDRESS = {
   // DAI, USDC, USDT
   [CHAINID.ETH_MAINNET]: "0x47ac0Fb4F2D84898e4D9E7b4DaB3C24507a6D503",
+};
+export const WBTC_WHALE_ADDRESS = {
+  [CHAINID.ETH_MAINNET]: "0xf977814e90da44bfa03b6295a0616a897441acec",
+};
+export const LINK_WHALE_ADDRESS = {
+  [CHAINID.ETH_MAINNET]: "0xf977814e90da44bfa03b6295a0616a897441acec",
 };
 
 /**
@@ -121,6 +137,11 @@ export const DAI_PRICE_ORACLE = {
 export const AAVE_PRICE_ORACLE = {
   [CHAINID.ETH_MAINNET]: "0x547a514d5e3769680Ce22B2361c10Ea13619e8a9",
   [CHAINID.ETH_RINKEBY]: "0x9326BFA02ADD2366b30bacB125260Af641031331", //NOTE: Unofficial, use only for deployment testing
+};
+
+export const LINK_PRICE_ORACLE = {
+  [CHAINID.ETH_MAINNET]: "0x2c1d072e956AFFC0D435Cb7AC38EF18d24d9127c",
+  [CHAINID.ETH_RINKEBY]: "", //NOTE: Unofficial, use only for deployment testing
 };
 
 export const PREMIA_VOLATILITY_SURFACE_ORACLE = {

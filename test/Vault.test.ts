@@ -16,7 +16,9 @@ import { assert } from "./helpers/assertions";
 import {
   ADDRESS_ZERO,
   ADDRESS_ONE,
-  WHALE_ADDRESS,
+  DAI_WHALE_ADDRESS,
+  WBTC_WHALE_ADDRESS,
+  LINK_WHALE_ADDRESS,
   TEST_URI,
   FEE_SCALING,
   SECONDS_PER_WEEK,
@@ -24,6 +26,10 @@ import {
   BLOCK_NUMBER,
   WETH_ADDRESS,
   WETH_DECIMALS,
+  WBTC_ADDRESS,
+  WBTC_DECIMALS,
+  LINK_ADDRESS,
+  LINK_DECIMALS,
   DAI_DECIMALS,
   DAI_ADDRESS,
   NEXT_FRIDAY,
@@ -37,30 +43,7 @@ moment.tz.setDefault("UTC");
 let block;
 describe("Vault Unit Tests", () => {
   behavesLikeOptionsVault({
-    whale: WHALE_ADDRESS[chainId],
-    name: `Knox ETH Delta Vault (Call)`,
-    tokenName: `Knox ETH Delta Vault`,
-    tokenSymbol: `kETH-DELTA-C`,
-    tokenDecimals: 18,
-    asset: WETH_ADDRESS[chainId],
-    depositAssetDecimals: WETH_DECIMALS,
-    baseDecimals: DAI_DECIMALS,
-    underlyingDecimals: WETH_DECIMALS,
-    depositAmount: parseUnits("10", WETH_DECIMALS),
-    cap: parseUnits("1000", WETH_DECIMALS),
-    minimumSupply: BigNumber.from("10").pow("10").toString(),
-    minimumContractSize: BigNumber.from("10").pow("17").toString(),
-    managementFee: BigNumber.from("2000000"),
-    performanceFee: BigNumber.from("20000000"),
-    isCall: true,
-    gasLimits: {
-      depositWorstCase: 101000,
-      depositBestCase: 90000,
-    },
-  });
-
-  behavesLikeOptionsVault({
-    whale: WHALE_ADDRESS[chainId],
+    whale: DAI_WHALE_ADDRESS[chainId],
     name: `Knox ETH Delta Vault (Put)`,
     tokenName: `Knox ETH Delta Vault`,
     tokenSymbol: `kETH-DELTA-P`,
@@ -76,10 +59,63 @@ describe("Vault Unit Tests", () => {
     managementFee: BigNumber.from("2000000"),
     performanceFee: BigNumber.from("20000000"),
     isCall: false,
-    gasLimits: {
-      depositWorstCase: 115000,
-      depositBestCase: 98000,
-    },
+  });
+
+  behavesLikeOptionsVault({
+    whale: DAI_WHALE_ADDRESS[chainId],
+    name: `Knox ETH Delta Vault (Call)`,
+    tokenName: `Knox ETH Delta Vault`,
+    tokenSymbol: `kETH-DELTA-C`,
+    tokenDecimals: 18,
+    asset: WETH_ADDRESS[chainId],
+    depositAssetDecimals: WETH_DECIMALS,
+    baseDecimals: DAI_DECIMALS,
+    underlyingDecimals: WETH_DECIMALS,
+    depositAmount: parseUnits("10", WETH_DECIMALS),
+    cap: parseUnits("1000", WETH_DECIMALS),
+    minimumSupply: BigNumber.from("10").pow("10").toString(),
+    minimumContractSize: BigNumber.from("10").pow("17").toString(),
+    managementFee: BigNumber.from("2000000"),
+    performanceFee: BigNumber.from("20000000"),
+    isCall: true,
+  });
+
+  behavesLikeOptionsVault({
+    whale: WBTC_WHALE_ADDRESS[chainId],
+    name: `Knox BTC Delta Vault (Call)`,
+    tokenName: `Knox BTC Delta Vault`,
+    tokenSymbol: `kBTC-DELTA-C`,
+    tokenDecimals: 18,
+    asset: WBTC_ADDRESS[chainId],
+    depositAssetDecimals: WBTC_DECIMALS,
+    baseDecimals: DAI_DECIMALS,
+    underlyingDecimals: WBTC_DECIMALS,
+    depositAmount: parseUnits("1", WBTC_DECIMALS),
+    cap: parseUnits("100", WBTC_DECIMALS),
+    minimumSupply: BigNumber.from("10").pow("3").toString(),
+    minimumContractSize: BigNumber.from("10").pow("7").toString(),
+    managementFee: BigNumber.from("2000000"),
+    performanceFee: BigNumber.from("20000000"),
+    isCall: true,
+  });
+
+  behavesLikeOptionsVault({
+    whale: LINK_WHALE_ADDRESS[chainId],
+    name: `Knox LINK Delta Vault (Call)`,
+    tokenName: `Knox LINK Delta Vault`,
+    tokenSymbol: `kLINK-DELTA-C`,
+    tokenDecimals: 18,
+    asset: LINK_ADDRESS[chainId],
+    depositAssetDecimals: LINK_DECIMALS,
+    baseDecimals: DAI_DECIMALS,
+    underlyingDecimals: LINK_DECIMALS,
+    depositAmount: parseUnits("100", LINK_DECIMALS),
+    cap: parseUnits("100000", LINK_DECIMALS),
+    minimumSupply: BigNumber.from("10").pow("10").toString(),
+    minimumContractSize: BigNumber.from("10").pow("17").toString(),
+    managementFee: BigNumber.from("1000000"),
+    performanceFee: BigNumber.from("30000000"),
+    isCall: true,
   });
 });
 
@@ -131,10 +167,6 @@ function behavesLikeOptionsVault(params: {
   managementFee: BigNumber;
   performanceFee: BigNumber;
   isCall: boolean;
-  gasLimits: {
-    depositWorstCase: number;
-    depositBestCase: number;
-  };
 }) {
   let signers: types.Signers;
   let addresses: types.Addresses;
@@ -187,9 +219,9 @@ function behavesLikeOptionsVault(params: {
       addresses = await fixtures.getAddresses(signers);
 
       [signers, addresses, assetContract] = await fixtures.impersonateWhale(
-        whale,
-        asset,
-        depositAssetDecimals,
+        params.whale,
+        params.asset,
+        params.depositAmount,
         signers,
         addresses
       );
@@ -1033,21 +1065,17 @@ function behavesLikeOptionsVault(params: {
       });
 
       it("should not inflate the share tokens on initialization", async () => {
-        const depositAmount = BigNumber.from("100000000000");
-
         await assetContract
           .connect(signers.admin)
-          .transfer(addresses.vault, depositAmount);
+          .transfer(addresses.vault, params.depositAmount.mul(3));
 
         await assetContract
           .connect(signers.user)
-          .approve(addresses.vault, BigNumber.from("10000000000"));
+          .approve(addresses.vault, depositAmount);
 
-        await vaultContract
-          .connect(signers.user)
-          .deposit(BigNumber.from("10000000000"));
+        await vaultContract.connect(signers.user).deposit(depositAmount);
 
-        // user needs to get back exactly 1 ether
+        // user needs to get back exact amount in LP shares
         // even though the total has been incremented
         assert.isTrue((await vaultContract.balanceOf(addresses.user)).isZero());
       });
@@ -1136,7 +1164,7 @@ function behavesLikeOptionsVault(params: {
       let creditor: string;
 
       beforeEach(async () => {
-        creditor = addresses.owner.toString();
+        creditor = addresses.user2.toString();
       });
 
       it("should create a pending deposit", async () => {
@@ -1210,21 +1238,19 @@ function behavesLikeOptionsVault(params: {
       });
 
       it("should not inflate the share tokens on initialization", async () => {
-        const depositAmount = BigNumber.from("100000000000");
-
         await assetContract
           .connect(signers.admin)
-          .transfer(addresses.vault, depositAmount);
+          .transfer(addresses.vault, depositAmount.mul(3));
 
         await assetContract
           .connect(signers.user)
-          .approve(addresses.vault, BigNumber.from("10000000000"));
+          .approve(addresses.vault, depositAmount);
 
         await vaultContract
           .connect(signers.user)
-          .depositFor(BigNumber.from("10000000000"), creditor);
+          .depositFor(depositAmount, creditor);
 
-        // user needs to get back exactly 1 ether
+        // user needs to get back exact amount in LP shares
         // even though the total has been incremented
         assert.isTrue((await vaultContract.balanceOf(creditor)).isZero());
       });
@@ -1469,15 +1495,8 @@ function behavesLikeOptionsVault(params: {
     });
 
     describe("#completeWithdraw", () => {
-      let userDepositSize = parseUnits("5", depositAssetDecimals);
-      let userDepositAmount = isCall
-        ? userDepositSize
-        : userDepositSize.mul(3000);
-
-      let user2DepositSize = parseUnits("7", depositAssetDecimals);
-      let user2DepositAmount = isCall
-        ? user2DepositSize
-        : user2DepositSize.mul(3000);
+      let userDepositAmount = depositAmount;
+      let user2DepositAmount = depositAmount.mul(2);
 
       time.revertToSnapshotAfterEach(async () => {
         await assetContract
@@ -2016,7 +2035,7 @@ function behavesLikeOptionsVault(params: {
             addresses.feeRecipient
           );
 
-        let vaultIncome = parseEther("1");
+        let vaultIncome = depositAmount.div(10);
 
         await assetContract
           .connect(signers.whale)
