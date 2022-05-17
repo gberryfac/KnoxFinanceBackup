@@ -550,6 +550,42 @@ function behavesLikeOptionsVault(params: {
       });
     });
 
+    describe("#setStrategy", () => {
+      time.revertToSnapshotAfterEach();
+
+      it("should revert if not owner", async () => {
+        await expect(
+          vaultContract.setStrategy(ADDRESS_ONE)
+        ).to.be.revertedWith("Ownable: caller is not the owner");
+      });
+
+      it("should revert when setting 0x0 as strategy", async () => {
+        await expect(
+          vaultContract.connect(signers.owner).setStrategy(ADDRESS_ZERO)
+        ).to.be.revertedWith("0");
+      });
+
+      it("should revert when new strategy equals old strategy ", async () => {
+        await expect(
+          vaultContract
+            .connect(signers.owner)
+            .setStrategy(addresses.strategy)
+        ).to.be.revertedWith("11");
+      });
+
+      it("should change the strategy if called by owner", async () => {
+        await vaultContract.connect(signers.owner).setStrategy(ADDRESS_ONE);
+        assert.equal(await vaultContract.strategy(), ADDRESS_ONE);
+      });
+
+      it("should change the strategy when paused", async () => {
+        await vaultContract.connect(signers.owner).pause();
+        await vaultContract.connect(signers.owner).setStrategy(ADDRESS_ONE);
+        assert.equal(await vaultContract.strategy(), ADDRESS_ONE);
+      });
+
+    });
+
     describe("#setFeeRecipient", () => {
       time.revertToSnapshotAfterEach();
 
