@@ -591,6 +591,41 @@ function behavesLikeOptionsVault(params: {
       });
     });
 
+    describe("#setKeeper", () => {
+      time.revertToSnapshotAfterEach();
+
+      it("should revert if not owner", async () => {
+        await expect(
+          vaultContract.setKeeper(addresses.owner)
+        ).to.be.revertedWith("Ownable: caller is not the owner");
+      });
+
+      it("should revert when setting 0x0 as keeper", async () => {
+        await expect(
+          vaultContract.connect(signers.owner).setKeeper(ADDRESS_ZERO)
+        ).to.be.revertedWith("0");
+      });
+
+      it("should revert when new keeper equals old keeper ", async () => {
+        await expect(
+          vaultContract
+            .connect(signers.owner)
+            .setKeeper(addresses.keeper)
+        ).to.be.revertedWith("11");
+      });
+
+      it("should change the keeper if called by owner", async () => {
+        await vaultContract.connect(signers.owner).setKeeper(ADDRESS_ONE);
+        assert.equal(await vaultContract.keeper(), ADDRESS_ONE);
+      });
+
+      it("should change the keeper when paused", async () => {
+        await vaultContract.connect(signers.owner).pause();
+        await vaultContract.connect(signers.owner).setKeeper(ADDRESS_ONE);
+        assert.equal(await vaultContract.keeper(), ADDRESS_ONE);
+      });
+    });
+
     describe("#setManagementFee", () => {
       time.revertToSnapshotAfterEach();
 
