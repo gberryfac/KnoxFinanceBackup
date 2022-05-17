@@ -320,7 +320,7 @@ contract StandardDelta is IStandardDelta, Ownable, Storage, ReentrancyGuard {
         Pool.withdraw(reservedLiquidity, option.isCall);
 
         uint256 balance = Asset.balanceOf(address(this));
-        Asset.safeTransferFrom(address(this), address(Vault), balance);
+        Asset.safeTransfer(address(Vault), balance);
 
         emit Repaid(address(Vault), balance);
     }
