@@ -120,12 +120,6 @@ contract Vault is
         _;
     }
 
-    // function _sync() internal onlyStrategy {
-    //     // return asset from Vault
-    //     // Set Vault expiry
-    //     // Sync other shared state variables
-    // }
-
     /************************************************
      *  SAFETY
      ***********************************************/

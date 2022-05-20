@@ -312,6 +312,10 @@ function behavesLikeOptionsVault(params: {
         assert.bnEqual(queuedWithdrawShares, BigNumber.from("0"));
         assert.bnEqual(queuedWithdrawals, BigNumber.from("0"));
         assert.bnNotEqual(expiry, BigNumber.from("0"));
+        assert.bnEqual(
+            await vaultContract.totalBalance(),
+            BigNumber.from("0")
+        );
 
         // Check State Variables
         assert.equal(await vaultContract.owner(), addresses.owner);
@@ -546,6 +550,42 @@ function behavesLikeOptionsVault(params: {
       });
     });
 
+    describe("#setStrategy", () => {
+      time.revertToSnapshotAfterEach();
+
+      it("should revert if not owner", async () => {
+        await expect(
+          vaultContract.setStrategy(ADDRESS_ONE)
+        ).to.be.revertedWith("Ownable: caller is not the owner");
+      });
+
+      it("should revert when setting 0x0 as strategy", async () => {
+        await expect(
+          vaultContract.connect(signers.owner).setStrategy(ADDRESS_ZERO)
+        ).to.be.revertedWith("0");
+      });
+
+      it("should revert when new strategy equals old strategy ", async () => {
+        await expect(
+          vaultContract
+            .connect(signers.owner)
+            .setStrategy(addresses.strategy)
+        ).to.be.revertedWith("11");
+      });
+
+      it("should change the strategy if called by owner", async () => {
+        await vaultContract.connect(signers.owner).setStrategy(ADDRESS_ONE);
+        assert.equal(await vaultContract.strategy(), ADDRESS_ONE);
+      });
+
+      it("should change the strategy when paused", async () => {
+        await vaultContract.connect(signers.owner).pause();
+        await vaultContract.connect(signers.owner).setStrategy(ADDRESS_ONE);
+        assert.equal(await vaultContract.strategy(), ADDRESS_ONE);
+      });
+
+    });
+
     describe("#setFeeRecipient", () => {
       time.revertToSnapshotAfterEach();
 
@@ -584,6 +624,41 @@ function behavesLikeOptionsVault(params: {
         await vaultContract.connect(signers.owner).pause();
         await vaultContract.connect(signers.owner).setFeeRecipient(ADDRESS_ONE);
         assert.equal(await vaultContract.feeRecipient(), ADDRESS_ONE);
+      });
+    });
+
+    describe("#setKeeper", () => {
+      time.revertToSnapshotAfterEach();
+
+      it("should revert if not owner", async () => {
+        await expect(
+          vaultContract.setKeeper(addresses.owner)
+        ).to.be.revertedWith("Ownable: caller is not the owner");
+      });
+
+      it("should revert when setting 0x0 as keeper", async () => {
+        await expect(
+          vaultContract.connect(signers.owner).setKeeper(ADDRESS_ZERO)
+        ).to.be.revertedWith("0");
+      });
+
+      it("should revert when new keeper equals old keeper ", async () => {
+        await expect(
+          vaultContract
+            .connect(signers.owner)
+            .setKeeper(addresses.keeper)
+        ).to.be.revertedWith("11");
+      });
+
+      it("should change the keeper if called by owner", async () => {
+        await vaultContract.connect(signers.owner).setKeeper(ADDRESS_ONE);
+        assert.equal(await vaultContract.keeper(), ADDRESS_ONE);
+      });
+
+      it("should change the keeper when paused", async () => {
+        await vaultContract.connect(signers.owner).pause();
+        await vaultContract.connect(signers.owner).setKeeper(ADDRESS_ONE);
+        assert.equal(await vaultContract.keeper(), ADDRESS_ONE);
       });
     });
 
@@ -777,6 +852,42 @@ function behavesLikeOptionsVault(params: {
 
         assert.bnEqual(heldByAccount2, BigNumber.from(1));
         assert.bnEqual(heldByVault2, depositAmount.sub(1));
+      });
+    });
+
+    describe("#totalBalance", () => {
+      time.revertToSnapshotAfterEach(async () => {});
+
+      it("should return correct amount with no locked capital ", async () => {
+        await assetContract
+            .connect(signers.user)
+            .transfer(addresses.vault, depositAmount.div(2));
+        assert.bnEqual(await vaultContract.totalBalance(), depositAmount.div(2));
+
+        await assetContract
+            .connect(signers.user)
+            .transfer(addresses.vault, depositAmount.div(2));
+        assert.bnEqual(await vaultContract.totalBalance(), depositAmount);
+      });
+
+      it("should return correct amount with locked capital ", async () => {
+        await assetContract
+          .connect(signers.user)
+          .transfer(addresses.vault, depositAmount);
+
+        let lockedCapitalAmount = depositAmount.div(2);
+
+        await vaultContract.connect(signers.strategy).borrow(lockedCapitalAmount);
+        let vaultBalance = await assetContract.balanceOf(addresses.vault);
+
+        assert.bnEqual(vaultBalance, depositAmount.sub(lockedCapitalAmount));
+        assert.bnEqual(await vaultContract.totalBalance(), depositAmount);
+
+        await vaultContract.connect(signers.strategy).borrow(lockedCapitalAmount);
+        vaultBalance = await assetContract.balanceOf(addresses.vault);
+
+        assert.bnEqual(vaultBalance, BigNumber.from(0));
+        assert.bnEqual(await vaultContract.totalBalance(), depositAmount);
       });
     });
 
