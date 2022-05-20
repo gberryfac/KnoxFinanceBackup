@@ -9,16 +9,22 @@ import "abdk-libraries-solidity/ABDKMath64x64.sol";
 
 import {IPremiaPool, PoolStorage} from "./../interfaces/IPremiaPool.sol";
 import "./../interfaces/IStandardDelta.sol";
+import "./../interfaces/IStandardDeltaPricer.sol";
 
 import "./../libraries/Common.sol";
 import "./../libraries/Constants.sol";
 import "./../libraries/Errors.sol";
 
-import "./StandardDelta/Storage.sol";
+import "./StandardDelta/StandardDeltaStorage.sol";
 
 import "hardhat/console.sol";
 
-contract StandardDelta is IStandardDelta, Ownable, Storage, ReentrancyGuard {
+contract StandardDelta is
+    IStandardDelta,
+    Ownable,
+    StandardDeltaStorage,
+    ReentrancyGuard
+{
     using SafeERC20 for IERC20;
     using ABDKMath64x64 for int128;
     using ABDKMath64x64 for uint256;
@@ -33,20 +39,20 @@ contract StandardDelta is IStandardDelta, Ownable, Storage, ReentrancyGuard {
      */
     function initialize(
         bool _isCall,
-        uint8 _baseDecimals,
         uint8 _underlyingDecimals,
+        uint8 _baseDecimals,
         uint64 _minimumContractSize,
         int128 _delta64x64,
         address _keeper,
         address _pool,
-        address _vault,
-        address _volatilityOracle
+        address _pricer,
+        address _vault
     ) external isInitialized onlyOwner {
         require(_keeper != address(0), Errors.ADDRESS_NOT_PROVIDED);
         require(_pool != address(0), Errors.ADDRESS_NOT_PROVIDED);
 
+        require(_pricer != address(0), Errors.ADDRESS_NOT_PROVIDED);
         require(_vault != address(0), Errors.ADDRESS_NOT_PROVIDED);
-        require(_volatilityOracle != address(0), Errors.ADDRESS_NOT_PROVIDED);
 
         require(
             _delta64x64 >= 0x00000000000000000,
@@ -67,21 +73,11 @@ contract StandardDelta is IStandardDelta, Ownable, Storage, ReentrancyGuard {
 
         keeper = _keeper;
         Vault = IVault(_vault);
+
         Pool = IPremiaPool(_pool);
+        Pricer = IStandardDeltaPricer(_pricer);
 
         _sync();
-
-        PoolStorage.PoolSettings memory settings = Pool.getPoolSettings();
-
-        address asset = address(Asset);
-
-        if (asset == settings.base) {
-            oracles.spot = settings.baseOracle;
-        } else if (asset == settings.underlying) {
-            oracles.spot = settings.underlyingOracle;
-        } else revert();
-
-        oracles.volatility = _volatilityOracle;
 
         startOffset = 2 hours;
         endOffset = 4 hours;
@@ -337,7 +333,14 @@ contract StandardDelta is IStandardDelta, Ownable, Storage, ReentrancyGuard {
     function _setNextOption() internal {
         option.expiry = _getNextFriday();
 
-        // TODO: option.strike64x64 = DeltaStrikeSelection.getDeltaStrikePrice();
+        option.strike64x64 = Pricer.getDeltaStrikePrice64x64(
+            option.isCall,
+            option.expiry,
+            option.delta64x64
+        );
+
+        option.strike64x64 = Pricer.snapToGrid(option.strike64x64);
+        require(option.strike64x64 > 0, "invalid strike price");
 
         emit NextOptionSet(option.isCall, option.expiry, option.strike64x64);
     }
@@ -377,7 +380,7 @@ contract StandardDelta is IStandardDelta, Ownable, Storage, ReentrancyGuard {
      */
     function _fromUnderlyingtoBaseDecimals(
         uint256 value,
-        Schema.AssetProperties memory assetProperties
+        StandardDeltaSchema.AssetProperties memory assetProperties
     ) internal pure returns (uint256) {
         int128 value64x64 = value.divu(10**assetProperties.underlyingDecimals);
         return value64x64.mulu(10**assetProperties.baseDecimals);

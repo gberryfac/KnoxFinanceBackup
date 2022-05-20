@@ -1,5 +1,11 @@
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 
+export type Asset = {
+  address: string;
+  decimals: number;
+  spotOracle: string;
+};
+
 export type Signers = {
   admin: SignerWithAddress;
   user: SignerWithAddress;
@@ -22,10 +28,11 @@ export type Addresses = {
   feeRecipient: string;
   whale?: string;
   pool?: string;
-  commonLogic?: string;
+  common?: string;
   vaultDisplay?: string;
   vaultLifecycle?: string;
   vaultLogic?: string;
+  pricer?: string;
   strategy?: string;
   vault?: string;
   spotOracle?: string;

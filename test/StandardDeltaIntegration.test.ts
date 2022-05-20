@@ -51,6 +51,7 @@ describe("Standard Delta Integration Tests", () => {
     tokenName: `Knox ETH Delta Vault`,
     tokenSymbol: `kETH-DELTA-P`,
     tokenDecimals: 18,
+    sFactor: 100,
     pool: WETH_DAI_POOL[chainId],
     spotOracle: DAI_PRICE_ORACLE[chainId],
     asset: DAI_ADDRESS[chainId],
@@ -74,6 +75,7 @@ describe("Standard Delta Integration Tests", () => {
     tokenName: `Knox ETH Delta Vault`,
     tokenSymbol: `kETH-DELTA-C`,
     tokenDecimals: 18,
+    sFactor: 100,
     pool: WETH_DAI_POOL[chainId],
     spotOracle: ETH_PRICE_ORACLE[chainId],
     asset: WETH_ADDRESS[chainId],
@@ -97,6 +99,7 @@ describe("Standard Delta Integration Tests", () => {
     tokenName: `Knox BTC Delta Vault`,
     tokenSymbol: `kBTC-DELTA-C`,
     tokenDecimals: 18,
+    sFactor: 100,
     pool: WBTC_DAI_POOL[chainId],
     spotOracle: BTC_PRICE_ORACLE[chainId],
     asset: WBTC_ADDRESS[chainId],
@@ -120,6 +123,7 @@ describe("Standard Delta Integration Tests", () => {
     tokenName: `Knox LINK Delta Vault`,
     tokenSymbol: `kLINK-DELTA-C`,
     tokenDecimals: 18,
+    sFactor: 10,
     pool: LINK_DAI_POOL[chainId],
     spotOracle: LINK_PRICE_ORACLE[chainId],
     asset: LINK_ADDRESS[chainId],
@@ -144,6 +148,7 @@ function behavesLikeOptionsVault(params: {
   tokenName: string;
   tokenSymbol: string;
   tokenDecimals: number;
+  sFactor: number;
   pool: string;
   spotOracle: string;
   asset: string;
@@ -166,15 +171,16 @@ function behavesLikeOptionsVault(params: {
   // Contracts
   let keeperContract: Contract;
   let oracleContract: Contract;
-  let commonLogicLibrary: Contract;
+  let commonLibrary: Contract;
   let vaultDisplayLibrary: Contract;
   let vaultLifecycleLibrary: Contract;
   let vaultContract: Contract;
   let assetContract: Contract;
   let poolContract: Contract;
   let strategyContract: Contract;
+  let pricerContract: Contract;
 
-  describe.only(`${params.name}`, () => {
+  describe.only(params.name, () => {
     let initSnapshotId: string;
 
     before(async () => {
@@ -215,7 +221,7 @@ function behavesLikeOptionsVault(params: {
         params.spotOracle
       );
 
-      commonLogicLibrary = await getContractFactory("Common").then((contract) =>
+      commonLibrary = await getContractFactory("Common").then((contract) =>
         contract.deploy()
       );
 
@@ -227,14 +233,25 @@ function behavesLikeOptionsVault(params: {
         (contract) => contract.deploy()
       );
 
-      addresses.commonLogic = commonLogicLibrary.address;
+      addresses.common = commonLibrary.address;
       addresses.vaultDisplay = vaultDisplayLibrary.address;
       addresses.vaultLifecycle = vaultLifecycleLibrary.address;
+
+      pricerContract = await getContractFactory("StandardDeltaPricer").then(
+        (contract) =>
+          contract.deploy(
+            params.sFactor,
+            params.pool,
+            PREMIA_VOLATILITY_SURFACE_ORACLE[chainId]
+          )
+      );
+
+      addresses.pricer = pricerContract.address;
 
       strategyContract = await getContractFactory("StandardDelta", {
         signer: signers.owner,
         libraries: {
-          Common: addresses.commonLogic,
+          Common: addresses.common,
         },
       }).then((contract) => contract.deploy());
 
@@ -257,14 +274,14 @@ function behavesLikeOptionsVault(params: {
 
       await strategyContract.initialize(
         params.isCall,
-        params.baseDecimals,
         params.underlyingDecimals,
+        params.baseDecimals,
         params.minimumContractSize,
         fixedFromFloat(0.5),
         addresses.keeper,
         addresses.pool,
-        addresses.vault,
-        addresses.volatilityOracle
+        addresses.pricer,
+        addresses.vault
       );
 
       strategyContract = await strategyContract.connect(signers.whale);
@@ -283,11 +300,6 @@ function behavesLikeOptionsVault(params: {
         assert.equal(await strategyContract.keeper(), addresses.keeper);
         assert.equal(await strategyContract.Pool(), addresses.pool);
         assert.equal(await strategyContract.Vault(), addresses.vault);
-
-        const { spot, volatility } = await strategyContract.oracles();
-
-        assert.equal(spot, params.spotOracle);
-        assert.equal(volatility, PREMIA_VOLATILITY_SURFACE_ORACLE[chainId]);
 
         // Check Option
         const { isCall, minimumContractSize, expiry, delta64x64, strike64x64 } =

@@ -4,13 +4,18 @@ pragma solidity ^0.8.0;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import "./../../interfaces/IPremiaPool.sol";
+import "./../../interfaces/IStandardDeltaPricer.sol";
 import "./../../interfaces/IVault.sol";
+import {
+    AggregatorInterface,
+    IVolatilitySurfaceOracle
+} from "./../../interfaces/Oracles.sol";
 
-import "./Schema.sol";
+import "./../StandardDeltaPricer.sol";
 
-import "hardhat/console.sol";
+import "./StandardDeltaSchema.sol";
 
-contract Storage {
+contract StandardDeltaStorage {
     bool internal initialized = false;
 
     uint16 public startOffset;
@@ -22,9 +27,10 @@ contract Storage {
 
     IERC20 public Asset;
     IPremiaPool public Pool;
+
+    IStandardDeltaPricer public Pricer;
     IVault public Vault;
 
-    Schema.AssetProperties public assetProperties;
-    Schema.Option public option;
-    Schema.Oracles public oracles;
+    StandardDeltaSchema.AssetProperties public assetProperties;
+    StandardDeltaSchema.Option public option;
 }
