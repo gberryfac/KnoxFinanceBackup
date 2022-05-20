@@ -39,8 +39,8 @@ contract StandardDelta is
      */
     function initialize(
         bool _isCall,
-        uint8 _underlyingDecimals,
         uint8 _baseDecimals,
+        uint8 _underlyingDecimals,
         uint64 _minimumContractSize,
         int128 _delta64x64,
         address _keeper,

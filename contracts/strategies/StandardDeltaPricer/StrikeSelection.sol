@@ -52,8 +52,8 @@ contract StrikeSelection is IStrikeSelection, StandardDeltaPricerStorage {
     }
 
     function _latestAnswer() internal view returns (int128) {
-        int256 underlyingPrice = UnderlyingSpotOracle.latestAnswer();
         int256 basePrice = BaseSpotOracle.latestAnswer();
+        int256 underlyingPrice = UnderlyingSpotOracle.latestAnswer();
 
         return ABDKMath64x64.divi(underlyingPrice, basePrice);
     }

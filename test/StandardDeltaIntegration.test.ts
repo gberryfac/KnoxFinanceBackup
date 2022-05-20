@@ -274,8 +274,8 @@ function behavesLikeOptionsVault(params: {
 
       await strategyContract.initialize(
         params.isCall,
-        params.underlyingDecimals,
         params.baseDecimals,
+        params.underlyingDecimals,
         params.minimumContractSize,
         fixedFromFloat(0.5),
         addresses.keeper,

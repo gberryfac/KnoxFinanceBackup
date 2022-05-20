@@ -312,10 +312,7 @@ function behavesLikeOptionsVault(params: {
         assert.bnEqual(queuedWithdrawShares, BigNumber.from("0"));
         assert.bnEqual(queuedWithdrawals, BigNumber.from("0"));
         assert.bnNotEqual(expiry, BigNumber.from("0"));
-        assert.bnEqual(
-            await vaultContract.totalBalance(),
-            BigNumber.from("0")
-        );
+        assert.bnEqual(await vaultContract.totalBalance(), BigNumber.from("0"));
 
         // Check State Variables
         assert.equal(await vaultContract.owner(), addresses.owner);
@@ -554,9 +551,9 @@ function behavesLikeOptionsVault(params: {
       time.revertToSnapshotAfterEach();
 
       it("should revert if not owner", async () => {
-        await expect(
-          vaultContract.setStrategy(ADDRESS_ONE)
-        ).to.be.revertedWith("Ownable: caller is not the owner");
+        await expect(vaultContract.setStrategy(ADDRESS_ONE)).to.be.revertedWith(
+          "Ownable: caller is not the owner"
+        );
       });
 
       it("should revert when setting 0x0 as strategy", async () => {
@@ -567,9 +564,7 @@ function behavesLikeOptionsVault(params: {
 
       it("should revert when new strategy equals old strategy ", async () => {
         await expect(
-          vaultContract
-            .connect(signers.owner)
-            .setStrategy(addresses.strategy)
+          vaultContract.connect(signers.owner).setStrategy(addresses.strategy)
         ).to.be.revertedWith("11");
       });
 
@@ -583,7 +578,6 @@ function behavesLikeOptionsVault(params: {
         await vaultContract.connect(signers.owner).setStrategy(ADDRESS_ONE);
         assert.equal(await vaultContract.strategy(), ADDRESS_ONE);
       });
-
     });
 
     describe("#setFeeRecipient", () => {
@@ -644,9 +638,7 @@ function behavesLikeOptionsVault(params: {
 
       it("should revert when new keeper equals old keeper ", async () => {
         await expect(
-          vaultContract
-            .connect(signers.owner)
-            .setKeeper(addresses.keeper)
+          vaultContract.connect(signers.owner).setKeeper(addresses.keeper)
         ).to.be.revertedWith("11");
       });
 
@@ -860,13 +852,16 @@ function behavesLikeOptionsVault(params: {
 
       it("should return correct amount with no locked capital ", async () => {
         await assetContract
-            .connect(signers.user)
-            .transfer(addresses.vault, depositAmount.div(2));
-        assert.bnEqual(await vaultContract.totalBalance(), depositAmount.div(2));
+          .connect(signers.user)
+          .transfer(addresses.vault, depositAmount.div(2));
+        assert.bnEqual(
+          await vaultContract.totalBalance(),
+          depositAmount.div(2)
+        );
 
         await assetContract
-            .connect(signers.user)
-            .transfer(addresses.vault, depositAmount.div(2));
+          .connect(signers.user)
+          .transfer(addresses.vault, depositAmount.div(2));
         assert.bnEqual(await vaultContract.totalBalance(), depositAmount);
       });
 
@@ -877,13 +872,17 @@ function behavesLikeOptionsVault(params: {
 
         let lockedCapitalAmount = depositAmount.div(2);
 
-        await vaultContract.connect(signers.strategy).borrow(lockedCapitalAmount);
+        await vaultContract
+          .connect(signers.strategy)
+          .borrow(lockedCapitalAmount);
         let vaultBalance = await assetContract.balanceOf(addresses.vault);
 
         assert.bnEqual(vaultBalance, depositAmount.sub(lockedCapitalAmount));
         assert.bnEqual(await vaultContract.totalBalance(), depositAmount);
 
-        await vaultContract.connect(signers.strategy).borrow(lockedCapitalAmount);
+        await vaultContract
+          .connect(signers.strategy)
+          .borrow(lockedCapitalAmount);
         vaultBalance = await assetContract.balanceOf(addresses.vault);
 
         assert.bnEqual(vaultBalance, BigNumber.from(0));
