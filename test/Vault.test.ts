@@ -35,7 +35,6 @@ import {
   NEXT_FRIDAY,
 } from "../constants";
 
-const gasPrice = parseUnits("100", "gwei");
 const chainId = network.config.chainId;
 
 moment.tz.setDefault("UTC");
@@ -958,16 +957,14 @@ function behavesLikeOptionsVault(params: {
           startBalance = await assetContract.balanceOf(addresses.user);
         }
 
-        const tx = await vaultContract.withdrawInstantly(depositAmount, {
-          gasPrice,
-        });
+        const tx = await vaultContract.withdrawInstantly(depositAmount);
         const receipt = await tx.wait();
 
         if (asset === WETH_ADDRESS[chainId]) {
           const endBalance = await provider.getBalance(addresses.user);
           withdrawAmount = endBalance
             .sub(startBalance)
-            .add(receipt.gasUsed.mul(gasPrice));
+            .add(receipt.gasUsed.mul(receipt.effectiveGasPrice));
         } else {
           const endBalance = await assetContract.balanceOf(addresses.user);
           withdrawAmount = endBalance.sub(startBalance);
@@ -1017,10 +1014,9 @@ function behavesLikeOptionsVault(params: {
           const depositAmount = parseEther("1");
           const tx = await vaultContract.depositETH({
             value: depositAmount,
-            gasPrice,
           });
           const receipt = await tx.wait();
-          const gasFee = receipt.gasUsed.mul(gasPrice);
+          const gasFee = receipt.gasUsed.mul(receipt.effectiveGasPrice);
 
           const vaultState = await vaultContract.vaultState();
           const queuedDeposits = vaultState.queuedDeposits;
@@ -1685,10 +1681,10 @@ function behavesLikeOptionsVault(params: {
         const { queuedWithdrawShares: startQueuedShares } =
           await vaultContract.vaultState();
 
-        const tx = await vaultContract.completeWithdraw({ gasPrice });
+        const tx = await vaultContract.completeWithdraw();
         const receipt = await tx.wait();
 
-        const gasFee = receipt.gasUsed.mul(gasPrice);
+        const gasFee = receipt.gasUsed.mul(receipt.effectiveGasPrice);
 
         await expect(tx)
           .to.emit(vaultContract, "Withdraw")
@@ -1761,10 +1757,10 @@ function behavesLikeOptionsVault(params: {
         const { queuedWithdrawShares: startQueuedShares } =
           await vaultContract.vaultState();
 
-        const tx = await vaultContract.completeWithdraw({ gasPrice });
+        const tx = await vaultContract.completeWithdraw();
         const receipt = await tx.wait();
 
-        const gasFee = receipt.gasUsed.mul(gasPrice);
+        const gasFee = receipt.gasUsed.mul(receipt.effectiveGasPrice);
 
         await expect(tx)
           .to.emit(vaultContract, "Withdraw")
@@ -1839,10 +1835,10 @@ function behavesLikeOptionsVault(params: {
         const { queuedWithdrawShares: startQueuedShares } =
           await vaultContract.vaultState();
 
-        const tx = await vaultContract.completeWithdraw({ gasPrice });
+        const tx = await vaultContract.completeWithdraw();
         const receipt = await tx.wait();
 
-        const gasFee = receipt.gasUsed.mul(gasPrice);
+        const gasFee = receipt.gasUsed.mul(receipt.effectiveGasPrice);
 
         await expect(tx)
           .to.emit(vaultContract, "Withdraw")
@@ -1892,7 +1888,7 @@ function behavesLikeOptionsVault(params: {
         let nextExpiry = expiry.add(SECONDS_PER_WEEK);
         await vaultContract.connect(signers.keeper).harvest(nextExpiry);
 
-        const tx = await vaultContract.completeWithdraw({ gasPrice });
+        const tx = await vaultContract.completeWithdraw();
 
         await expect(tx)
           .to.emit(vaultContract, "Withdraw")
