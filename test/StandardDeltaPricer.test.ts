@@ -136,14 +136,14 @@ describe("Standard Delta Pricer Unit Tests", () => {
     });
   });
 
-  describe("#latestAnswer", () => {
+  describe("#latestAnswer64x64", () => {
     time.revertToSnapshotAfterEach(async () => {});
 
     it("should convert price correctly", async () => {
       // test is valid for block 14765000 (ETH Mainnet)
 
       assert.equal(
-        fixedToNumber(await standardDeltaPricer.latestAnswer()),
+        fixedToNumber(await standardDeltaPricer.latestAnswer64x64()),
         2085.703677825
       );
     });
@@ -172,17 +172,17 @@ describe("Standard Delta Pricer Unit Tests", () => {
     });
   });
 
-  describe("#getAnnualizedVolatility64x64", () => {
+  describe("#getAnnualizedVolatilityATM64x64", () => {
     time.revertToSnapshotAfterEach(async () => {});
 
-    it("should calculate annualized volatility", async () => {
+    it("should calculate annualized implied volatility ATM", async () => {
       const spot64x64 = fixedFromFloat(2000);
       const tau64x64 = fixedFromFloat(
         (params.expiry - block.timestamp) / 31536000
       );
 
       const annualizedVolatility =
-        await standardDeltaPricer.getAnnualizedVolatility64x64(
+        await standardDeltaPricer.getAnnualizedVolatilityATM64x64(
           tau64x64,
           spot64x64
         );

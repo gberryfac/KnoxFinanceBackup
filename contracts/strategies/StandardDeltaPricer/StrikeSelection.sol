@@ -19,8 +19,8 @@ contract StrikeSelection is IStrikeSelection, StandardDeltaPricerStorage {
     using ABDKMath64x64 for int128;
     using ABDKMath64x64 for uint256;
 
-    function latestAnswer() external view returns (int128) {
-        return _latestAnswer();
+    function latestAnswer64x64() external view returns (int128) {
+        return _latestAnswer64x64();
     }
 
     function getTimeToMaturity64x64(uint64 expiry)
@@ -31,12 +31,12 @@ contract StrikeSelection is IStrikeSelection, StandardDeltaPricerStorage {
         return _getTimeToMaturity64x64(expiry);
     }
 
-    function getAnnualizedVolatility64x64(int128 tau64x64, int128 spot64x64)
+    function getAnnualizedVolatilityATM64x64(int128 tau64x64, int128 spot64x64)
         external
         view
         returns (int128)
     {
-        return _getAnnualizedVolatility64x64(tau64x64, spot64x64);
+        return _getAnnualizedVolatilityATM64x64(tau64x64, spot64x64);
     }
 
     function getDeltaStrikePrice64x64(
@@ -51,7 +51,7 @@ contract StrikeSelection is IStrikeSelection, StandardDeltaPricerStorage {
         return _snapToGrid(n);
     }
 
-    function _latestAnswer() internal view returns (int128) {
+    function _latestAnswer64x64() internal view returns (int128) {
         int256 basePrice = BaseSpotOracle.latestAnswer();
         int256 underlyingPrice = UnderlyingSpotOracle.latestAnswer();
 
@@ -66,7 +66,7 @@ contract StrikeSelection is IStrikeSelection, StandardDeltaPricerStorage {
         return ABDKMath64x64.divu(expiry - block.timestamp, 365 days);
     }
 
-    function _getAnnualizedVolatility64x64(int128 tau64x64, int128 spot64x64)
+    function _getAnnualizedVolatilityATM64x64(int128 tau64x64, int128 spot64x64)
         internal
         view
         returns (int128)
@@ -86,12 +86,12 @@ contract StrikeSelection is IStrikeSelection, StandardDeltaPricerStorage {
         uint64 expiry,
         int128 delta64x64
     ) internal view returns (int128) {
-        int128 spot64x64 = _latestAnswer();
+        int128 spot64x64 = _latestAnswer64x64();
 
         int128 tau64x64 = _getTimeToMaturity64x64(expiry);
         require(tau64x64 > 0, "tau <= 0");
 
-        int128 iv_atm = _getAnnualizedVolatility64x64(tau64x64, spot64x64);
+        int128 iv_atm = _getAnnualizedVolatilityATM64x64(tau64x64, spot64x64);
         require(iv_atm > 0, "iv_atm <= 0");
 
         int128 v = iv_atm.mul(tau64x64.sqrt());
