@@ -27,6 +27,16 @@ const config: HardhatUserConfig = {
           },
         },
       },
+      {
+        version: "0.8.6",
+        settings: {
+          optimizer: {
+            runs: 200,
+            enabled: true,
+          },
+        },
+      },
+
       // WETH
       {
         version: "0.4.18",
