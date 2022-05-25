@@ -136,14 +136,14 @@ describe("Standard Delta Pricer Unit Tests", () => {
     });
   });
 
-  describe("#latestAnswer", () => {
+  describe("#latestAnswer64x64", () => {
     time.revertToSnapshotAfterEach(async () => {});
 
     it("should convert price correctly", async () => {
       // test is valid for block 14765000 (ETH Mainnet)
 
       assert.equal(
-        fixedToNumber(await standardDeltaPricer.latestAnswer()),
+        fixedToNumber(await standardDeltaPricer.latestAnswer64x64()),
         2085.703677825
       );
     });

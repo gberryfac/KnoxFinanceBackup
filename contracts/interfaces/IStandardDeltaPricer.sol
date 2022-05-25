@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 interface IStrikeSelection {
-    function latestAnswer() external view returns (int128);
+    function latestAnswer64x64() external view returns (int128);
 
     function getTimeToMaturity64x64(uint64 expiry)
         external
