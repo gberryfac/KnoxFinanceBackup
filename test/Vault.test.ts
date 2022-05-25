@@ -2118,6 +2118,114 @@ function behavesLikeOptionsVault(params: {
       });
     });
 
+    describe("#borrow", () => {
+      time.revertToSnapshotAfterEach(async () => {
+        // assert test suite assumption
+        assert.bnEqual(
+          await assetContract.balanceOf(addresses.vault),
+          BigNumber.from("0")
+        );
+      });
+
+      it("should revert when not called by strategy", async () => {
+        await expect(
+          vaultContract.connect(signers.user).borrow(0)
+        ).to.be.revertedWith("unauthorized");
+      });
+
+      it("should allow when called by strategy", async () => {
+        await assetContract.connect(signers.user).transfer(addresses.vault, 1);
+        await vaultContract.connect(signers.strategy).borrow(1);
+      });
+
+      it("should revert when paused", async () => {
+        await assetContract.connect(signers.user).transfer(addresses.vault, 1);
+
+        await vaultContract.connect(signers.owner).pause();
+
+        await expect(
+          vaultContract.connect(signers.strategy).borrow(1)
+        ).to.be.revertedWith("Pausable: paused");
+      });
+
+      it("should allow borrowing after unpause", async () => {
+        await assetContract.connect(signers.user).transfer(addresses.vault, 1);
+
+        await vaultContract.connect(signers.owner).pause();
+        await vaultContract.connect(signers.owner).unpause();
+        await vaultContract.connect(signers.strategy).borrow(1);
+      });
+
+      it("should revert when the amount of borrowable assets are less than requested amount", async () => {
+        await expect(
+          vaultContract.connect(signers.strategy).borrow(1)
+        ).to.be.revertedWith("5");
+
+        await assetContract.connect(signers.user).transfer(addresses.vault, 1);
+
+        await vaultContract.connect(signers.strategy).borrow(1);
+
+        await expect(
+          vaultContract.connect(signers.strategy).borrow(1)
+        ).to.be.revertedWith("5");
+      });
+
+      it("should allow when amount of borrowable assets are greater than requested amount", async () => {
+        await vaultContract.connect(signers.strategy).borrow(0);
+
+        await assetContract.connect(signers.user).transfer(addresses.vault, 10);
+
+        await vaultContract.connect(signers.strategy).borrow(1);
+        await vaultContract.connect(signers.strategy).borrow(4);
+        await vaultContract.connect(signers.strategy).borrow(5);
+      });
+
+      it("should transfer requested asset amount from vault to strategy", async () => {
+        await assetContract
+          .connect(signers.user)
+          .transfer(addresses.vault, depositAmount);
+
+        const assetInVault = await assetContract.balanceOf(addresses.vault);
+        const toBorrow = depositAmount.div(2);
+
+        await vaultContract.connect(signers.strategy).borrow(toBorrow);
+
+        assert.bnEqual(
+          await assetContract.balanceOf(addresses.vault),
+          assetInVault.sub(toBorrow)
+        );
+        assert.bnEqual(
+          await assetContract.balanceOf(addresses.strategy),
+          toBorrow
+        );
+      });
+
+      it("should increment locked collateral accounting by requested amount", async () => {
+        await assetContract
+          .connect(signers.user)
+          .transfer(addresses.vault, depositAmount);
+
+        let lockedCollateral = BigNumber.from("0");
+        let borrowSequence = [0, 1, 2, 3];
+
+        borrowSequence.forEach(async function (toBorrow) {
+          assert.bnEqual(
+            (await vaultContract.vaultState()).lockedCollateral,
+            lockedCollateral
+          );
+
+          await vaultContract.connect(signers.strategy).borrow(toBorrow);
+
+          assert.bnEqual(
+            (await vaultContract.vaultState()).lockedCollateral,
+            lockedCollateral.add(toBorrow)
+          );
+
+          lockedCollateral = lockedCollateral.add(lockedCollateral);
+        });
+      });
+    });
+
     describe("#harvest", () => {
       time.revertToSnapshotAfterEach(async () => {
         await assetContract
