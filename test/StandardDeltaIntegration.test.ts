@@ -316,5 +316,30 @@ function behavesLikeOptionsVault(params: {
         assert.equal(saleWindowEnd.sub(saleWindowStart), 7200);
       });
     });
+
+    describe("#sync", () => {
+      it("should set vault's expiry to the strategy's option expiry", async () => {
+        const { expiry: vaultExpiryBefore } = await vaultContract.vaultState();
+        const { expiry: optionExpiry } = await strategyContract.option();
+
+        assert.bnNotEqual(vaultExpiryBefore, optionExpiry);
+
+        await strategyContract.connect(signers.keeper).sync();
+
+        const { expiry: vaultExpiryAfter } = await vaultContract.vaultState();
+
+        assert.bnEqual(vaultExpiryAfter, optionExpiry);
+      });
+
+      it("should set strategy's asset to the vault's asset", async () => {
+        let { asset: vaultAsset } = await vaultContract.vaultParams();
+
+        await strategyContract.connect(signers.keeper).sync();
+
+        let strategyAsset = await strategyContract.Asset();
+
+        assert.equal(vaultAsset, strategyAsset);
+      });
+    });
   });
 }

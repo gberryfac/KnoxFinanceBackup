@@ -428,6 +428,34 @@ function behavesLikeOptionsVault(params: {
       });
     });
 
+    describe("#sync", () => {
+      time.revertToSnapshotAfterEach();
+
+      it("should revert when caller is not strategy", async () => {
+        await expect(
+          vaultContract.connect(signers.user).sync(0)
+        ).to.be.revertedWith("unauthorized");
+      });
+
+      it("should succeed when caller is strategy", async () => {
+        await vaultContract.connect(signers.strategy).sync(0);
+      });
+
+      it("should set vault state expiry", async () => {
+        let { expiry } = await vaultContract.vaultState();
+        let nextExpiry = expiry.add(SECONDS_PER_WEEK);
+        await vaultContract.connect(signers.strategy).sync(nextExpiry);
+        let { expiry: expiryAfter } = await vaultContract.vaultState();
+        assert.bnEqual(expiryAfter, nextExpiry);
+      });
+
+      it("should return the vault's asset", async () => {
+        const { asset: vaultAsset } = await vaultContract.vaultParams();
+        const syncAsset = await vaultContract.connect(signers.strategy).callStatic.sync(0);
+        assert.equal(syncAsset, vaultAsset);
+      });
+    });
+
     describe("#decimals", () => {
       it("should return 18 for decimals", async () => {
         const vaultParams = await vaultContract.vaultParams();

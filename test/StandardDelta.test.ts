@@ -439,6 +439,26 @@ function behavesLikeOptionsVault(params: {
       });
     });
 
+    describe("#sync", () => {
+      time.revertToSnapshotAfterEach();
+      it("should revert when caller is not keeper", async () => {
+        await expect(
+          strategyContract.connect(signers.user).sync()
+        ).to.be.revertedWith("1");
+      });
+
+      it("should succeed when caller is keeper", async () => {
+        await strategyContract.connect(signers.keeper).sync();
+      });
+
+      it("should invoke vault.sync", async () => {
+        const tx = await strategyContract.connect(signers.keeper).sync();
+
+        // NOTE: A `Sync` event is ONLY emitted for TESTING.
+        await expect(tx).to.emit(vaultContract, "Sync");
+      });
+    });
+
     describe("#setNewKeeper", () => {
       time.revertToSnapshotAfterEach(async () => {});
 
