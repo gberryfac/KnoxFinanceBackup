@@ -12,8 +12,8 @@ require("dotenv").config();
 
 import { TEST_URI, BLOCK_NUMBER } from "./constants";
 
-// Defaults to CHAINID=1 so things will run with mainnet fork if not specified
-const CHAINID = process.env.CHAINID ? Number(process.env.CHAINID) : 1;
+// Defaults to CHAINID=42161 so things will run with mainnet fork if not specified
+const CHAINID = process.env.CHAINID ? Number(process.env.CHAINID) : 42161;
 
 const config: HardhatUserConfig = {
   solidity: {

@@ -451,7 +451,9 @@ function behavesLikeOptionsVault(params: {
 
       it("should return the vault's asset", async () => {
         const { asset: vaultAsset } = await vaultContract.vaultParams();
-        const syncAsset = await vaultContract.connect(signers.strategy).callStatic.sync(0);
+        const syncAsset = await vaultContract
+          .connect(signers.strategy)
+          .callStatic.sync(0);
         assert.equal(syncAsset, vaultAsset);
       });
     });

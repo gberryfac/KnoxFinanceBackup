@@ -1,4 +1,4 @@
-import { ethers } from "hardhat";
+import { network, ethers } from "hardhat";
 import { BigNumber, Contract } from "ethers";
 
 const { getContractFactory, provider } = ethers;
@@ -21,7 +21,7 @@ import {
   WETH_DAI_POOL,
 } from "../constants";
 
-const chainId = 1; // ETH Mainnet
+const chainId = network.config.chainId;
 
 moment.tz.setDefault("UTC");
 
@@ -30,7 +30,7 @@ const params = {
   pool: WETH_DAI_POOL[chainId],
   volatilityOracle: PREMIA_VOLATILITY_SURFACE_ORACLE[chainId],
   isCall: true,
-  expiry: NEXT_FRIDAY,
+  expiry: NEXT_FRIDAY[chainId],
   delta64x64: fixedFromFloat(0.25),
   base: assets.DAI,
   underlying: assets.ETH,

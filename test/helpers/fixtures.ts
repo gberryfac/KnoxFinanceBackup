@@ -2,7 +2,7 @@ import { ethers, network } from "hardhat";
 import { BigNumber, Contract } from "ethers";
 
 const { getContractAt } = ethers;
-const { parseUnits, parseEther } = ethers.utils;
+const { parseEther } = ethers.utils;
 
 import * as utils from "./utils";
 import * as types from "./types";
