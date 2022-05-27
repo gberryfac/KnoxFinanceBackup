@@ -1,7 +1,7 @@
 {
   "scripts": {
     "prepare": "npx husky install",
-    "test": "npm run test:eth",
+    "test": "npm run test:arb",
     "test:eth": "CHAINID=1 npx hardhat test test/*.ts",
     "compile:eth": "CHAINID=1 npx hardhat compile",
     "test:arb": "CHAINID=42161 npx hardhat test test/*.ts",
