@@ -454,6 +454,7 @@ function behavesLikeOptionsVault(params: {
         const syncAsset = await vaultContract
           .connect(signers.strategy)
           .callStatic.sync(0);
+
         assert.equal(syncAsset, vaultAsset);
       });
     });

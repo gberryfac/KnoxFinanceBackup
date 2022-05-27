@@ -6,6 +6,7 @@ import { expect } from "chai";
 import { assert } from "../helpers/assertions";
 
 describe.only("VaultDisplay", () => {
+
   let vaultDisplay;
   let shareMath;
 
