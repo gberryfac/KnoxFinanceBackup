@@ -50,3 +50,19 @@ export async function impersonateWhale(account: string, ethBalance: string) {
 
   return await ethers.getSigner(account);
 }
+
+export async function setERC20Balance(
+  asset: string,
+  account: string,
+  balance: string,
+  slot: number
+) {
+  const key = ethers.utils.hexlify(ethers.utils.zeroPad(account, 32));
+  const index = ethers.utils.solidityKeccak256(
+    ["uint256", "uint256"],
+    [account, slot]
+  );
+  const amount = ethers.utils.hexZeroPad(balance, 32);
+
+  await ethers.provider.send("hardhat_setStorageAt", [asset, index, amount]);
+}

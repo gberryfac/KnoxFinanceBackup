@@ -259,7 +259,7 @@ function behavesLikeOptionsVault(params: {
 
       addresses.vault = vaultContract.address;
 
-      await vaultContract.connect(signers.strategy).sync(NEXT_FRIDAY);
+      await vaultContract.connect(signers.strategy).sync(NEXT_FRIDAY[chainId]);
     });
 
     after(async () => {

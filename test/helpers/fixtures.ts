@@ -7,7 +7,7 @@ const { parseUnits, parseEther } = ethers.utils;
 import * as utils from "./utils";
 import * as types from "./types";
 
-import { WETH_ADDRESS } from "../../constants";
+import { WETH_ADDRESS, SLOTS } from "../../constants";
 
 const chainId = network.config.chainId;
 
@@ -63,6 +63,13 @@ export async function impersonateWhale(
   signers.whale = whaleSigner;
 
   const assetContract = await getContractAt("IAsset", depositAsset);
+
+  await utils.setERC20Balance(
+    depositAsset,
+    addresses.whale,
+    depositAmount.mul(100).toHexString(),
+    SLOTS[depositAsset]
+  );
 
   if (depositAsset === WETH_ADDRESS[chainId]) {
     await assetContract
