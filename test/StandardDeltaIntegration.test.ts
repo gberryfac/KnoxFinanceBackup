@@ -171,7 +171,7 @@ function behavesLikeOptionsVault(params: {
   // Contracts
   let keeperContract: Contract;
   let oracleContract: Contract;
-  let commonLibrary: Contract;
+  let helpersLibrary: Contract;
   let vaultDisplayLibrary: Contract;
   let vaultLifecycleLibrary: Contract;
   let vaultContract: Contract;
@@ -221,7 +221,7 @@ function behavesLikeOptionsVault(params: {
         params.spotOracle
       );
 
-      commonLibrary = await getContractFactory("Common").then((contract) =>
+      helpersLibrary = await getContractFactory("Helpers").then((contract) =>
         contract.deploy()
       );
 
@@ -233,7 +233,7 @@ function behavesLikeOptionsVault(params: {
         (contract) => contract.deploy()
       );
 
-      addresses.common = commonLibrary.address;
+      addresses.helpers = helpersLibrary.address;
       addresses.vaultDisplay = vaultDisplayLibrary.address;
       addresses.vaultLifecycle = vaultLifecycleLibrary.address;
 
@@ -251,7 +251,7 @@ function behavesLikeOptionsVault(params: {
       strategyContract = await getContractFactory("StandardDelta", {
         signer: signers.owner,
         libraries: {
-          Common: addresses.common,
+          Helpers: addresses.helpers,
         },
       }).then((contract) => contract.deploy());
 
@@ -352,6 +352,18 @@ function behavesLikeOptionsVault(params: {
 
         assert.equal(vaultAsset, strategyAsset);
       });
+    });
+
+    describe("#setNextRound", () => {
+      time.revertToSnapshotAfterEach(async () => {
+        await assetContract
+          .connect(signers.user)
+          .approve(addresses.vault, params.depositAmount);
+
+        await vaultContract["depositToQueue(uint256)"](params.depositAmount);
+      });
+
+      it("should remove reserved liquidity from Premia pool", async () => {});
     });
   });
 }

@@ -181,7 +181,7 @@ function behavesLikeOptionsVault(params: {
   let addresses: types.Addresses;
 
   // Contracts
-  let commonLibrary: Contract;
+  let helpersLibrary: Contract;
   let premiaPool: Contract;
   let vaultContract: Contract;
   let strategyContract: Contract;
@@ -231,7 +231,7 @@ function behavesLikeOptionsVault(params: {
 
       addresses.pool = premiaPool.address;
 
-      commonLibrary = await getContractFactory("Common").then((contract) =>
+      helpersLibrary = await getContractFactory("Helpers").then((contract) =>
         contract.deploy()
       );
 
@@ -239,7 +239,7 @@ function behavesLikeOptionsVault(params: {
         contract.deploy(params.asset)
       );
 
-      addresses.common = commonLibrary.address;
+      addresses.helpers = helpersLibrary.address;
       addresses.vault = vaultContract.address;
 
       pricerContract = await getContractFactory("StandardDeltaPricer").then(
@@ -256,7 +256,7 @@ function behavesLikeOptionsVault(params: {
       strategyContract = await getContractFactory("StandardDelta", {
         signer: signers.owner,
         libraries: {
-          Common: addresses.common,
+          Helpers: addresses.helpers,
         },
       }).then((contract) => contract.deploy());
 
@@ -287,7 +287,7 @@ function behavesLikeOptionsVault(params: {
         testStrategy = await getContractFactory("StandardDelta", {
           signer: signers.owner,
           libraries: {
-            Common: addresses.common,
+            Helpers: addresses.helpers,
           },
         }).then((contract) => contract.deploy());
       });

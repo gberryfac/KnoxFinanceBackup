@@ -11,7 +11,7 @@ import {IPremiaPool, PoolStorage} from "./../interfaces/IPremiaPool.sol";
 import "./../interfaces/IStandardDelta.sol";
 import "./../interfaces/IStandardDeltaPricer.sol";
 
-import "./../libraries/Common.sol";
+import "./../libraries/Helpers.sol";
 import "./../libraries/Constants.sol";
 import "./../libraries/Errors.sol";
 
@@ -195,18 +195,19 @@ contract StandardDelta is
         Vault.borrow(amount);
         Asset.approve(address(Pool), amount);
 
-        Pool.writeFrom(
-            address(this),
-            msg.sender,
-            option.expiry,
-            option.strike64x64,
-            contractSize,
-            option.isCall
-        );
+        (uint256 longTokenId, ) =
+            Pool.writeFrom(
+                address(Vault),
+                msg.sender,
+                option.expiry,
+                option.strike64x64,
+                contractSize,
+                option.isCall
+            );
+
+        emit Sold(msg.sender, contractSize, longTokenId);
 
         Pool.setDivestmentTimestamp(option.expiry, option.isCall);
-
-        emit Purchased(msg.sender, contractSize);
     }
 
     /************************************************
@@ -246,7 +247,7 @@ contract StandardDelta is
         onlyKeeper
     {
         if (process) _processExpired();
-        _withdrawAndRepay();
+        // _withdrawAndRepay();
         _setSaleWindow();
         _setNextOption();
     }
@@ -262,7 +263,7 @@ contract StandardDelta is
      * @notice Removes liquidity from option pool, returns borrowed funds to vault
      */
     function withdrawAndRepay() external isExpired nonReentrant onlyKeeper {
-        _withdrawAndRepay();
+        // _withdrawAndRepay();
     }
 
     /**
@@ -302,23 +303,6 @@ contract StandardDelta is
                 }
             }
         }
-    }
-
-    function _withdrawAndRepay() internal {
-        uint256 reservedLiquidity =
-            Pool.balanceOf(
-                address(this),
-                option.isCall
-                    ? Constants.UNDERLYING_RESERVED_LIQ_TOKEN_ID
-                    : Constants.BASE_RESERVED_LIQ_TOKEN_ID
-            );
-
-        Pool.withdraw(reservedLiquidity, option.isCall);
-
-        uint256 balance = Asset.balanceOf(address(this));
-        Asset.safeTransfer(address(Vault), balance);
-
-        emit Repaid(address(Vault), balance);
     }
 
     function _setSaleWindow() internal {
@@ -370,7 +354,7 @@ contract StandardDelta is
      ***********************************************/
 
     function _getNextFriday() internal view returns (uint64) {
-        return uint64(Common.getNextFriday(block.timestamp));
+        return uint64(Helpers.getNextFriday(block.timestamp));
     }
 
     /**
