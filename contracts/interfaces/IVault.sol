@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "./../libraries/VaultSchema.sol";
-
 interface IVault {
     event Deposit(address indexed account, uint256 amount, uint256 round);
 

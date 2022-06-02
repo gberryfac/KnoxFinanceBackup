@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 interface IStandardDelta {
     event NextOptionSet(bool isCall, uint64 expiry, int128 strike64x64);
 
-    event Purchased(address indexed account, uint256 amount);
+    event Sold(address account, uint256 amount, uint256 indexed tokenId);
 
     event Repaid(address indexed account, uint256 amount);
 
