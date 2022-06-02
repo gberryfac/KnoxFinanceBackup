@@ -79,6 +79,9 @@ abstract contract VaultInternal is Queue {
         // emit DepositQueuedToVault(pricePerShare, mintedShares, l.state.totalQueuedAssets);
     }
 
+    // TODO;
+    function _disburseVaultFees() internal {}
+
     /**
      * @notice get the total quantity of the assets managed by the vault sans queued assets
      * @return total managed asset amount
@@ -99,7 +102,21 @@ abstract contract VaultInternal is Queue {
     }
 
     /**
+     * @dev Throws if called by any account other than authorized accounts.
+     */
+    modifier onlyAuthorized() {
+        VaultStorage.Layout storage l = VaultStorage.layout();
+        require(
+            msg.sender == l.addresses.strategy ||
+                msg.sender == l.addresses.keeper,
+            "unauthorized"
+        );
+        _;
+    }
+
+    /**
      * @notice execute a deposit of assets on behalf of given address
+     * @dev only the vault keeper may call this function
      * @param assetAmount quantity of assets to deposit
      * @param receiver recipient of shares resulting from deposit
      * @return shareAmount quantity of shares to mint
@@ -107,6 +124,7 @@ abstract contract VaultInternal is Queue {
     function _deposit(uint256 assetAmount, address receiver)
         internal
         override(ERC4626BaseInternal)
+        onlyAuthorized
         returns (uint256 shareAmount)
     {
         require(
@@ -121,6 +139,7 @@ abstract contract VaultInternal is Queue {
 
     /**
      * @notice execute a minting of shares on behalf of given address
+     * @dev only the vault keeper may call this function
      * @param shareAmount quantity of shares to mint
      * @param receiver recipient of shares resulting from deposit
      * @return assetAmount quantity of assets to deposit
@@ -128,6 +147,7 @@ abstract contract VaultInternal is Queue {
     function _mint(uint256 shareAmount, address receiver)
         internal
         override(ERC4626BaseInternal)
+        onlyAuthorized
         returns (uint256 assetAmount)
     {
         require(

@@ -49,17 +49,15 @@ contract Vault is VaultInternal {
         l.ERC20 = IERC20(_initParams.asset);
     }
 
-    // TODO: Inherit Ownable, Reentrancy, Pausable protection
+    // TODO: Inherit Timelock, Ownable, Reentrancy, Pausable protection
     // TODO: Add setters for addresses (strategy, feeRecipient, etc.)
     // NOTE: Setters should call to internal functions in VaultStorage
 
-    function setNextRound(uint64 expiry, uint256 tokenId) external {
+    function setNextRound(uint64 expiry, uint256 tokenId)
+        external
+        onlyAuthorized
+    {
         VaultStorage.Layout storage l = VaultStorage.layout();
-        require(
-            msg.sender == l.addresses.strategy ||
-                msg.sender == l.addresses.keeper,
-            "unauthorized"
-        );
 
         require(expiry > l.option.expiry, "Previous expiry > new expiry");
 
@@ -71,13 +69,8 @@ contract Vault is VaultInternal {
         _setNextRound(expiry, tokenId);
     }
 
-    function withdrawLiquidityFromPool() external {
+    function withdrawLiquidityFromPool() external onlyAuthorized {
         VaultStorage.Layout storage l = VaultStorage.layout();
-        require(
-            msg.sender == l.addresses.strategy ||
-                msg.sender == l.addresses.keeper,
-            "unauthorized"
-        );
 
         require(
             block.timestamp >= l.option.expiry,
@@ -87,13 +80,8 @@ contract Vault is VaultInternal {
         _withdrawLiquidityFromPool();
     }
 
-    function depositQueuedToVault() external {
+    function depositQueuedToVault() external onlyAuthorized {
         VaultStorage.Layout storage l = VaultStorage.layout();
-        require(
-            msg.sender == l.addresses.strategy ||
-                msg.sender == l.addresses.keeper,
-            "unauthorized"
-        );
 
         require(
             block.timestamp >= l.option.expiry,
@@ -102,6 +90,9 @@ contract Vault is VaultInternal {
 
         _depositQueuedToVault();
     }
+
+    // TODO:
+    function borrow() external {}
 
     function totalQueuedAssets() external view returns (uint256) {
         return VaultStorage._totalQueuedAssets();

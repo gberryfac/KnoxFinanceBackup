@@ -217,6 +217,84 @@ function behavesLikeOptionsVault(params: {
         const vaultBalance = await assetContract.balanceOf(addresses.vault);
         assert.bnEqual(vaultBalance, params.depositAmount);
       });
+
+      it("should increase vault balance and queue shares if user deposits multiple times", async () => {
+        const firstDeposit = params.depositAmount;
+
+        await assetContract
+          .connect(signers.user)
+          .approve(addresses.vault, firstDeposit);
+
+        await vaultContract["depositToQueue(uint256)"](firstDeposit);
+
+        let epoch = await vaultContract.epoch();
+        let userQueueSharesBalance = await vaultContract[
+          "balanceOf(address,uint256)"
+        ](addresses.user, epoch);
+
+        // Queue token is minted 1:1 with deposit
+        assert.bnEqual(userQueueSharesBalance, firstDeposit);
+
+        let vaultBalance = await assetContract.balanceOf(addresses.vault);
+        assert.bnEqual(vaultBalance, firstDeposit);
+
+        const secondDeposit = params.depositAmount.div(2);
+
+        await assetContract
+          .connect(signers.user)
+          .approve(addresses.vault, secondDeposit);
+
+        await vaultContract["depositToQueue(uint256)"](secondDeposit);
+
+        epoch = await vaultContract.epoch();
+        userQueueSharesBalance = await vaultContract[
+          "balanceOf(address,uint256)"
+        ](addresses.user, epoch);
+
+        const balance = firstDeposit.add(secondDeposit);
+
+        // Queue token is minted 1:1 with deposit
+        assert.bnEqual(userQueueSharesBalance, balance);
+
+        vaultBalance = await assetContract.balanceOf(addresses.vault);
+        assert.bnEqual(vaultBalance, balance);
+      });
+
+      it("should receieve vault shares if User has deposits in past rounds", async () => {
+        const firstDeposit = params.depositAmount;
+
+        await assetContract
+          .connect(signers.user)
+          .approve(addresses.vault, firstDeposit);
+
+        await vaultContract["depositToQueue(uint256)"](firstDeposit);
+
+        await vaultContract
+          .connect(signers.strategy)
+          .setNextRound(NEXT_FRIDAY[chainId], BigNumber.from("111"));
+
+        const secondDeposit = params.depositAmount.div(2);
+
+        await assetContract
+          .connect(signers.user)
+          .approve(addresses.vault, secondDeposit);
+
+        await vaultContract["depositToQueue(uint256)"](secondDeposit);
+
+        const epoch = await vaultContract.epoch();
+
+        const userQueueShares = await vaultContract[
+          "balanceOf(address,uint256)"
+        ](addresses.user, epoch);
+
+        assert.bnEqual(userQueueShares, secondDeposit);
+
+        const userVaultShares = await vaultContract["balanceOf(address)"](
+          addresses.user
+        );
+
+        assert.bnEqual(userVaultShares, firstDeposit);
+      });
     });
 
     describe("#maxRedeemShares", () => {
