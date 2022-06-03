@@ -53,7 +53,6 @@ describe("Standard Delta Strategy Unit Tests", () => {
     tokenName: `Knox ETH Delta Vault`,
     tokenSymbol: `kETH-DELTA-P`,
     tokenDecimals: 18,
-    sFactor: 100,
     pool: WETH_DAI_POOL[chainId],
     spotOracle: DAI_PRICE_ORACLE[chainId],
     asset: DAI_ADDRESS[chainId],
@@ -79,7 +78,6 @@ describe("Standard Delta Strategy Unit Tests", () => {
     tokenName: `Knox ETH Delta Vault`,
     tokenSymbol: `kETH-DELTA-C`,
     tokenDecimals: 18,
-    sFactor: 100,
     pool: WETH_DAI_POOL[chainId],
     spotOracle: ETH_PRICE_ORACLE[chainId],
     asset: WETH_ADDRESS[chainId],
@@ -105,7 +103,6 @@ describe("Standard Delta Strategy Unit Tests", () => {
     tokenName: `Knox BTC Delta Vault`,
     tokenSymbol: `kBTC-DELTA-C`,
     tokenDecimals: 18,
-    sFactor: 100,
     pool: WBTC_DAI_POOL[chainId],
     spotOracle: BTC_PRICE_ORACLE[chainId],
     asset: WBTC_ADDRESS[chainId],
@@ -131,7 +128,6 @@ describe("Standard Delta Strategy Unit Tests", () => {
     tokenName: `Knox LINK Delta Vault`,
     tokenSymbol: `kLINK-DELTA-C`,
     tokenDecimals: 18,
-    sFactor: 10,
     pool: LINK_DAI_POOL[chainId],
     spotOracle: LINK_PRICE_ORACLE[chainId],
     asset: LINK_ADDRESS[chainId],
@@ -158,7 +154,6 @@ function behavesLikeOptionsVault(params: {
   tokenName: string;
   tokenSymbol: string;
   tokenDecimals: number;
-  sFactor: number;
   pool: string;
   spotOracle: string;
   asset: string;
@@ -245,7 +240,6 @@ function behavesLikeOptionsVault(params: {
       pricerContract = await getContractFactory("StandardDeltaPricer").then(
         (contract) =>
           contract.deploy(
-            params.sFactor,
             params.pool,
             PREMIA_VOLATILITY_SURFACE_ORACLE[chainId]
           )

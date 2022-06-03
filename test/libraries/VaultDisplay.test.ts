@@ -1,12 +1,10 @@
 import { ethers } from "hardhat";
-import { BigNumber, Contract } from "ethers";
+import { BigNumber } from "ethers";
 const { parseUnits } = ethers.utils;
 
-import { expect } from "chai";
 import { assert } from "../helpers/assertions";
 
 describe.only("VaultDisplay", () => {
-
   let vaultDisplay;
   let shareMath;
 

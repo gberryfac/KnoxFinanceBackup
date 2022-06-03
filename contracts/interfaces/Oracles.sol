@@ -8,11 +8,6 @@ interface AggregatorInterface {
 }
 
 interface IVolatilitySurfaceOracle {
-    function getTimeToMaturity64x64(uint64 maturity)
-        external
-        view
-        returns (int128);
-
     function getAnnualizedVolatility64x64(
         address base,
         address underlying,

@@ -339,7 +339,11 @@ contract StandardDelta is
             option.delta64x64
         );
 
-        option.strike64x64 = Pricer.snapToGrid(option.strike64x64);
+        option.strike64x64 = Pricer.snapToGrid(
+            option.isCall,
+            option.strike64x64
+        );
+
         require(option.strike64x64 > 0, "invalid strike price");
 
         emit NextOptionSet(option.isCall, option.expiry, option.strike64x64);

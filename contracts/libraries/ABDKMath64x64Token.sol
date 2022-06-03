@@ -54,12 +54,11 @@ library ABDKMath64x64Token {
 
     /**
      * @custom:author Yaojin Sun
-     * @notice rounds a positive 64x64 fixed point number to the second highest place value using round up (ceiling)
-     *  method
+     * @notice applies ceiling to the second highest place value of a positive 64x64 number
      * @param x 64x64 fixed point number
      * @return rounded 64x64 fixed point number
      */
-    function roundUp64x64(int128 x) internal pure returns (int128) {
+    function ceil(int128 x) internal pure returns (int128) {
         require(x > 0);
 
         (int256 integer, Value[3] memory values) = _getPositivePlaceValues(x);
@@ -85,8 +84,7 @@ library ABDKMath64x64Token {
 
     /**
      * @custom:author Yaojin Sun
-     * @notice rounds a positive 64x64 fixed point number to the second highest place value using round half to even
-     *  (bankers rounding) method
+     * @notice applies bankers rounding to the second highest place value of a positive 64x64 number
      * @param x 64x64 fixed point number
      * @return rounded 64x64 fixed point number
      */
