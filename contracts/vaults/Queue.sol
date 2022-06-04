@@ -10,7 +10,6 @@ import "@solidstate/contracts/utils/SafeERC20.sol";
 import "./../libraries/Errors.sol";
 
 import "./QueueInternal.sol";
-import "./VaultStorage.sol";
 
 abstract contract Queue is QueueInternal {
     using ERC165Storage for ERC165Storage.Layout;

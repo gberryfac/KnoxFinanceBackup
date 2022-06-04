@@ -9,7 +9,6 @@ import "@solidstate/contracts/utils/SafeERC20.sol";
 import "./../libraries/Errors.sol";
 
 import "./VaultInternal.sol";
-import "./VaultStorage.sol";
 
 import "hardhat/console.sol";
 

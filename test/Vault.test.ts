@@ -1,8 +1,8 @@
 import { ethers, network } from "hardhat";
 import { BigNumber, Contract } from "ethers";
 
-const { getContractFactory, provider } = ethers;
-const { parseUnits, parseEther } = ethers.utils;
+const { provider } = ethers;
+const { parseUnits } = ethers.utils;
 
 import { Vault, Vault__factory } from "./../types";
 
@@ -16,16 +16,7 @@ import * as types from "./helpers/types";
 
 import { assert } from "./helpers/assertions";
 
-import {
-  ADDRESS_ZERO,
-  ADDRESS_ONE,
-  TEST_URI,
-  FEE_SCALING,
-  SECONDS_PER_WEEK,
-  WEEKS_PER_YEAR,
-  BLOCK_NUMBER,
-  NEXT_FRIDAY,
-} from "../constants";
+import { TEST_URI, BLOCK_NUMBER, NEXT_FRIDAY } from "../constants";
 
 const chainId = network.config.chainId;
 
@@ -65,37 +56,37 @@ describe("Vault Unit Tests", () => {
     isCall: true,
   });
 
-  // behavesLikeOptionsVault({
-  //   name: `Knox BTC Delta Vault (Call)`,
-  //   tokenName: `Knox BTC Delta Vault`,
-  //   tokenSymbol: `kBTC-DELTA-C`,
-  //   tokenDecimals: 18,
-  //   asset: assets.BTC,
-  //   pool: assets.PREMIA.WBTC_DAI,
-  //   depositAmount: parseUnits("1", assets.BTC.decimals),
-  //   cap: parseUnits("100", assets.BTC.decimals),
-  //   minimumSupply: BigNumber.from("10").pow("3").toString(),
-  //   minimumContractSize: BigNumber.from("10").pow("7").toString(),
-  //   managementFee: BigNumber.from("2000000"),
-  //   performanceFee: BigNumber.from("20000000"),
-  //   isCall: true,
-  // });
+  behavesLikeOptionsVault({
+    name: `Knox BTC Delta Vault (Call)`,
+    tokenName: `Knox BTC Delta Vault`,
+    tokenSymbol: `kBTC-DELTA-C`,
+    tokenDecimals: 18,
+    asset: assets.BTC,
+    pool: assets.PREMIA.WBTC_DAI,
+    depositAmount: parseUnits("1", assets.BTC.decimals),
+    cap: parseUnits("100", assets.BTC.decimals),
+    minimumSupply: BigNumber.from("10").pow("3").toString(),
+    minimumContractSize: BigNumber.from("10").pow("7").toString(),
+    managementFee: BigNumber.from("2000000"),
+    performanceFee: BigNumber.from("20000000"),
+    isCall: true,
+  });
 
-  // behavesLikeOptionsVault({
-  //   name: `Knox LINK Delta Vault (Call)`,
-  //   tokenName: `Knox LINK Delta Vault`,
-  //   tokenSymbol: `kLINK-DELTA-C`,
-  //   tokenDecimals: 18,
-  //   asset: assets.LINK,
-  //   pool: assets.PREMIA.LINK_DAI,
-  //   depositAmount: parseUnits("100", assets.LINK.decimals),
-  //   cap: parseUnits("100000", assets.LINK.decimals),
-  //   minimumSupply: BigNumber.from("10").pow("10").toString(),
-  //   minimumContractSize: BigNumber.from("10").pow("17").toString(),
-  //   managementFee: BigNumber.from("1000000"),
-  //   performanceFee: BigNumber.from("30000000"),
-  //   isCall: true,
-  // });
+  behavesLikeOptionsVault({
+    name: `Knox LINK Delta Vault (Call)`,
+    tokenName: `Knox LINK Delta Vault`,
+    tokenSymbol: `kLINK-DELTA-C`,
+    tokenDecimals: 18,
+    asset: assets.LINK,
+    pool: assets.PREMIA.LINK_DAI,
+    depositAmount: parseUnits("100", assets.LINK.decimals),
+    cap: parseUnits("100000", assets.LINK.decimals),
+    minimumSupply: BigNumber.from("10").pow("10").toString(),
+    minimumContractSize: BigNumber.from("10").pow("17").toString(),
+    managementFee: BigNumber.from("1000000"),
+    performanceFee: BigNumber.from("30000000"),
+    isCall: true,
+  });
 });
 
 function behavesLikeOptionsVault(params: {
@@ -117,9 +108,6 @@ function behavesLikeOptionsVault(params: {
   let addresses: types.Addresses;
 
   // Contracts
-  let commonLibrary: Contract;
-  let vaultDisplayLibrary: Contract;
-  let vaultLifecycleLibrary: Contract;
   let vaultContract: Vault;
   let assetContract: Contract;
 

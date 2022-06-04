@@ -8,7 +8,6 @@ import "@solidstate/contracts/utils/SafeERC20.sol";
 import "./../libraries/Constants.sol";
 
 import "./Queue.sol";
-import "./VaultStorage.sol";
 
 import "hardhat/console.sol";
 
