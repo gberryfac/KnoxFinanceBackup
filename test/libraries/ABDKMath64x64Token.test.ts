@@ -18,119 +18,234 @@ describe.only("ABDKMath64x64Token", () => {
     instance = await new TestABDKMath64x64Token__factory(signer).deploy();
   });
 
-  describe("#ceil", () => {
+  describe("#ceil64x64", () => {
     it("should revert if x == 0", async () => {
-      await expect(instance.ceil(0)).to.be.reverted;
+      await expect(instance.ceil64x64(0)).to.be.reverted;
     });
     it("should round 1.0 to 1.0", async () => {
       const x = fixedFromFloat("1.0");
       assert.equal(
-        (await instance.ceil(x)).toString(),
+        (await instance.ceil64x64(x)).toString(),
         fixedFromFloat("1.0").toString()
       );
     });
     it("should round 90.0 to 90.0", async () => {
       const x = fixedFromFloat("90.0");
       assert.equal(
-        (await instance.ceil(x)).toString(),
+        (await instance.ceil64x64(x)).toString(),
         fixedFromFloat("90.0").toString()
       );
     });
     it("should round 53510034427 to 54000000000", async () => {
       const x = fixedFromFloat("53510034427");
       assert.equal(
-        (await instance.ceil(x)).toString(),
+        (await instance.ceil64x64(x)).toString(),
         fixedFromFloat("54000000000").toString()
       );
     });
     it("should round 53410034427 to 54000000000", async () => {
       const x = fixedFromFloat("53410034427");
       assert.equal(
-        (await instance.ceil(x)).toString(),
+        (await instance.ceil64x64(x)).toString(),
         fixedFromFloat("54000000000").toString()
       );
     });
     it("should round 24450 to 25000", async () => {
       const x = fixedFromFloat("24450");
       assert.equal(
-        (await instance.ceil(x)).toString(),
+        (await instance.ceil64x64(x)).toString(),
         fixedFromFloat("25000").toString()
       );
     });
     it("should round 9999 to 10000", async () => {
       const x = fixedFromFloat("9999");
       assert.equal(
-        (await instance.ceil(x)).toString(),
+        (await instance.ceil64x64(x)).toString(),
         fixedFromFloat("10000").toString()
       );
     });
     it("should round 8863 to 8900", async () => {
       const x = fixedFromFloat("8863");
       assert.equal(
-        (await instance.ceil(x)).toString(),
+        (await instance.ceil64x64(x)).toString(),
         fixedFromFloat("8900").toString()
       );
     });
     it("should round 521 to 530", async () => {
       const x = fixedFromFloat("521");
       assert.equal(
-        (await instance.ceil(x)).toString(),
+        (await instance.ceil64x64(x)).toString(),
         fixedFromFloat("530").toString()
       );
     });
     it("should round 12.211 to 13", async () => {
       const x = fixedFromFloat("12.211");
       assert.equal(
-        (await instance.ceil(x)).toString(),
+        (await instance.ceil64x64(x)).toString(),
         fixedFromFloat("13").toString()
       );
     });
     it("should round 24.550 to 25", async () => {
       const x = fixedFromFloat("24.550");
       assert.equal(
-        (await instance.ceil(x)).toString(),
+        (await instance.ceil64x64(x)).toString(),
         fixedFromFloat("25").toString()
       );
     });
     it("should round 1.419 to 1.5", async () => {
       const x = fixedFromFloat("1.419");
       assert.equal(
-        (await instance.ceil(x)).toString(),
+        (await instance.ceil64x64(x)).toString(),
         fixedFromFloat("1.5").toString()
       );
     });
     it("should round 9.9994 to 10", async () => {
       const x = fixedFromFloat("9.9994");
       assert.equal(
-        (await instance.ceil(x)).toString(),
+        (await instance.ceil64x64(x)).toString(),
         fixedFromFloat("10").toString()
       );
     });
     it("should round 0.07745 to 0.078", async () => {
       const x = fixedFromFloat("0.07745");
       assert.equal(
-        (await instance.ceil(x)).toString(),
+        (await instance.ceil64x64(x)).toString(),
         fixedFromFloat("0.078").toString()
       );
     });
     it("should round 0.00994 to 0.01", async () => {
       const x = fixedFromFloat("0.00994");
       assert.equal(
-        (await instance.ceil(x)).toString(),
+        (await instance.ceil64x64(x)).toString(),
         fixedFromFloat("0.01").toString()
       );
     });
     it("should round 0.0000068841 to 0.0000069", async () => {
       const x = fixedFromFloat("0.0000068841");
       assert.equal(
-        (await instance.ceil(x)).toString(),
+        (await instance.ceil64x64(x)).toString(),
         fixedFromFloat("0.0000069").toString()
       );
     });
     it("should round 45 to 45", async () => {
       const x = fixedFromFloat("45");
       assert.equal(
-        (await instance.ceil(x)).toString(),
+        (await instance.ceil64x64(x)).toString(),
+        fixedFromFloat("45").toString()
+      );
+    });
+  });
+
+  describe("#floor64x64", () => {
+    it("should round 1.0 to 1.0", async () => {
+      const x = fixedFromFloat("1.0");
+      assert.equal(
+        (await instance.floor64x64(x)).toString(),
+        fixedFromFloat("1.0").toString()
+      );
+    });
+    it("should round 90.0 to 90.0", async () => {
+      const x = fixedFromFloat("90.0");
+      assert.equal(
+        (await instance.floor64x64(x)).toString(),
+        fixedFromFloat("90.0").toString()
+      );
+    });
+    it("should round 53510034427 to 53000000000", async () => {
+      const x = fixedFromFloat("53510034427");
+      assert.equal(
+        (await instance.floor64x64(x)).toString(),
+        fixedFromFloat("53000000000").toString()
+      );
+    });
+    it("should round 53410034427 to 53000000000", async () => {
+      const x = fixedFromFloat("53410034427");
+      assert.equal(
+        (await instance.floor64x64(x)).toString(),
+        fixedFromFloat("53000000000").toString()
+      );
+    });
+    it("should round 24450 to 24000", async () => {
+      const x = fixedFromFloat("24450");
+      assert.equal(
+        (await instance.floor64x64(x)).toString(),
+        fixedFromFloat("24000").toString()
+      );
+    });
+    it("should round 9999 to 9900", async () => {
+      const x = fixedFromFloat("9999");
+      assert.equal(
+        (await instance.floor64x64(x)).toString(),
+        fixedFromFloat("9900").toString()
+      );
+    });
+    it("should round 8863 to 8800", async () => {
+      const x = fixedFromFloat("8863");
+      assert.equal(
+        (await instance.floor64x64(x)).toString(),
+        fixedFromFloat("8800").toString()
+      );
+    });
+    it("should round 521 to 520", async () => {
+      const x = fixedFromFloat("521");
+      assert.equal(
+        (await instance.floor64x64(x)).toString(),
+        fixedFromFloat("520").toString()
+      );
+    });
+    it("should round 12.211 to 12", async () => {
+      const x = fixedFromFloat("12.211");
+      assert.equal(
+        (await instance.floor64x64(x)).toString(),
+        fixedFromFloat("12").toString()
+      );
+    });
+    it("should round 24.550 to 25", async () => {
+      const x = fixedFromFloat("24.550");
+      assert.equal(
+        (await instance.floor64x64(x)).toString(),
+        fixedFromFloat("24").toString()
+      );
+    });
+    it("should round 1.419 to 1.4", async () => {
+      const x = fixedFromFloat("1.419");
+      assert.equal(
+        (await instance.floor64x64(x)).toString(),
+        fixedFromFloat("1.4").toString()
+      );
+    });
+    it("should round 9.9994 to 9.9", async () => {
+      const x = fixedFromFloat("9.9994");
+      assert.equal(
+        (await instance.floor64x64(x)).toString(),
+        fixedFromFloat("9.9").toString()
+      );
+    });
+    it("should round 0.07745 to 0.077", async () => {
+      const x = fixedFromFloat("0.07745");
+      assert.equal(
+        (await instance.floor64x64(x)).toString(),
+        fixedFromFloat("0.077").toString()
+      );
+    });
+    it("should round 0.00994 to 0.0099", async () => {
+      const x = fixedFromFloat("0.00994");
+      assert.equal(
+        (await instance.floor64x64(x)).toString(),
+        fixedFromFloat("0.0099").toString()
+      );
+    });
+    it("should round 0.0000068841 to 0.0000068", async () => {
+      const x = fixedFromFloat("0.0000068841");
+      assert.equal(
+        (await instance.floor64x64(x)).toString(),
+        fixedFromFloat("0.0000068").toString()
+      );
+    });
+    it("should round 45 to 45", async () => {
+      const x = fixedFromFloat("45");
+      assert.equal(
+        (await instance.floor64x64(x)).toString(),
         fixedFromFloat("45").toString()
       );
     });

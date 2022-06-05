@@ -54,16 +54,16 @@ library ABDKMath64x64Token {
 
     /**
      * @custom:author Yaojin Sun
-     * @notice applies ceiling to the second highest place value of a positive 64x64 number
+     * @notice applies ceiling to the second highest place value of a positive 64x64 fixed point number
      * @param x 64x64 fixed point number
      * @return rounded 64x64 fixed point number
      */
-    function ceil(int128 x) internal pure returns (int128) {
+    function ceil64x64(int128 x) internal pure returns (int128) {
         require(x > 0);
 
         (int256 integer, Value[3] memory values) = _getPositivePlaceValues(x);
 
-        // if the summation of values[0] and values[1] is equal to integer, the integer has already been rounded
+        // if the summation of first and second values is equal to integer, the integer has already been rounded
         if (
             values[0].ruler *
                 values[0].value +
@@ -84,7 +84,26 @@ library ABDKMath64x64Token {
 
     /**
      * @custom:author Yaojin Sun
-     * @notice applies bankers rounding to the second highest place value of a positive 64x64 number
+     * @notice applies floor to the second highest place value of a positive 64x64 fixed point number
+     * @param x 64x64 fixed point number
+     * @return rounded 64x64 fixed point number
+     */
+    function floor64x64(int128 x) internal pure returns (int128) {
+        require(x > 0);
+
+        (, Value[3] memory values) = _getPositivePlaceValues(x);
+
+        // No matter whether third value is non-zero or not, we ONLY need to keep the first and second places.
+        int256 res =
+            (values[0].ruler * values[0].value) +
+                (values[1].ruler * values[1].value);
+        return int128((res << 64) / 10000000000000000000);
+    }
+
+    /**
+     * @custom:author Yaojin Sun
+     * @notice applies bankers rounding to the second highest place value of a positive 64x64 fixed
+     * point number
      * @param x 64x64 fixed point number
      * @return rounded 64x64 fixed point number
      */
@@ -93,7 +112,7 @@ library ABDKMath64x64Token {
 
         (int256 integer, Value[3] memory values) = _getPositivePlaceValues(x);
 
-        // if the summation of values[0] and values[1] is equal to integer, the integer has already been rounded
+        // if the summation of first and second values is equal to integer, the integer has already been rounded
         if (
             values[0].ruler *
                 values[0].value +

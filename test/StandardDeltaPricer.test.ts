@@ -232,7 +232,7 @@ describe.only("Standard Delta Pricer Unit Tests", () => {
   describe("#snapToGrid", () => {
     time.revertToSnapshotAfterEach(async () => {});
 
-    it("should not round if n is already rounded", async () => {
+    it("should not round if already round", async () => {
       const n = fixedFromFloat(4500);
       const answer = 4500;
       assert.equal(
@@ -241,47 +241,20 @@ describe.only("Standard Delta Pricer Unit Tests", () => {
       );
     });
 
-    it("should round up to the nearest 100", async () => {
-      const n = fixedFromFloat(4501);
-      const answer = 4600;
+    it("should round up if call option", async () => {
+      const n = fixedFromFloat(4401);
+      const answer = 4500;
       assert.equal(
         fixedToNumber(await standardDeltaPricer.snapToGrid(true, n)),
         answer
       );
     });
 
-    it("should round up to the nearest 100", async () => {
-      const n = fixedFromFloat(4549);
-      const answer = 4600;
+    it("should round down if put option", async () => {
+      const n = fixedFromFloat(4599);
+      const answer = 4500;
       assert.equal(
-        fixedToNumber(await standardDeltaPricer.snapToGrid(true, n)),
-        answer
-      );
-    });
-
-    it("should round up to the nearest 100", async () => {
-      const n = fixedFromFloat(4550);
-      const answer = 4600;
-      assert.equal(
-        fixedToNumber(await standardDeltaPricer.snapToGrid(true, n)),
-        answer
-      );
-    });
-
-    it("should round up to the nearest 100", async () => {
-      const n = fixedFromFloat(4551);
-      const answer = 4600;
-      assert.equal(
-        fixedToNumber(await standardDeltaPricer.snapToGrid(true, n)),
-        answer
-      );
-    });
-
-    it("should round up to the nearest 10000", async () => {
-      const n = fixedFromFloat(455699);
-      const answer = 460000;
-      assert.equal(
-        fixedToNumber(await standardDeltaPricer.snapToGrid(true, n)),
+        fixedToNumber(await standardDeltaPricer.snapToGrid(false, n)),
         answer
       );
     });

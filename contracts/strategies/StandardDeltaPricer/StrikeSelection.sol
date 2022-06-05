@@ -110,7 +110,6 @@ contract StrikeSelection is IStrikeSelection, StandardDeltaPricerStorage {
     }
 
     function _snapToGrid(bool isCall, int128 n) internal pure returns (int128) {
-        // TODO: Replace 1 with floor()
-        return isCall ? n.ceil() : int128(1);
+        return isCall ? n.ceil64x64() : n.floor64x64();
     }
 }
