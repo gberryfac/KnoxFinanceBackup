@@ -1,26 +1,34 @@
 import { ethers } from "hardhat";
-import { Contract } from "ethers";
+const { BigNumber, provider } = ethers;
 
-import moment from "moment-timezone";
+import {
+  Helpers,
+  TestHelpers,
+  Helpers__factory,
+  TestHelpers__factory,
+} from "./../../types";
 
 import { assert } from "../helpers/assertions";
 import * as time from "../helpers/time";
 
+import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
+
+import moment from "moment-timezone";
 moment.tz.setDefault("UTC");
 
-const provider = ethers.provider;
-
-describe.only("Common", () => {
-  let common: Contract;
+describe.only("Helpers", () => {
+  let helpers: Helpers;
+  let instance: TestHelpers;
+  let signer: SignerWithAddress;
 
   before(async () => {
-    const Common = await ethers.getContractFactory("Common");
-    const commonLibrary = await Common.deploy();
+    [signer] = await ethers.getSigners();
 
-    const TestCommon = await ethers.getContractFactory("TestCommon", {
-      libraries: { Common: commonLibrary.address },
-    });
-    common = await TestCommon.deploy();
+    helpers = await new Helpers__factory(signer).deploy();
+    instance = await new TestHelpers__factory(
+      { "contracts/libraries/Helpers.sol:Helpers": helpers.address },
+      signer
+    ).deploy();
   });
 
   describe("#getNextFriday", () => {
@@ -51,8 +59,8 @@ describe.only("Common", () => {
         .day("friday")
         .hour(8); // needs to be 8am UTC
 
-      const nextFriday = await common.getNextFriday(saturday.unix());
-      const fridayDate = moment.unix(nextFriday);
+      const nextFriday = await instance.getNextFriday(saturday.unix());
+      const fridayDate = moment.unix(nextFriday.toNumber());
       assert.equal(fridayDate.weekday(), 5);
 
       assert.isTrue(fridayDate.isSame(expectedFriday));
@@ -71,8 +79,8 @@ describe.only("Common", () => {
         .day("friday")
         .hour(8); // needs to be 8am UTC
 
-      const nextFriday = await common.getNextFriday(sunday.unix());
-      const fridayDate = moment.unix(nextFriday);
+      const nextFriday = await instance.getNextFriday(sunday.unix());
+      const fridayDate = moment.unix(nextFriday.toNumber());
       assert.equal(fridayDate.weekday(), 5);
 
       assert.isTrue(fridayDate.isSame(expectedFriday));
@@ -90,8 +98,8 @@ describe.only("Common", () => {
         .day("friday")
         .hour(8); // needs to be 8am UTC
 
-      const nextFriday = await common.getNextFriday(thursday.unix());
-      const fridayDate = moment.unix(nextFriday);
+      const nextFriday = await instance.getNextFriday(thursday.unix());
+      const fridayDate = moment.unix(nextFriday.toNumber());
       assert.equal(fridayDate.weekday(), 5);
 
       assert.isTrue(fridayDate.isSame(expectedFriday));
@@ -109,8 +117,8 @@ describe.only("Common", () => {
         .day("friday")
         .hour(8); // needs to be 8am UTC
 
-      const nextFriday = await common.getNextFriday(thisFriday.unix());
-      const fridayDate = moment.unix(nextFriday);
+      const nextFriday = await instance.getNextFriday(thisFriday.unix());
+      const fridayDate = moment.unix(nextFriday.toNumber());
       assert.equal(fridayDate.weekday(), 5);
 
       assert.isTrue(fridayDate.isSame(expectedFriday));
@@ -128,8 +136,8 @@ describe.only("Common", () => {
         .day("friday")
         .hour(8); // needs to be 8am UTC
 
-      const nextFriday = await common.getNextFriday(thisFriday.unix());
-      const fridayDate = moment.unix(nextFriday);
+      const nextFriday = await instance.getNextFriday(thisFriday.unix());
+      const fridayDate = moment.unix(nextFriday.toNumber());
       assert.equal(fridayDate.weekday(), 5);
       assert.isTrue(fridayDate.isSame(expectedFriday));
     });

@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "./../libraries/Common.sol";
+import "./../libraries/Helpers.sol";
 
-contract TestCommon {
+contract TestHelpers {
     function getNextFriday(uint256 currentExpiry)
         external
         pure
         returns (uint256 nextFriday)
     {
-        return Common.getNextFriday(currentExpiry);
+        return Helpers.getNextFriday(currentExpiry);
     }
 }

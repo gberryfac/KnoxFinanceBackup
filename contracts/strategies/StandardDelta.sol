@@ -11,7 +11,7 @@ import {IPremiaPool, PoolStorage} from "./../interfaces/IPremiaPool.sol";
 import "./../interfaces/IStandardDelta.sol";
 import "./../interfaces/IStandardDeltaPricer.sol";
 
-import "./../libraries/Common.sol";
+import "./../libraries/Helpers.sol";
 import "./../libraries/Constants.sol";
 import "./../libraries/Errors.sol";
 
@@ -374,7 +374,7 @@ contract StandardDelta is
      ***********************************************/
 
     function _getNextFriday() internal view returns (uint64) {
-        return uint64(Common.getNextFriday(block.timestamp));
+        return uint64(Helpers.getNextFriday(block.timestamp));
     }
 
     /**

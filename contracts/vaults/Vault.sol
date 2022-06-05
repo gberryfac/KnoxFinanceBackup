@@ -15,7 +15,7 @@ import "abdk-libraries-solidity/ABDKMath64x64.sol";
 import "./../interfaces/IVault.sol";
 import "./../interfaces/IWETH.sol";
 
-import "./../libraries/Common.sol";
+import "./../libraries/Helpers.sol";
 import "./../libraries/Constants.sol";
 import "./../libraries/Errors.sol";
 import "./../libraries/ShareMath.sol";
@@ -367,7 +367,7 @@ contract Vault is
 
         emit InstantWithdraw(msg.sender, amount, currentRound);
 
-        Common.transferAsset(msg.sender, vaultParams.asset, weth, amount);
+        Helpers.transferAsset(msg.sender, vaultParams.asset, weth, amount);
     }
 
     /**
@@ -454,7 +454,7 @@ contract Vault is
 
         require(withdrawAmount > 0, Errors.WITHDRAWAL_AMOUNT_EXCEEDS_MINIMUM);
 
-        Common.transferAsset(
+        Helpers.transferAsset(
             msg.sender,
             vaultParams.asset,
             weth,
@@ -655,7 +655,7 @@ contract Vault is
         _mint(address(this), mintShares);
 
         if (totalVaultFee > 0) {
-            Common.transferAsset(
+            Helpers.transferAsset(
                 payable(recipient),
                 vaultParams.asset,
                 weth,

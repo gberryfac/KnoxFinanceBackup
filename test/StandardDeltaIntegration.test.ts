@@ -166,7 +166,7 @@ function behavesLikeOptionsVault(params: {
   // Contracts
   let keeperContract: Contract;
   let oracleContract: Contract;
-  let commonLibrary: Contract;
+  let helpersLibrary: Contract;
   let vaultDisplayLibrary: Contract;
   let vaultLifecycleLibrary: Contract;
   let vaultContract: Contract;
@@ -216,7 +216,7 @@ function behavesLikeOptionsVault(params: {
         params.spotOracle
       );
 
-      commonLibrary = await getContractFactory("Common").then((contract) =>
+      helpersLibrary = await getContractFactory("Helpers").then((contract) =>
         contract.deploy()
       );
 
@@ -228,7 +228,7 @@ function behavesLikeOptionsVault(params: {
         (contract) => contract.deploy()
       );
 
-      addresses.common = commonLibrary.address;
+      addresses.common = helpersLibrary.address;
       addresses.vaultDisplay = vaultDisplayLibrary.address;
       addresses.vaultLifecycle = vaultLifecycleLibrary.address;
 
@@ -245,7 +245,7 @@ function behavesLikeOptionsVault(params: {
       strategyContract = await getContractFactory("StandardDelta", {
         signer: signers.owner,
         libraries: {
-          Common: addresses.common,
+          Helpers: addresses.common,
         },
       }).then((contract) => contract.deploy());
 

@@ -188,7 +188,7 @@ function behavesLikeOptionsVault(params: {
   // TODO: Remove global variables---------
 
   // Contracts
-  let commonLibrary: Contract;
+  let helpersLibrary: Contract;
   let vaultDisplayLibrary: Contract;
   let vaultLifecycleLibrary: Contract;
   let vaultContract: Contract;
@@ -228,7 +228,7 @@ function behavesLikeOptionsVault(params: {
       signers.strategy = signers.user3;
       addresses.strategy = addresses.user3;
 
-      commonLibrary = await getContractFactory("Common").then((contract) =>
+      helpersLibrary = await getContractFactory("Helpers").then((contract) =>
         contract.deploy()
       );
 
@@ -240,7 +240,7 @@ function behavesLikeOptionsVault(params: {
         (contract) => contract.deploy()
       );
 
-      addresses.common = commonLibrary.address;
+      addresses.common = helpersLibrary.address;
       addresses.vaultDisplay = vaultDisplayLibrary.address;
       addresses.vaultLifecycle = vaultLifecycleLibrary.address;
 
@@ -271,7 +271,7 @@ function behavesLikeOptionsVault(params: {
       time.revertToSnapshotAfterEach(async () => {
         const Vault = await getContractFactory("Vault", {
           libraries: {
-            Common: addresses.common,
+            Helpers: addresses.common,
             VaultDisplay: addresses.vaultDisplay,
             VaultLifecycle: addresses.vaultLifecycle,
           },
