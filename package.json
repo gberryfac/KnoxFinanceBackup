@@ -12,7 +12,8 @@
     "prettier:sol": "npx prettier --write \"contracts/**/*.sol\"",
     "prettier:all": "npm run prettier:ts && npm run prettier:sol",
     "coverage": "rm -rf ./coverage.json ./coverage/ && npx hardhat coverage || exit 0",
-    "sizer": "npx hardhat size-contracts"
+    "sizer": "npx hardhat size-contracts",
+    "typechain": "npx hardhat clean && npx hardhat typechain"
   },
   "license": "MIT",
   "devDependencies": {
@@ -59,8 +60,5 @@
   "lint-staged": {
     "*.ts": "npm run lint:ts",
     "*.sol": "npm run lint:sol"
-  },
-  "mocha": {
-    "timeout": 20000
   }
 }

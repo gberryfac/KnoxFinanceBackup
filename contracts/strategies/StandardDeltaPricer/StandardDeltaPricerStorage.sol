@@ -9,8 +9,6 @@ import {
 import "./StandardDeltaPricerSchema.sol";
 
 contract StandardDeltaPricerStorage {
-    uint64 public sFactor;
-
     AggregatorInterface public BaseSpotOracle;
     AggregatorInterface public UnderlyingSpotOracle;
 

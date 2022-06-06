@@ -11,14 +11,8 @@ import "./StandardDeltaPricer/StrikeSelection.sol";
 import "hardhat/console.sol";
 
 contract StandardDeltaPricer is StandardDeltaPricerStorage, StrikeSelection {
-    constructor(
-        uint64 _sFactor,
-        address _pool,
-        address _volatilityOracle
-    ) {
+    constructor(address _pool, address _volatilityOracle) {
         require(_pool != address(0), Errors.ADDRESS_NOT_PROVIDED);
-        require(_sFactor > 0, "sFactor <= 0");
-        require(_sFactor % 10 == 0, "not divisible by 10");
         require(_volatilityOracle != address(0), Errors.ADDRESS_NOT_PROVIDED);
 
         IVolOracle = IVolatilitySurfaceOracle(_volatilityOracle);
@@ -38,7 +32,5 @@ contract StandardDeltaPricer is StandardDeltaPricerStorage, StrikeSelection {
             BaseSpotOracle.decimals() == decimals,
             "oracle decimals must match"
         );
-
-        sFactor = _sFactor;
     }
 }

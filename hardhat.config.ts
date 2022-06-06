@@ -86,7 +86,7 @@ const config: HardhatUserConfig = {
     },
   },
   mocha: {
-    timeout: 500000,
+    timeout: 20000,
   },
   typechain: {
     outDir: "./types",

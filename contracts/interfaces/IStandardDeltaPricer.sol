@@ -9,10 +9,11 @@ interface IStrikeSelection {
         view
         returns (int128);
 
-    function getAnnualizedVolatilityATM64x64(int128 tau64x64, int128 spot64x64)
-        external
-        view
-        returns (int128);
+    function getAnnualizedVolatilityATM64x64(
+        int128 tau64x64,
+        int128 spot64x64,
+        int128 strike64x64
+    ) external view returns (int128);
 
     function getDeltaStrikePrice64x64(
         bool isCall,
@@ -20,7 +21,7 @@ interface IStrikeSelection {
         int128 delta64x64
     ) external view returns (int128);
 
-    function snapToGrid(int128 n) external view returns (int128);
+    function snapToGrid(bool isCall, int128 n) external view returns (int128);
 }
 
 interface IStandardDeltaPricer is IStrikeSelection {}
