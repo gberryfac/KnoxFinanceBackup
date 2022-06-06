@@ -2,8 +2,8 @@
   "scripts": {
     "prepare": "npx husky install",
     "test": "npm run test:arb",
-    "test:eth": "CHAINID=1 npx hardhat test test/*.ts",
-    "test:arb": "CHAINID=42161 npx hardhat test test/*.ts",
+    "test:eth": "CHAINID=1 npx hardhat test",
+    "test:arb": "CHAINID=42161 npx hardhat test",
     "lint-staged": "npx lint-staged",
     "lint:ts": "npx eslint '**/*.ts'",
     "lint:sol": "npx solhint -f table contracts/**/*.sol",
