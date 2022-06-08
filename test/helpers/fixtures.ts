@@ -2,7 +2,7 @@ import { ethers, network } from "hardhat";
 import { BigNumber, Contract } from "ethers";
 
 const { getContractAt } = ethers;
-const { parseUnits, parseEther } = ethers.utils;
+const { parseEther } = ethers.utils;
 
 import * as utils from "./utils";
 import * as types from "./types";
@@ -134,7 +134,7 @@ export async function getVaultFixture(
       [WETH_ADDRESS[chainId]],
       {
         libraries: {
-          Common: addresses.commonLogic,
+          Helpers: addresses.common,
           VaultDisplay: addresses.vaultDisplay,
           VaultLifecycle: addresses.vaultLifecycle,
         },

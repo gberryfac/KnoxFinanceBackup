@@ -188,13 +188,13 @@ function behavesLikeOptionsVault(params: {
   // TODO: Remove global variables---------
 
   // Contracts
-  let commonLogicLibrary: Contract;
+  let helpersLibrary: Contract;
   let vaultDisplayLibrary: Contract;
   let vaultLifecycleLibrary: Contract;
   let vaultContract: Contract;
   let assetContract: Contract;
 
-  describe.only(`${params.name}`, () => {
+  describe.only(params.name, () => {
     let initSnapshotId: string;
 
     before(async () => {
@@ -228,7 +228,7 @@ function behavesLikeOptionsVault(params: {
       signers.strategy = signers.user3;
       addresses.strategy = addresses.user3;
 
-      commonLogicLibrary = await getContractFactory("Common").then((contract) =>
+      helpersLibrary = await getContractFactory("Helpers").then((contract) =>
         contract.deploy()
       );
 
@@ -240,7 +240,7 @@ function behavesLikeOptionsVault(params: {
         (contract) => contract.deploy()
       );
 
-      addresses.commonLogic = commonLogicLibrary.address;
+      addresses.common = helpersLibrary.address;
       addresses.vaultDisplay = vaultDisplayLibrary.address;
       addresses.vaultLifecycle = vaultLifecycleLibrary.address;
 
@@ -271,7 +271,7 @@ function behavesLikeOptionsVault(params: {
       time.revertToSnapshotAfterEach(async () => {
         const Vault = await getContractFactory("Vault", {
           libraries: {
-            Common: addresses.commonLogic,
+            Helpers: addresses.common,
             VaultDisplay: addresses.vaultDisplay,
             VaultLifecycle: addresses.vaultLifecycle,
           },
@@ -451,7 +451,10 @@ function behavesLikeOptionsVault(params: {
 
       it("should return the vault's asset", async () => {
         const { asset: vaultAsset } = await vaultContract.vaultParams();
-        const syncAsset = await vaultContract.connect(signers.strategy).callStatic.sync(0);
+        const syncAsset = await vaultContract
+          .connect(signers.strategy)
+          .callStatic.sync(0);
+
         assert.equal(syncAsset, vaultAsset);
       });
     });

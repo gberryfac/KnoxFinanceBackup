@@ -1,32 +1,27 @@
 import { ethers } from "hardhat";
-import { BigNumber, Contract } from "ethers";
+import { BigNumber } from "ethers";
 const { parseUnits } = ethers.utils;
 
-import { expect } from "chai";
 import { assert } from "../helpers/assertions";
 
-
 describe.only("VaultDisplay", () => {
-
   let vaultDisplay;
   let shareMath;
 
   before(async () => {
+    shareMath = await ethers
+      .getContractFactory("TestShareMath")
+      .then((contract) => contract.deploy());
 
-    shareMath = await ethers.getContractFactory("TestShareMath").then((contract) =>
-      contract.deploy()
-    );
+    const displayLib = await ethers
+      .getContractFactory("VaultDisplay")
+      .then((contract) => contract.deploy());
 
-    const displayLib = await ethers.getContractFactory("VaultDisplay").then((contract) =>
-      contract.deploy()
-    );
-
-    vaultDisplay = await ethers.getContractFactory(
-      "TestVaultDisplay",
-      { libraries: { VaultDisplay: displayLib.address } }
-    ).then((contract) =>
-      contract.deploy()
-    );
+    vaultDisplay = await ethers
+      .getContractFactory("TestVaultDisplay", {
+        libraries: { VaultDisplay: displayLib.address },
+      })
+      .then((contract) => contract.deploy());
   });
 
   describe("#lpShareBalances", () => {

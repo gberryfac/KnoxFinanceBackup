@@ -166,15 +166,16 @@ function behavesLikeOptionsVault(params: {
   // Contracts
   let keeperContract: Contract;
   let oracleContract: Contract;
-  let commonLogicLibrary: Contract;
+  let helpersLibrary: Contract;
   let vaultDisplayLibrary: Contract;
   let vaultLifecycleLibrary: Contract;
   let vaultContract: Contract;
   let assetContract: Contract;
   let poolContract: Contract;
   let strategyContract: Contract;
+  let pricerContract: Contract;
 
-  describe.only(`${params.name}`, () => {
+  describe.only(params.name, () => {
     let initSnapshotId: string;
 
     before(async () => {
@@ -215,7 +216,7 @@ function behavesLikeOptionsVault(params: {
         params.spotOracle
       );
 
-      commonLogicLibrary = await getContractFactory("Common").then((contract) =>
+      helpersLibrary = await getContractFactory("Helpers").then((contract) =>
         contract.deploy()
       );
 
@@ -227,14 +228,24 @@ function behavesLikeOptionsVault(params: {
         (contract) => contract.deploy()
       );
 
-      addresses.commonLogic = commonLogicLibrary.address;
+      addresses.common = helpersLibrary.address;
       addresses.vaultDisplay = vaultDisplayLibrary.address;
       addresses.vaultLifecycle = vaultLifecycleLibrary.address;
+
+      pricerContract = await getContractFactory("StandardDeltaPricer").then(
+        (contract) =>
+          contract.deploy(
+            params.pool,
+            PREMIA_VOLATILITY_SURFACE_ORACLE[chainId]
+          )
+      );
+
+      addresses.pricer = pricerContract.address;
 
       strategyContract = await getContractFactory("StandardDelta", {
         signer: signers.owner,
         libraries: {
-          Common: addresses.commonLogic,
+          Helpers: addresses.common,
         },
       }).then((contract) => contract.deploy());
 
@@ -263,8 +274,8 @@ function behavesLikeOptionsVault(params: {
         fixedFromFloat(0.5),
         addresses.keeper,
         addresses.pool,
-        addresses.vault,
-        addresses.volatilityOracle
+        addresses.pricer,
+        addresses.vault
       );
 
       strategyContract = await strategyContract.connect(signers.whale);
@@ -283,11 +294,6 @@ function behavesLikeOptionsVault(params: {
         assert.equal(await strategyContract.keeper(), addresses.keeper);
         assert.equal(await strategyContract.Pool(), addresses.pool);
         assert.equal(await strategyContract.Vault(), addresses.vault);
-
-        const { spot, volatility } = await strategyContract.oracles();
-
-        assert.equal(spot, params.spotOracle);
-        assert.equal(volatility, PREMIA_VOLATILITY_SURFACE_ORACLE[chainId]);
 
         // Check Option
         const { isCall, minimumContractSize, expiry, delta64x64, strike64x64 } =

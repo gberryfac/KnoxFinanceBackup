@@ -17,11 +17,13 @@ import { assert } from "./helpers/assertions";
 
 import {
   ADDRESS_ZERO,
-  ADDRESS_ONE,
   TEST_URI,
   DAI_WHALE_ADDRESS,
   WBTC_WHALE_ADDRESS,
   LINK_WHALE_ADDRESS,
+  WETH_DAI_POOL,
+  WBTC_DAI_POOL,
+  LINK_DAI_POOL,
   BLOCK_NUMBER,
   WETH_ADDRESS,
   WETH_DECIMALS,
@@ -51,6 +53,7 @@ describe("Standard Delta Strategy Unit Tests", () => {
     tokenName: `Knox ETH Delta Vault`,
     tokenSymbol: `kETH-DELTA-P`,
     tokenDecimals: 18,
+    pool: WETH_DAI_POOL[chainId],
     spotOracle: DAI_PRICE_ORACLE[chainId],
     asset: DAI_ADDRESS[chainId],
     depositAssetDecimals: DAI_DECIMALS,
@@ -58,6 +61,8 @@ describe("Standard Delta Strategy Unit Tests", () => {
     underlying: WETH_ADDRESS[chainId],
     baseDecimals: DAI_DECIMALS,
     underlyingDecimals: WETH_DECIMALS,
+    baseSpotOracle: DAI_PRICE_ORACLE[chainId],
+    underlyingSpotOracle: ETH_PRICE_ORACLE[chainId],
     depositAmount: parseUnits("1000", DAI_DECIMALS),
     cap: parseUnits("5000000", DAI_DECIMALS),
     minimumSupply: BigNumber.from("10").pow("3").toString(),
@@ -73,6 +78,7 @@ describe("Standard Delta Strategy Unit Tests", () => {
     tokenName: `Knox ETH Delta Vault`,
     tokenSymbol: `kETH-DELTA-C`,
     tokenDecimals: 18,
+    pool: WETH_DAI_POOL[chainId],
     spotOracle: ETH_PRICE_ORACLE[chainId],
     asset: WETH_ADDRESS[chainId],
     depositAssetDecimals: WETH_DECIMALS,
@@ -80,6 +86,8 @@ describe("Standard Delta Strategy Unit Tests", () => {
     underlying: WETH_ADDRESS[chainId],
     baseDecimals: DAI_DECIMALS,
     underlyingDecimals: WETH_DECIMALS,
+    baseSpotOracle: DAI_PRICE_ORACLE[chainId],
+    underlyingSpotOracle: ETH_PRICE_ORACLE[chainId],
     depositAmount: parseUnits("1", WETH_DECIMALS),
     cap: parseUnits("1000", WETH_DECIMALS),
     minimumSupply: BigNumber.from("10").pow("10").toString(),
@@ -95,6 +103,7 @@ describe("Standard Delta Strategy Unit Tests", () => {
     tokenName: `Knox BTC Delta Vault`,
     tokenSymbol: `kBTC-DELTA-C`,
     tokenDecimals: 18,
+    pool: WBTC_DAI_POOL[chainId],
     spotOracle: BTC_PRICE_ORACLE[chainId],
     asset: WBTC_ADDRESS[chainId],
     depositAssetDecimals: WBTC_DECIMALS,
@@ -102,6 +111,8 @@ describe("Standard Delta Strategy Unit Tests", () => {
     underlying: WBTC_ADDRESS[chainId],
     baseDecimals: DAI_DECIMALS,
     underlyingDecimals: WBTC_DECIMALS,
+    baseSpotOracle: DAI_PRICE_ORACLE[chainId],
+    underlyingSpotOracle: BTC_PRICE_ORACLE[chainId],
     depositAmount: parseUnits("0.1", WBTC_DECIMALS),
     cap: parseUnits("100", WBTC_DECIMALS),
     minimumSupply: BigNumber.from("10").pow("3").toString(),
@@ -117,6 +128,7 @@ describe("Standard Delta Strategy Unit Tests", () => {
     tokenName: `Knox LINK Delta Vault`,
     tokenSymbol: `kLINK-DELTA-C`,
     tokenDecimals: 18,
+    pool: LINK_DAI_POOL[chainId],
     spotOracle: LINK_PRICE_ORACLE[chainId],
     asset: LINK_ADDRESS[chainId],
     depositAssetDecimals: LINK_DECIMALS,
@@ -124,6 +136,8 @@ describe("Standard Delta Strategy Unit Tests", () => {
     underlying: LINK_ADDRESS[chainId],
     baseDecimals: DAI_DECIMALS,
     underlyingDecimals: LINK_DECIMALS,
+    baseSpotOracle: DAI_PRICE_ORACLE[chainId],
+    underlyingSpotOracle: LINK_PRICE_ORACLE[chainId],
     depositAmount: parseUnits("100", LINK_DECIMALS),
     cap: parseUnits("100000", LINK_DECIMALS),
     minimumSupply: BigNumber.from("10").pow("10").toString(),
@@ -140,6 +154,7 @@ function behavesLikeOptionsVault(params: {
   tokenName: string;
   tokenSymbol: string;
   tokenDecimals: number;
+  pool: string;
   spotOracle: string;
   asset: string;
   depositAssetDecimals: number;
@@ -147,6 +162,8 @@ function behavesLikeOptionsVault(params: {
   underlying: string;
   baseDecimals: number;
   underlyingDecimals: number;
+  baseSpotOracle: string;
+  underlyingSpotOracle: string;
   depositAmount: BigNumber;
   cap: BigNumber;
   minimumSupply: string;
@@ -159,14 +176,13 @@ function behavesLikeOptionsVault(params: {
   let addresses: types.Addresses;
 
   // Contracts
-  let commonLogicLibrary: Contract;
-  let vaultDisplayLibrary: Contract;
-  let vaultLifecycleLibrary: Contract;
+  let helpersLibrary: Contract;
   let premiaPool: Contract;
   let vaultContract: Contract;
   let strategyContract: Contract;
+  let pricerContract: Contract;
 
-  describe.only(`${params.name}`, () => {
+  describe.only(params.name, () => {
     let initSnapshotId: string;
 
     before(async () => {
@@ -203,38 +219,38 @@ function behavesLikeOptionsVault(params: {
         contract.deploy(
           params.underlying,
           params.base,
-          ADDRESS_ONE,
-          ADDRESS_ONE
+          params.underlyingSpotOracle,
+          params.baseSpotOracle
         )
       );
 
       addresses.pool = premiaPool.address;
 
-      commonLogicLibrary = await getContractFactory("Common").then((contract) =>
+      helpersLibrary = await getContractFactory("Helpers").then((contract) =>
         contract.deploy()
-      );
-
-      vaultDisplayLibrary = await getContractFactory("VaultDisplay").then(
-        (contract) => contract.deploy()
-      );
-
-      vaultLifecycleLibrary = await getContractFactory("VaultLifecycle").then(
-        (contract) => contract.deploy()
       );
 
       vaultContract = await getContractFactory("MockVault").then((contract) =>
         contract.deploy(params.asset)
       );
 
-      addresses.commonLogic = commonLogicLibrary.address;
-      addresses.vaultDisplay = vaultDisplayLibrary.address;
-      addresses.vaultLifecycle = vaultLifecycleLibrary.address;
+      addresses.common = helpersLibrary.address;
       addresses.vault = vaultContract.address;
+
+      pricerContract = await getContractFactory("StandardDeltaPricer").then(
+        (contract) =>
+          contract.deploy(
+            params.pool,
+            PREMIA_VOLATILITY_SURFACE_ORACLE[chainId]
+          )
+      );
+
+      addresses.pricer = pricerContract.address;
 
       strategyContract = await getContractFactory("StandardDelta", {
         signer: signers.owner,
         libraries: {
-          Common: addresses.commonLogic,
+          Helpers: addresses.common,
         },
       }).then((contract) => contract.deploy());
 
@@ -248,9 +264,10 @@ function behavesLikeOptionsVault(params: {
         fixedFromFloat(0.5),
         addresses.keeper,
         addresses.pool,
-        addresses.vault,
-        addresses.volatilityOracle
+        addresses.pricer,
+        addresses.vault
       );
+
       strategyContract = await strategyContract.connect(signers.whale);
     });
 
@@ -264,7 +281,7 @@ function behavesLikeOptionsVault(params: {
         testStrategy = await getContractFactory("StandardDelta", {
           signer: signers.owner,
           libraries: {
-            Common: addresses.commonLogic,
+            Helpers: addresses.common,
           },
         }).then((contract) => contract.deploy());
       });
@@ -276,20 +293,14 @@ function behavesLikeOptionsVault(params: {
         assert.equal(await strategyContract.Pool(), addresses.pool);
         assert.equal(await strategyContract.Vault(), addresses.vault);
 
-        const { spot, volatility } = await strategyContract.oracles();
-
-        assert.equal(spot, ADDRESS_ONE);
-        assert.equal(volatility, PREMIA_VOLATILITY_SURFACE_ORACLE[chainId]);
-
         // Check Option
-        const { isCall, minimumContractSize, expiry, delta64x64, strike64x64 } =
+        const { isCall, minimumContractSize, expiry, delta64x64 } =
           await strategyContract.option();
 
         assert.equal(isCall, params.isCall);
         assert.equal(minimumContractSize, params.minimumContractSize);
         assert.bnNotEqual(expiry, BigNumber.from("0"));
         assert.equal(delta64x64, 0x8000000000000000);
-        assert.bnNotEqual(strike64x64, BigNumber.from("0"));
 
         // Check Asset Properties
         const { baseDecimals, underlyingDecimals } =
@@ -298,7 +309,6 @@ function behavesLikeOptionsVault(params: {
         assert.equal(baseDecimals, params.baseDecimals);
         assert.equal(underlyingDecimals, params.underlyingDecimals);
 
-        // Check Strategy Properties
         assert.equal(await strategyContract.startOffset(), 7200);
         assert.equal(await strategyContract.endOffset(), 14400);
 
@@ -638,9 +648,14 @@ function behavesLikeOptionsVault(params: {
           .connect(signers.keeper)
           .setNextOption();
 
-        await expect(tx)
-          .to.emit(strategyContract, "NextOptionSet")
-          .withArgs(params.isCall, expiry.add(SECONDS_PER_WEEK), 0);
+        const receipt = await tx.wait();
+        const args = receipt.events[0].args;
+
+        assert.equal(args[0], params.isCall);
+        assert.equal(args[1].toString(), expiry.add(SECONDS_PER_WEEK));
+        assert.isFalse(args[2].isZero());
+
+        await expect(tx).to.emit(strategyContract, "NextOptionSet");
       });
     });
   });

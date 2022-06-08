@@ -32,6 +32,7 @@ export const NEXT_FRIDAY = {
   [CHAINID.ARB_MAINNET]: 1651234035,
 };
 
+// Must be on a Friday.
 export const BLOCK_NUMBER = {
   [CHAINID.ETH_MAINNET]: 14320000,
   [CHAINID.ARB_MAINNET]: 10300000,
