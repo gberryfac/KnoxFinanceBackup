@@ -46,7 +46,7 @@ moment.tz.setDefault("UTC");
 let block;
 describe("Standard Delta Integration Tests", () => {
   behavesLikeOptionsVault({
-    whale: DAI_WHALE_ADDRESS[chainId],
+    buyer: DAI_WHALE_ADDRESS[chainId],
     name: `Knox ETH Delta Vault (Put)`,
     tokenName: `Knox ETH Delta Vault`,
     tokenSymbol: `kETH-DELTA-P`,
@@ -69,7 +69,7 @@ describe("Standard Delta Integration Tests", () => {
   });
 
   behavesLikeOptionsVault({
-    whale: DAI_WHALE_ADDRESS[chainId],
+    buyer: DAI_WHALE_ADDRESS[chainId],
     name: `Knox ETH Delta Vault (Call)`,
     tokenName: `Knox ETH Delta Vault`,
     tokenSymbol: `kETH-DELTA-C`,
@@ -92,7 +92,7 @@ describe("Standard Delta Integration Tests", () => {
   });
 
   behavesLikeOptionsVault({
-    whale: WBTC_WHALE_ADDRESS[chainId],
+    buyer: WBTC_WHALE_ADDRESS[chainId],
     name: `Knox BTC Delta Vault (Call)`,
     tokenName: `Knox BTC Delta Vault`,
     tokenSymbol: `kBTC-DELTA-C`,
@@ -115,7 +115,7 @@ describe("Standard Delta Integration Tests", () => {
   });
 
   behavesLikeOptionsVault({
-    whale: LINK_WHALE_ADDRESS[chainId],
+    buyer: LINK_WHALE_ADDRESS[chainId],
     name: `Knox LINK Delta Vault (Call)`,
     tokenName: `Knox LINK Delta Vault`,
     tokenSymbol: `kLINK-DELTA-C`,
@@ -139,7 +139,7 @@ describe("Standard Delta Integration Tests", () => {
 });
 
 function behavesLikeOptionsVault(params: {
-  whale: string;
+  buyer: string;
   name: string;
   tokenName: string;
   tokenSymbol: string;
@@ -199,7 +199,7 @@ function behavesLikeOptionsVault(params: {
       addresses = await fixtures.getAddresses(signers);
 
       [signers, addresses, assetContract] = await fixtures.impersonateWhale(
-        params.whale,
+        params.buyer,
         params.asset,
         params.depositAmount,
         signers,
@@ -278,7 +278,7 @@ function behavesLikeOptionsVault(params: {
         addresses.vault
       );
 
-      strategyContract = await strategyContract.connect(signers.whale);
+      strategyContract = await strategyContract.connect(signers.buyer);
     });
 
     after(async () => {
@@ -351,7 +351,7 @@ function behavesLikeOptionsVault(params: {
     describe("#setNextRound", () => {
       time.revertToSnapshotAfterEach(async () => {
         await assetContract
-          .connect(signers.user)
+          .connect(signers.lp1)
           .approve(addresses.vault, params.depositAmount);
 
         await vaultContract["depositToQueue(uint256)"](params.depositAmount);

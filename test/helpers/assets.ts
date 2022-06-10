@@ -27,28 +27,28 @@ export const DAI = {
   address: DAI_ADDRESS[chainId],
   decimals: DAI_DECIMALS,
   spotOracle: DAI_PRICE_ORACLE[chainId],
-  whale: DAI_WHALE_ADDRESS[chainId],
+  buyer: DAI_WHALE_ADDRESS[chainId],
 };
 
 export const ETH = {
   address: WETH_ADDRESS[chainId],
   decimals: WETH_DECIMALS,
   spotOracle: ETH_PRICE_ORACLE[chainId],
-  whale: DAI_WHALE_ADDRESS[chainId],
+  buyer: DAI_WHALE_ADDRESS[chainId],
 };
 
 export const BTC = {
   address: WBTC_ADDRESS[chainId],
   decimals: WBTC_DECIMALS,
   spotOracle: BTC_PRICE_ORACLE[chainId],
-  whale: WBTC_WHALE_ADDRESS[chainId],
+  buyer: WBTC_WHALE_ADDRESS[chainId],
 };
 
 export const LINK = {
   address: LINK_ADDRESS[chainId],
   decimals: LINK_DECIMALS,
   spotOracle: LINK_PRICE_ORACLE[chainId],
-  whale: LINK_WHALE_ADDRESS[chainId],
+  buyer: LINK_WHALE_ADDRESS[chainId],
 };
 
 export const PREMIA = {

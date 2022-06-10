@@ -23,9 +23,9 @@ export async function getSigners(): Promise<types.Signers> {
   ] = await ethers.getSigners();
   const signers = {
     admin: adminSigner,
-    user: userSigner,
-    user2: user2Signer,
-    user3: user3Signer,
+    lp1: userSigner,
+    lp2: user2Signer,
+    lp3: user3Signer,
     owner: ownerSigner,
     keeper: keeperSigner,
     feeRecipient: feeRecipientSigner,
@@ -39,9 +39,9 @@ export async function getAddresses(
 ): Promise<types.Addresses> {
   const addresses = {
     admin: signers.admin.address,
-    user: signers.user.address,
-    user2: signers.user2.address,
-    user3: signers.user3.address,
+    lp1: signers.lp1.address,
+    lp2: signers.lp2.address,
+    lp3: signers.lp3.address,
     owner: signers.owner.address,
     keeper: signers.keeper.address,
     feeRecipient: signers.feeRecipient.address,
@@ -51,50 +51,50 @@ export async function getAddresses(
 }
 
 export async function impersonateWhale(
-  whale: string,
+  buyer: string,
   depositAsset: string,
   depositAmount: BigNumber,
   signers: types.Signers,
   addresses: types.Addresses
 ): Promise<[types.Signers, types.Addresses, Contract]> {
-  addresses.whale = whale;
+  addresses.buyer = buyer;
 
-  const whaleSigner = await utils.impersonateWhale(addresses.whale, "1500");
-  signers.whale = whaleSigner;
+  const whaleSigner = await utils.impersonateWhale(addresses.buyer, "1500");
+  signers.buyer = whaleSigner;
 
   const assetContract = await getContractAt("IAsset", depositAsset);
 
   await utils.setERC20Balance(
     depositAsset,
-    addresses.whale,
+    addresses.buyer,
     depositAmount.mul(100).toHexString(),
     SLOTS[depositAsset]
   );
 
   if (depositAsset === WETH_ADDRESS[chainId]) {
     await assetContract
-      .connect(signers.whale)
+      .connect(signers.buyer)
       .deposit({ value: parseEther("700") });
 
     await assetContract
-      .connect(signers.whale)
+      .connect(signers.buyer)
       .transfer(addresses.admin, depositAmount.mul(10));
     await assetContract
-      .connect(signers.whale)
-      .transfer(addresses.user, depositAmount.mul(10));
+      .connect(signers.buyer)
+      .transfer(addresses.lp1, depositAmount.mul(10));
     await assetContract
-      .connect(signers.whale)
-      .transfer(addresses.user2, depositAmount.mul(10));
+      .connect(signers.buyer)
+      .transfer(addresses.lp2, depositAmount.mul(10));
   } else {
     await assetContract
-      .connect(signers.whale)
+      .connect(signers.buyer)
       .transfer(addresses.admin, depositAmount.mul(10));
     await assetContract
-      .connect(signers.whale)
-      .transfer(addresses.user, depositAmount.mul(10));
+      .connect(signers.buyer)
+      .transfer(addresses.lp1, depositAmount.mul(10));
     await assetContract
-      .connect(signers.whale)
-      .transfer(addresses.user2, depositAmount.mul(10));
+      .connect(signers.buyer)
+      .transfer(addresses.lp2, depositAmount.mul(10));
   }
 
   return [signers, addresses, assetContract];
@@ -140,7 +140,7 @@ export async function getVaultFixture(
         },
       }
     )
-  ).connect(signers.user);
+  ).connect(signers.lp1);
 
   return vaultContract;
 }

@@ -10,30 +10,30 @@ export type Asset = {
   address: string;
   decimals: number;
   spotOracle: string;
-  whale: string;
+  buyer: string;
 };
 
 export type Signers = {
   admin: SignerWithAddress;
-  user: SignerWithAddress;
-  user2: SignerWithAddress;
-  user3: SignerWithAddress;
+  lp1: SignerWithAddress;
+  lp2: SignerWithAddress;
+  lp3: SignerWithAddress;
   owner: SignerWithAddress;
   keeper: SignerWithAddress;
   feeRecipient: SignerWithAddress;
-  whale?: SignerWithAddress;
+  buyer?: SignerWithAddress;
   strategy?: SignerWithAddress;
 };
 
 export type Addresses = {
   admin: string;
-  user: string;
-  user2: string;
-  user3: string;
+  lp1: string;
+  lp2: string;
+  lp3: string;
   owner: string;
   keeper: string;
   feeRecipient: string;
-  whale?: string;
+  buyer?: string;
   pool?: string;
   helpers?: string;
   vaultDisplay?: string;

@@ -48,7 +48,7 @@ moment.tz.setDefault("UTC");
 let block;
 describe("Standard Delta Strategy Unit Tests", () => {
   behavesLikeOptionsVault({
-    whale: DAI_WHALE_ADDRESS[chainId],
+    buyer: DAI_WHALE_ADDRESS[chainId],
     name: `Knox ETH Delta Vault (Put)`,
     tokenName: `Knox ETH Delta Vault`,
     tokenSymbol: `kETH-DELTA-P`,
@@ -73,7 +73,7 @@ describe("Standard Delta Strategy Unit Tests", () => {
   });
 
   behavesLikeOptionsVault({
-    whale: DAI_WHALE_ADDRESS[chainId],
+    buyer: DAI_WHALE_ADDRESS[chainId],
     name: `Knox ETH Delta Vault (Call)`,
     tokenName: `Knox ETH Delta Vault`,
     tokenSymbol: `kETH-DELTA-C`,
@@ -98,7 +98,7 @@ describe("Standard Delta Strategy Unit Tests", () => {
   });
 
   behavesLikeOptionsVault({
-    whale: WBTC_WHALE_ADDRESS[chainId],
+    buyer: WBTC_WHALE_ADDRESS[chainId],
     name: `Knox BTC Delta Vault (Call)`,
     tokenName: `Knox BTC Delta Vault`,
     tokenSymbol: `kBTC-DELTA-C`,
@@ -123,7 +123,7 @@ describe("Standard Delta Strategy Unit Tests", () => {
   });
 
   behavesLikeOptionsVault({
-    whale: LINK_WHALE_ADDRESS[chainId],
+    buyer: LINK_WHALE_ADDRESS[chainId],
     name: `Knox LINK Delta Vault (Call)`,
     tokenName: `Knox LINK Delta Vault`,
     tokenSymbol: `kLINK-DELTA-C`,
@@ -149,7 +149,7 @@ describe("Standard Delta Strategy Unit Tests", () => {
 });
 
 function behavesLikeOptionsVault(params: {
-  whale: string;
+  buyer: string;
   name: string;
   tokenName: string;
   tokenSymbol: string;
@@ -206,7 +206,7 @@ function behavesLikeOptionsVault(params: {
       addresses = await fixtures.getAddresses(signers);
 
       [signers, addresses] = await fixtures.impersonateWhale(
-        params.whale,
+        params.buyer,
         params.asset,
         params.depositAmount,
         signers,
@@ -268,7 +268,7 @@ function behavesLikeOptionsVault(params: {
         addresses.vault
       );
 
-      strategyContract = await strategyContract.connect(signers.whale);
+      strategyContract = await strategyContract.connect(signers.buyer);
     });
 
     after(async () => {
@@ -337,7 +337,7 @@ function behavesLikeOptionsVault(params: {
       it("should revert when not owner", async () => {
         await expect(
           testStrategy
-            .connect(signers.user)
+            .connect(signers.lp1)
             .initialize(
               params.isCall,
               params.baseDecimals,
@@ -453,7 +453,7 @@ function behavesLikeOptionsVault(params: {
       time.revertToSnapshotAfterEach();
       it("should revert when caller is not keeper", async () => {
         await expect(
-          strategyContract.connect(signers.user).sync()
+          strategyContract.connect(signers.lp1).sync()
         ).to.be.revertedWith("1");
       });
 

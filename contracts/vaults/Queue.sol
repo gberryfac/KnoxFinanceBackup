@@ -4,57 +4,84 @@ pragma solidity ^0.8.0;
 import "@solidstate/contracts/introspection/ERC165Storage.sol";
 import "@solidstate/contracts/introspection/IERC165.sol";
 import "@solidstate/contracts/token/ERC20/IERC20.sol";
+import "@solidstate/contracts/token/ERC1155/enumerable/ERC1155Enumerable.sol";
 import "@solidstate/contracts/token/ERC1155/IERC1155.sol";
+import "@solidstate/contracts/utils/ReentrancyGuard.sol";
 import "@solidstate/contracts/utils/SafeERC20.sol";
 
 import "./../libraries/Errors.sol";
 
-import "./QueueInternal.sol";
+import "./internal/QueueInternal.sol";
 
-abstract contract Queue is QueueInternal {
+contract Queue is QueueInternal, ReentrancyGuard {
     using ERC165Storage for ERC165Storage.Layout;
     using SafeERC20 for IERC20;
-    using VaultStorage for VaultStorage.Layout;
+    using Storage for Storage.Layout;
 
-    constructor() {
-        ERC165Storage.layout().setSupportedInterface(
-            type(IERC165).interfaceId,
-            true
-        );
-        ERC165Storage.layout().setSupportedInterface(
-            type(IERC1155).interfaceId,
-            true
-        );
+    /************************************************
+     *  INITIALIZATION
+     ***********************************************/
+
+    // TODO: Inherit initializer
+    function initializeQueue() external onlyOwner {
+        {
+            ERC165Storage.Layout storage l = ERC165Storage.layout();
+            l.setSupportedInterface(type(IERC165).interfaceId, true);
+            l.setSupportedInterface(type(IERC1155).interfaceId, true);
+        }
+
+        {
+            Storage.Layout storage l = Storage.layout();
+            l.Queue = IQueue(address(this));
+        }
     }
 
-    function depositToQueue(uint256 amount) external {
-        VaultStorage.Layout storage l = VaultStorage.layout();
+    /************************************************
+     *  INPUT/OUTPUT
+     ***********************************************/
 
-        require(amount > 0, Errors.VALUE_EXCEEDS_MINIMUM);
-
-        _depositToQueue(amount, msg.sender);
-
-        // An approve() by the msg.sender is required beforehand
-        l.ERC20.safeTransferFrom(msg.sender, address(this), amount);
+    function depositToQueue(uint256 amount) external nonReentrant {
+        Storage.Layout storage l = Storage.layout();
+        _depositToQueue(l, amount, msg.sender);
     }
 
-    function depositToQueue(uint256 amount, address receiver) external {
-        VaultStorage.Layout storage l = VaultStorage.layout();
-
-        require(amount > 0, Errors.VALUE_EXCEEDS_MINIMUM);
-
-        _depositToQueue(amount, receiver);
-
-        // An approve() by the msg.sender is required beforehand
-        l.ERC20.safeTransferFrom(msg.sender, address(this), amount);
+    function depositToQueue(uint256 amount, address receiver)
+        external
+        nonReentrant
+    {
+        Storage.Layout storage l = Storage.layout();
+        _depositToQueue(l, amount, receiver);
     }
 
-    function withdrawFromQueue() external {
-        _withdrawFromQueue();
+    function withdrawFromQueue(uint256 amount) external nonReentrant {
+        Storage.Layout storage l = Storage.layout();
+        _withdrawFromQueue(l, amount);
     }
 
-    function maxRedeemShares() external {
-        _maxRedeemShares();
+    function redeemSharesFromEpoch(uint256 epoch, address receiver)
+        external
+        nonReentrant
+    {
+        Storage.Layout storage l = Storage.layout();
+        _redeemSharesFromEpoch(l, epoch, receiver);
+    }
+
+    function maxRedeemShares(address receiver) external nonReentrant {
+        Storage.Layout storage l = Storage.layout();
+        _maxRedeemShares(l, receiver);
+    }
+
+    /************************************************
+     *  VIEW
+     ***********************************************/
+
+    function previewUnredeemedShares(address account)
+        external
+        view
+        returns (uint256)
+    {
+        Storage.Layout storage l = Storage.layout();
+        return _previewUnredeemedShares(l, account);
     }
 
     function previewUnredeemedSharesFromEpoch(uint256 epoch, uint256 balance)
@@ -62,27 +89,19 @@ abstract contract Queue is QueueInternal {
         view
         returns (uint256)
     {
-        return _previewUnredeemedSharesFromEpoch(epoch, balance);
+        Storage.Layout storage l = Storage.layout();
+        return _previewUnredeemedSharesFromEpoch(l, epoch, balance);
     }
 
-    function previewUnredeemedShares(address account)
+    /************************************************
+     *  ERC165 IMPLEMENTATIONS
+     ***********************************************/
+
+    function supportsInterface(bytes4 interfaceId)
         external
         view
-        returns (uint256)
+        returns (bool)
     {
-        uint256[] memory epochs = tokensByAccount(account);
-
-        uint256 unredeemedShares;
-        for (uint256 i; i < epochs.length; i++) {
-            uint256 epoch = epochs[i];
-            uint256 balance = _balanceOf(account, epoch);
-
-            unredeemedShares += _previewUnredeemedSharesFromEpoch(
-                epoch,
-                balance
-            );
-        }
-
-        return unredeemedShares;
+        return ERC165Storage.layout().isSupportedInterface(interfaceId);
     }
 }
