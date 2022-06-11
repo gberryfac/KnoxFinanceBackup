@@ -296,7 +296,7 @@ function behavesLikeOptionsVault(params: {
           assert.bnEqual(vaultBalance, balance);
         });
 
-        it("should receieve vault shares if LP has deposits in past rounds", async () => {
+        it("should receieve vault shares if LP has deposits in past epoch", async () => {
           const firstDeposit = params.depositAmount;
 
           await assetContract
@@ -307,7 +307,7 @@ function behavesLikeOptionsVault(params: {
 
           await vault
             .connect(signers.strategy)
-            .setNextRound(NEXT_FRIDAY[chainId], BigNumber.from("111"));
+            .processEpoch(NEXT_FRIDAY[chainId], BigNumber.from("111"));
 
           const secondDeposit = params.depositAmount.div(2);
 
@@ -374,7 +374,7 @@ function behavesLikeOptionsVault(params: {
 
           await vault
             .connect(signers.strategy)
-            .setNextRound(NEXT_FRIDAY[chainId], BigNumber.from("111"));
+            .processEpoch(NEXT_FRIDAY[chainId], BigNumber.from("111"));
         });
 
         it("should redeem Queue shares for Vault shares", async () => {
@@ -419,7 +419,7 @@ function behavesLikeOptionsVault(params: {
       });
 
       describe("#Vault", () => {
-        describe("#setNextRound", () => {
+        describe("#processEpoch", () => {
           time.revertToSnapshotAfterEach(async () => {
             await assetContract
               .connect(signers.lp1)
@@ -428,7 +428,7 @@ function behavesLikeOptionsVault(params: {
             await vault["depositToQueue(uint256)"](params.depositAmount);
           });
 
-          it("should adjust Queue and Vault balances when setNextRound is called", async () => {
+          it("should adjust Queue and Vault balances when processEpoch is called", async () => {
             let totalAssets = await vault.totalAssets();
             assert.isTrue(totalAssets.isZero());
 
@@ -437,7 +437,7 @@ function behavesLikeOptionsVault(params: {
 
             await vault
               .connect(signers.strategy)
-              .setNextRound(NEXT_FRIDAY[chainId], BigNumber.from("111"));
+              .processEpoch(NEXT_FRIDAY[chainId], BigNumber.from("111"));
 
             totalAssets = await vault.totalAssets();
             assert.bnEqual(totalAssets, params.depositAmount);
@@ -446,13 +446,13 @@ function behavesLikeOptionsVault(params: {
             assert.isTrue(totalQueuedAssets.isZero());
           });
 
-          it("should update the Vault state when setNextRound is called", async () => {
+          it("should update the Vault state when processEpoch is called", async () => {
             let epoch = await vault.epoch();
             assert.bnEqual(epoch, BigNumber.from("0"));
 
             await vault
               .connect(signers.strategy)
-              .setNextRound(NEXT_FRIDAY[chainId], BigNumber.from("111"));
+              .processEpoch(NEXT_FRIDAY[chainId], BigNumber.from("111"));
 
             epoch = await vault.epoch();
             assert.bnEqual(epoch, BigNumber.from("1"));
@@ -473,7 +473,7 @@ function behavesLikeOptionsVault(params: {
 
             await vault
               .connect(signers.strategy)
-              .setNextRound(NEXT_FRIDAY[chainId], BigNumber.from("111"));
+              .processEpoch(NEXT_FRIDAY[chainId], BigNumber.from("111"));
           });
 
           it("should withdraw deposit amount from Vault", async () => {

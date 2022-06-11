@@ -20,15 +20,15 @@ contract VaultInternal is AdminInternal, ERC4626Base {
      *  OPERATIONS
      ***********************************************/
 
-    function _setNextRound(
+    function _processEpoch(
         Storage.Layout storage l,
         uint64 expiry,
         uint256 tokenId
     ) internal {
         require(expiry > l.expiry, "previous expiry > new expiry");
 
-        _withdrawLiquidityFromPool(l);
-        _disburseVaultFees(l);
+        _withdrawReservedLiquidity(l);
+        _collectVaultFees(l);
         _depositQueuedToVault(l);
 
         l.expiry = expiry;
@@ -43,10 +43,10 @@ contract VaultInternal is AdminInternal, ERC4626Base {
     }
 
     /**
-     * @notice Transfers freed liquidity from Premia pool to Vault.
+     * @notice Transfers reserved liquidity from Premia pool to Vault.
      * @dev Should only be called if option's expired.
      */
-    function _withdrawLiquidityFromPool(Storage.Layout storage l) internal {
+    function _withdrawReservedLiquidity(Storage.Layout storage l) internal {
         // uint256 liquidityBefore = l.ERC20.balanceOf(address(this));
 
         uint256 reservedLiquidity =
@@ -83,7 +83,7 @@ contract VaultInternal is AdminInternal, ERC4626Base {
         // emit DepositQueuedToVault(pricePerShare, mintedShares);
     }
 
-    function _disburseVaultFees(Storage.Layout storage l) internal {
+    function _collectVaultFees(Storage.Layout storage l) internal {
         uint256 totalAssets = _totalAssets();
 
         uint256 vaultFee;

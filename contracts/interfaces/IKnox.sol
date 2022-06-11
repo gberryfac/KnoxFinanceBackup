@@ -15,9 +15,11 @@ interface IKnox is IERC4626, IQueue {
         address _strategy
     ) external;
 
-    function setNextRound(uint64 expiry, uint256 tokenId) external;
+    function processEpoch(uint64 expiry, uint256 tokenId) external;
 
-    function withdrawLiquidityFromPool() external;
+    function withdrawReservedLiquidity() external;
+
+    function collectVaultFees() external;
 
     function depositQueuedToVault() external;
 

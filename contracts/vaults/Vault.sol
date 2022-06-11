@@ -137,18 +137,18 @@ contract Vault is Pausable, VaultInternal {
      *  OPERATIONS
      ***********************************************/
 
-    function setNextRound(uint64 expiry, uint256 tokenId)
+    function processEpoch(uint64 expiry, uint256 tokenId)
         external
         isExpired
         onlyAuthorized
     {
         Storage.Layout storage l = Storage.layout();
-        _setNextRound(l, expiry, tokenId);
+        _processEpoch(l, expiry, tokenId);
     }
 
-    function withdrawLiquidityFromPool() external isExpired onlyAuthorized {
+    function withdrawReservedLiquidity() external isExpired onlyAuthorized {
         Storage.Layout storage l = Storage.layout();
-        _withdrawLiquidityFromPool(l);
+        _withdrawReservedLiquidity(l);
     }
 
     function depositQueuedToVault() external isExpired onlyAuthorized {
@@ -156,9 +156,9 @@ contract Vault is Pausable, VaultInternal {
         _depositQueuedToVault(l);
     }
 
-    function disburseVaultFees() external isExpired onlyAuthorized {
+    function collectVaultFees() external isExpired onlyAuthorized {
         Storage.Layout storage l = Storage.layout();
-        _disburseVaultFees(l);
+        _collectVaultFees(l);
     }
 
     function borrow(uint256 amount) external onlyStrategy {
