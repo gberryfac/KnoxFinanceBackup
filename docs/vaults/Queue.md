@@ -1,4 +1,4 @@
-# Vault
+# Queue
 
 
 
@@ -9,6 +9,28 @@
 
 
 ## Methods
+
+### accountsByToken
+
+```solidity
+function accountsByToken(uint256 id) external view returns (address[])
+```
+
+query holders of given token
+
+
+
+#### Parameters
+
+| Name | Type | Description |
+|---|---|---|
+| id | uint256 | token id to query |
+
+#### Returns
+
+| Name | Type | Description |
+|---|---|---|
+| _0 | address[] | list of holder addresses |
 
 ### allowance
 
@@ -76,6 +98,29 @@ get the address of the base token used for vault accountin purposes
 ### balanceOf
 
 ```solidity
+function balanceOf(address account, uint256 id) external view returns (uint256)
+```
+
+query the balance of given token held by given address
+
+
+
+#### Parameters
+
+| Name | Type | Description |
+|---|---|---|
+| account | address | address to query |
+| id | uint256 | token to query |
+
+#### Returns
+
+| Name | Type | Description |
+|---|---|---|
+| _0 | uint256 | token balance |
+
+### balanceOf
+
+```solidity
 function balanceOf(address account) external view returns (uint256)
 ```
 
@@ -95,13 +140,13 @@ query the token balance of given account
 |---|---|---|
 | _0 | uint256 | token balance |
 
-### borrow
+### balanceOfBatch
 
 ```solidity
-function borrow(uint256 amount) external nonpayable
+function balanceOfBatch(address[] accounts, uint256[] ids) external view returns (uint256[])
 ```
 
-
+query the balances of given tokens held by given addresses
 
 
 
@@ -109,18 +154,14 @@ function borrow(uint256 amount) external nonpayable
 
 | Name | Type | Description |
 |---|---|---|
-| amount | uint256 | undefined |
+| accounts | address[] | addresss to query |
+| ids | uint256[] | tokens to query |
 
-### collectVaultFees
+#### Returns
 
-```solidity
-function collectVaultFees() external nonpayable
-```
-
-
-
-
-
+| Name | Type | Description |
+|---|---|---|
+| _0 | uint256[] | token balances |
 
 ### convertToAssets
 
@@ -189,38 +230,10 @@ execute a deposit of assets on behalf of given address
 |---|---|---|
 | shareAmount | uint256 | quantity of shares to mint |
 
-### depositQueuedToVault
+### depositToQueue
 
 ```solidity
-function depositQueuedToVault() external nonpayable
-```
-
-
-
-
-
-
-### epoch
-
-```solidity
-function epoch() external view returns (uint256)
-```
-
-
-
-
-
-
-#### Returns
-
-| Name | Type | Description |
-|---|---|---|
-| _0 | uint256 | undefined |
-
-### initializeVault
-
-```solidity
-function initializeVault(Storage.InitParams _initParams, Storage.InitProps _initProps, address _keeper, address _feeRecipient, address _strategy) external nonpayable
+function depositToQueue(uint256 amount, address receiver) external nonpayable
 ```
 
 
@@ -231,11 +244,58 @@ function initializeVault(Storage.InitParams _initParams, Storage.InitProps _init
 
 | Name | Type | Description |
 |---|---|---|
-| _initParams | Storage.InitParams | undefined |
-| _initProps | Storage.InitProps | undefined |
-| _keeper | address | undefined |
-| _feeRecipient | address | undefined |
-| _strategy | address | undefined |
+| amount | uint256 | undefined |
+| receiver | address | undefined |
+
+### depositToQueue
+
+```solidity
+function depositToQueue(uint256 amount) external nonpayable
+```
+
+
+
+
+
+#### Parameters
+
+| Name | Type | Description |
+|---|---|---|
+| amount | uint256 | undefined |
+
+### initializeQueue
+
+```solidity
+function initializeQueue() external nonpayable
+```
+
+
+
+
+
+
+### isApprovedForAll
+
+```solidity
+function isApprovedForAll(address account, address operator) external view returns (bool)
+```
+
+query approval status of given operator with respect to given address
+
+
+
+#### Parameters
+
+| Name | Type | Description |
+|---|---|---|
+| account | address | address to query for approval granted |
+| operator | address | address to query for approval received |
+
+#### Returns
+
+| Name | Type | Description |
+|---|---|---|
+| _0 | bool | whether operator is approved to spend tokens held by account |
 
 ### maxDeposit
 
@@ -303,6 +363,22 @@ calculate the maximum quantity of shares which may be redeemed by given holder
 |---|---|---|
 | maxShares | uint256 | maximum share redeem amount |
 
+### maxRedeemShares
+
+```solidity
+function maxRedeemShares(address receiver) external nonpayable
+```
+
+
+
+
+
+#### Parameters
+
+| Name | Type | Description |
+|---|---|---|
+| receiver | address | undefined |
+
 ### maxWithdraw
 
 ```solidity
@@ -347,54 +423,6 @@ execute a minting of shares on behalf of given address
 | Name | Type | Description |
 |---|---|---|
 | assetAmount | uint256 | quantity of assets to deposit |
-
-### option
-
-```solidity
-function option() external view returns (bool, uint256, uint256, address)
-```
-
-
-
-
-
-
-#### Returns
-
-| Name | Type | Description |
-|---|---|---|
-| _0 | bool | undefined |
-| _1 | uint256 | undefined |
-| _2 | uint256 | undefined |
-| _3 | address | undefined |
-
-### pause
-
-```solidity
-function pause() external nonpayable
-```
-
-Pauses the vault during an emergency preventing deposits and borrowing.
-
-
-
-
-### paused
-
-```solidity
-function paused() external view returns (bool)
-```
-
-
-
-
-
-
-#### Returns
-
-| Name | Type | Description |
-|---|---|---|
-| _0 | bool | undefined |
 
 ### previewDeposit
 
@@ -462,6 +490,51 @@ simulate a redemption of given quantity of shares
 |---|---|---|
 | assetAmount | uint256 | quantity of assets to withdraw |
 
+### previewUnredeemedShares
+
+```solidity
+function previewUnredeemedShares(address account) external view returns (uint256)
+```
+
+
+
+
+
+#### Parameters
+
+| Name | Type | Description |
+|---|---|---|
+| account | address | undefined |
+
+#### Returns
+
+| Name | Type | Description |
+|---|---|---|
+| _0 | uint256 | undefined |
+
+### previewUnredeemedSharesFromEpoch
+
+```solidity
+function previewUnredeemedSharesFromEpoch(uint256 epoch, uint256 balance) external view returns (uint256)
+```
+
+
+
+
+
+#### Parameters
+
+| Name | Type | Description |
+|---|---|---|
+| epoch | uint256 | undefined |
+| balance | uint256 | undefined |
+
+#### Returns
+
+| Name | Type | Description |
+|---|---|---|
+| _0 | uint256 | undefined |
+
 ### previewWithdraw
 
 ```solidity
@@ -483,45 +556,6 @@ simulate a withdrawal of given quantity of assets
 | Name | Type | Description |
 |---|---|---|
 | shareAmount | uint256 | quantity of shares to redeem |
-
-### pricePerShare
-
-```solidity
-function pricePerShare(uint256 epoch) external view returns (uint256)
-```
-
-
-
-
-
-#### Parameters
-
-| Name | Type | Description |
-|---|---|---|
-| epoch | uint256 | undefined |
-
-#### Returns
-
-| Name | Type | Description |
-|---|---|---|
-| _0 | uint256 | undefined |
-
-### processEpoch
-
-```solidity
-function processEpoch(uint64 expiry, uint256 tokenId) external nonpayable
-```
-
-
-
-
-
-#### Parameters
-
-| Name | Type | Description |
-|---|---|---|
-| expiry | uint64 | undefined |
-| tokenId | uint256 | undefined |
 
 ### redeem
 
@@ -547,13 +581,13 @@ execute a redemption of shares on behalf of given address
 |---|---|---|
 | assetAmount | uint256 | quantity of assets to withdraw |
 
-### setCap
+### redeemSharesFromEpoch
 
 ```solidity
-function setCap(uint256 newCap) external nonpayable
+function redeemSharesFromEpoch(uint256 epoch, address receiver) external nonpayable
 ```
 
-Sets a new cap for deposits
+
 
 
 
@@ -561,15 +595,16 @@ Sets a new cap for deposits
 
 | Name | Type | Description |
 |---|---|---|
-| newCap | uint256 | is the new cap for deposits |
+| epoch | uint256 | undefined |
+| receiver | address | undefined |
 
-### setFeeRecipient
+### safeBatchTransferFrom
 
 ```solidity
-function setFeeRecipient(address newFeeRecipient) external nonpayable
+function safeBatchTransferFrom(address from, address to, uint256[] ids, uint256[] amounts, bytes data) external nonpayable
 ```
 
-Sets the new fee recipient
+transfer batch of tokens between given addresses, checking for ERC1155Receiver implementation if applicable
 
 
 
@@ -577,15 +612,19 @@ Sets the new fee recipient
 
 | Name | Type | Description |
 |---|---|---|
-| newFeeRecipient | address | is the address of the new fee recipient |
+| from | address | sender of tokens |
+| to | address | receiver of tokens |
+| ids | uint256[] | list of token IDs |
+| amounts | uint256[] | list of quantities of tokens to transfer |
+| data | bytes | data payload |
 
-### setKeeper
+### safeTransferFrom
 
 ```solidity
-function setKeeper(address newKeeper) external nonpayable
+function safeTransferFrom(address from, address to, uint256 id, uint256 amount, bytes data) external nonpayable
 ```
 
-Sets the new keeper
+transfer tokens between given addresses, checking for ERC1155Receiver implementation if applicable
 
 
 
@@ -593,15 +632,19 @@ Sets the new keeper
 
 | Name | Type | Description |
 |---|---|---|
-| newKeeper | address | is the address of the new keeper |
+| from | address | sender of tokens |
+| to | address | receiver of tokens |
+| id | uint256 | token ID |
+| amount | uint256 | quantity of tokens to transfer |
+| data | bytes | data payload |
 
-### setManagementFee
+### setApprovalForAll
 
 ```solidity
-function setManagementFee(uint256 newManagementFee) external nonpayable
+function setApprovalForAll(address operator, bool status) external nonpayable
 ```
 
-Sets the management fee for the vault
+grant approval to or revoke approval from given operator to spend held tokens
 
 
 
@@ -609,15 +652,16 @@ Sets the management fee for the vault
 
 | Name | Type | Description |
 |---|---|---|
-| newManagementFee | uint256 | is the management fee (6 decimals). ex: 2 * 10 ** 6 = 2% |
+| operator | address | address whose approval status to update |
+| status | bool | whether operator should be considered approved |
 
-### setPerformanceFee
+### supportsInterface
 
 ```solidity
-function setPerformanceFee(uint256 newPerformanceFee) external nonpayable
+function supportsInterface(bytes4 interfaceId) external view returns (bool)
 ```
 
-Sets the performance fee for the vault
+query whether contract has registered support for given interface
 
 
 
@@ -625,15 +669,21 @@ Sets the performance fee for the vault
 
 | Name | Type | Description |
 |---|---|---|
-| newPerformanceFee | uint256 | is the performance fee (6 decimals). ex: 20 * 10 ** 6 = 20% |
+| interfaceId | bytes4 | interface id |
 
-### setStrategy
+#### Returns
+
+| Name | Type | Description |
+|---|---|---|
+| _0 | bool | bool whether interface is supported |
+
+### tokensByAccount
 
 ```solidity
-function setStrategy(address newStrategy) external nonpayable
+function tokensByAccount(address account) external view returns (uint256[])
 ```
 
-Sets the new strategy
+query tokens held by given address
 
 
 
@@ -641,7 +691,13 @@ Sets the new strategy
 
 | Name | Type | Description |
 |---|---|---|
-| newStrategy | address | is the address of the new strategy |
+| account | address | address to query |
+
+#### Returns
+
+| Name | Type | Description |
+|---|---|---|
+| _0 | uint256[] | list of token ids |
 
 ### totalAssets
 
@@ -660,22 +716,27 @@ get the total quantity of the base asset currently managed by the vault
 |---|---|---|
 | _0 | uint256 | total managed asset amount |
 
-### totalQueuedAssets
+### totalHolders
 
 ```solidity
-function totalQueuedAssets() external view returns (uint256)
+function totalHolders(uint256 id) external view returns (uint256)
 ```
 
+query total number of holders for given token
 
 
 
+#### Parameters
 
+| Name | Type | Description |
+|---|---|---|
+| id | uint256 | token id to query |
 
 #### Returns
 
 | Name | Type | Description |
 |---|---|---|
-| _0 | uint256 | undefined |
+| _0 | uint256 | quantity of holders |
 
 ### totalSupply
 
@@ -687,6 +748,28 @@ query the total minted token supply
 
 
 
+
+#### Returns
+
+| Name | Type | Description |
+|---|---|---|
+| _0 | uint256 | token supply |
+
+### totalSupply
+
+```solidity
+function totalSupply(uint256 id) external view returns (uint256)
+```
+
+query total minted supply of given token
+
+
+
+#### Parameters
+
+| Name | Type | Description |
+|---|---|---|
+| id | uint256 | token id to query |
 
 #### Returns
 
@@ -741,17 +824,6 @@ transfer tokens to given recipient on behalf of given holder
 |---|---|---|
 | _0 | bool | success status (always true; otherwise function should revert) |
 
-### unpause
-
-```solidity
-function unpause() external nonpayable
-```
-
-Unpauses the vault during following an emergency allowing deposits and borrowing.
-
-
-
-
 ### withdraw
 
 ```solidity
@@ -776,16 +848,21 @@ execute a withdrawal of assets on behalf of given address
 |---|---|---|
 | shareAmount | uint256 | quantity of shares to redeem |
 
-### withdrawReservedLiquidity
+### withdrawFromQueue
 
 ```solidity
-function withdrawReservedLiquidity() external nonpayable
+function withdrawFromQueue(uint256 amount) external nonpayable
 ```
 
 
 
 
 
+#### Parameters
+
+| Name | Type | Description |
+|---|---|---|
+| amount | uint256 | undefined |
 
 
 
@@ -808,6 +885,24 @@ event Approval(address indexed owner, address indexed spender, uint256 value)
 | owner `indexed` | address | undefined |
 | spender `indexed` | address | undefined |
 | value  | uint256 | undefined |
+
+### ApprovalForAll
+
+```solidity
+event ApprovalForAll(address indexed account, address indexed operator, bool approved)
+```
+
+
+
+
+
+#### Parameters
+
+| Name | Type | Description |
+|---|---|---|
+| account `indexed` | address | undefined |
+| operator `indexed` | address | undefined |
+| approved  | bool | undefined |
 
 ### Deposit
 
@@ -877,6 +972,46 @@ event Transfer(address indexed from, address indexed to, uint256 value)
 |---|---|---|
 | from `indexed` | address | undefined |
 | to `indexed` | address | undefined |
+| value  | uint256 | undefined |
+
+### TransferBatch
+
+```solidity
+event TransferBatch(address indexed operator, address indexed from, address indexed to, uint256[] ids, uint256[] values)
+```
+
+
+
+
+
+#### Parameters
+
+| Name | Type | Description |
+|---|---|---|
+| operator `indexed` | address | undefined |
+| from `indexed` | address | undefined |
+| to `indexed` | address | undefined |
+| ids  | uint256[] | undefined |
+| values  | uint256[] | undefined |
+
+### TransferSingle
+
+```solidity
+event TransferSingle(address indexed operator, address indexed from, address indexed to, uint256 id, uint256 value)
+```
+
+
+
+
+
+#### Parameters
+
+| Name | Type | Description |
+|---|---|---|
+| operator `indexed` | address | undefined |
+| from `indexed` | address | undefined |
+| to `indexed` | address | undefined |
+| id  | uint256 | undefined |
 | value  | uint256 | undefined |
 
 ### Unpaused

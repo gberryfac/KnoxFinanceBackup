@@ -49,23 +49,6 @@ event NextOptionSet(bool isCall, uint64 expiry, int128 strike64x64)
 | expiry  | uint64 | undefined |
 | strike64x64  | int128 | undefined |
 
-### Purchased
-
-```solidity
-event Purchased(address indexed account, uint256 amount)
-```
-
-
-
-
-
-#### Parameters
-
-| Name | Type | Description |
-|---|---|---|
-| account `indexed` | address | undefined |
-| amount  | uint256 | undefined |
-
 ### Repaid
 
 ```solidity
@@ -100,6 +83,24 @@ event SaleWindowSet(uint256 blockTimestamp, uint256 startTimestamp, uint256 endT
 | blockTimestamp  | uint256 | undefined |
 | startTimestamp  | uint256 | undefined |
 | endTimestamp  | uint256 | undefined |
+
+### Sold
+
+```solidity
+event Sold(address account, uint256 amount, uint256 indexed tokenId)
+```
+
+
+
+
+
+#### Parameters
+
+| Name | Type | Description |
+|---|---|---|
+| account  | address | undefined |
+| amount  | uint256 | undefined |
+| tokenId `indexed` | uint256 | undefined |
 
 
 
