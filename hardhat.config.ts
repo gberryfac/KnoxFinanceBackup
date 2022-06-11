@@ -7,6 +7,7 @@ import "solidity-coverage";
 import "hardhat-contract-sizer";
 // import "hardhat-gas-reporter";
 import "hardhat-tracer";
+import "@primitivefi/hardhat-dodoc";
 
 require("dotenv").config();
 
@@ -92,6 +93,17 @@ const config: HardhatUserConfig = {
     outDir: "./types",
     target: "ethers-v5",
     alwaysGenerateOverloads: false,
+  },
+  dodoc: {
+    runOnCompile: false,
+    include: [
+      "contracts/strategies/StandardDelta.sol",
+      "contracts/strategies/StandardDeltaPricer.sol",
+      "contracts/vaults/Vault.sol",
+      "contracts/interfaces/IVault.sol",
+      "contracts/interfaces/IStandardDeltaPricer.sol",
+      "contracts/interfaces/IStandardDelta.sol",
+    ],
   },
 };
 
