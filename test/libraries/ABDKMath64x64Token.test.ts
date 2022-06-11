@@ -10,6 +10,15 @@ import {
 import { expect } from "chai";
 import { assert } from "../helpers/assertions";
 
+const decimalValues = ["0", "1", "2.718281828459045", "9223372036854775807"];
+
+const fixedPointValues = [
+  "0x00000000000000000",
+  "0x10000000000000000",
+  "0x2b7e151628aed1975",
+  "0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
+];
+
 let instance: TestABDKMath64x64Token;
 
 describe.only("ABDKMath64x64Token", () => {
@@ -394,6 +403,121 @@ describe.only("ABDKMath64x64Token", () => {
         (await instance.roundHalfToEven64x64(x)).toString(),
         fixedFromFloat("0.0000069").toString()
       );
+    });
+  });
+
+  describe("#toDecimals", () => {
+    it("returns scaled decimal representation of 64x64 fixed point number", async () => {
+      for (let decimals = 0; decimals < 22; decimals++) {
+        for (let fixed of fixedPointValues) {
+          const bn = ethers.BigNumber.from(fixed);
+
+          expect(await instance.toDecimals(bn, decimals)).to.equal(
+            bn.mul(ethers.BigNumber.from(`1${"0".repeat(decimals)}`)).shr(64)
+          );
+        }
+      }
+    });
+
+    describe("reverts if", () => {
+      it("given 64x64 fixed point number is negative", async () => {
+        for (let decimals = 0; decimals < 22; decimals++) {
+          for (let fixed of fixedPointValues.filter((f) => Number(f) > 0)) {
+            const bn = ethers.constants.Zero.sub(ethers.BigNumber.from(fixed));
+
+            await expect(instance.toDecimals(bn, decimals)).to.be.reverted;
+          }
+        }
+      });
+    });
+  });
+
+  describe("#fromDecimals", () => {
+    it("returns 64x64 fixed point representation of scaled decimal number", async () => {
+      for (let decimals = 0; decimals < 22; decimals++) {
+        for (let decimal of decimalValues) {
+          const truncatedArray = decimal.match(
+            new RegExp(`^\\d+(.\\d{,${decimals}})?`)
+          );
+
+          const truncated = truncatedArray?.[0] ?? "0";
+
+          const bn = ethers.utils.parseUnits(truncated, decimals);
+
+          expect(await instance.fromDecimals(bn, decimals)).to.equal(
+            bn.shl(64).div(ethers.BigNumber.from(`1${"0".repeat(decimals)}`))
+          );
+        }
+      }
+    });
+
+    describe("reverts if", () => {
+      it("given number exceeds range of 64x64 fixed point representation", async () => {
+        const max = ethers.BigNumber.from("0x7FFFFFFFFFFFFFFF");
+
+        for (let decimals = 0; decimals < 22; decimals++) {
+          const bn = max
+            .add(ethers.constants.One)
+            .mul(ethers.BigNumber.from(`1${"0".repeat(decimals)}`))
+            .sub(ethers.constants.One);
+
+          await expect(instance.fromDecimals(bn, decimals)).not.to.be.reverted;
+
+          await expect(
+            instance.fromDecimals(bn.add(ethers.constants.One), decimals)
+          ).to.be.reverted;
+        }
+      });
+    });
+  });
+
+  describe("#toWei", () => {
+    it("returns wei representation of 64x64 fixed point number", async () => {
+      for (let fixed of fixedPointValues) {
+        const bn = ethers.BigNumber.from(fixed);
+
+        expect(await instance.toWei(bn)).to.equal(
+          bn.mul(ethers.BigNumber.from(`1${"0".repeat(18)}`)).shr(64)
+        );
+      }
+    });
+
+    describe("reverts if", () => {
+      it("given 64x64 fixed point number is negative", async () => {
+        for (let fixed of fixedPointValues.filter((f) => Number(f) > 0)) {
+          const bn = ethers.constants.Zero.sub(ethers.BigNumber.from(fixed));
+
+          await expect(instance.toWei(bn)).to.be.reverted;
+        }
+      });
+    });
+  });
+
+  describe("#fromWei", () => {
+    it("returns 64x64 fixed point representation of wei number", async () => {
+      for (let decimal of decimalValues) {
+        const bn = ethers.utils.parseEther(decimal);
+
+        expect(await instance.fromWei(bn)).to.equal(
+          bn.shl(64).div(ethers.BigNumber.from(`1${"0".repeat(18)}`))
+        );
+      }
+    });
+
+    describe("reverts if", () => {
+      it("given wei number exceeds range of 64x64 fixed point representation", async () => {
+        const max = ethers.BigNumber.from("0x7FFFFFFFFFFFFFFF");
+
+        const bn = max
+          .add(ethers.constants.One)
+          .mul(ethers.BigNumber.from(`1${"0".repeat(18)}`))
+          .sub(ethers.constants.One);
+
+        await expect(instance.fromWei(bn)).not.to.be.reverted;
+
+        await expect(instance.fromWei(bn.add(ethers.constants.One))).to.be
+          .reverted;
+      });
     });
   });
 });
