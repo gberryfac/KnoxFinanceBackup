@@ -1,16 +1,19 @@
 import { HardhatUserConfig } from "hardhat/types";
-import "hardhat-deploy";
 import "@nomiclabs/hardhat-ethers";
 import "@nomiclabs/hardhat-waffle";
+import "@primitivefi/hardhat-dodoc";
 import "@typechain/hardhat";
-import "solidity-coverage";
 import "hardhat-contract-sizer";
-// import "hardhat-gas-reporter";
+import "hardhat-gas-reporter";
 import "hardhat-tracer";
+import "solidity-coverage";
 
 require("dotenv").config();
 
 import { TEST_URI, BLOCK_NUMBER } from "./constants";
+
+let { MAINNET_URI, DODOC_ON_COMPILE, REPORT_GAS, SIZER_ON_COMPILE } =
+  process.env;
 
 // Defaults to CHAINID=42161 so things will run with mainnet fork if not specified
 const CHAINID = process.env.CHAINID ? Number(process.env.CHAINID) : 42161;
@@ -51,9 +54,6 @@ const config: HardhatUserConfig = {
   },
   networks: {
     hardhat: {
-      accounts: {
-        mnemonic: process.env.TEST_MNEMONIC,
-      },
       chainId: CHAINID,
       forking: {
         url: TEST_URI[CHAINID],
@@ -61,37 +61,34 @@ const config: HardhatUserConfig = {
       },
     },
     mainnet: {
-      url: process.env.TEST_URI,
+      url: MAINNET_URI,
       chainId: CHAINID,
-      accounts: {
-        mnemonic: process.env.MAINNET_MNEMONIC,
-      },
-    },
-  },
-  namedAccounts: {
-    deployer: {
-      default: 0,
-    },
-    owner: {
-      default: 0,
-    },
-    keeper: {
-      default: 0,
-    },
-    admin: {
-      default: 0,
-    },
-    feeRecipient: {
-      default: 0,
     },
   },
   mocha: {
-    timeout: 20000,
+    timeout: 60000,
   },
   typechain: {
     outDir: "./types",
     target: "ethers-v5",
-    alwaysGenerateOverloads: false,
+    alwaysGenerateOverloads: true,
+  },
+  dodoc: {
+    runOnCompile: DODOC_ON_COMPILE === "true",
+    include: [
+      "contracts/interfaces/IVault.sol",
+      "contracts/interfaces/IStandardDelta.sol",
+      "contracts/interfaces/IStandardDeltaPricer.sol",
+      "contracts/strategies/StandardDelta.sol",
+      "contracts/strategies/StandardDeltaPricer.sol",
+      "contracts/vaults/Vault.sol",
+    ],
+  },
+  gasReporter: {
+    enabled: REPORT_GAS === "true",
+  },
+  contractSizer: {
+    runOnCompile: SIZER_ON_COMPILE === "true",
   },
 };
 

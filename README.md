@@ -1,27 +1,66 @@
+[![Twitter Follow](https://img.shields.io/twitter/follow/knox_finance?style=flat-square)](https://twitter.com/knox_finance)
+[![Discord](https://img.shields.io/discord/936681223831580734.svg?label=&logo=discord&logoColor=ffffff&color=7389D8&labelColor=6A7EC2)](https://discord.gg/azPNJXQ4kR)
 [![tests](https://github.com/KnoxFinance/knox-contracts/actions/workflows/test.yaml/badge.svg)](https://codecov.io/gh/KnoxFinance/knox-contracts)
 [![codecov](https://codecov.io/gh/KnoxFinance/knox-contracts/branch/master/graph/badge.svg?token=ZI3OV5TSAV)](https://codecov.io/gh/KnoxFinance/knox-contracts)
-# Knox
+[![Lint](https://github.com/KnoxFinance/knox-contracts/workflows/Lint/badge.svg)](https://github.com/KnoxFinance/knox-contracts/actions/workflows/lint.yaml)
 
-## Getting Started
+# Knox Finance
 
-First, install the dependencies with npm run:
+Create a `.env` file with the following values defined:
+
+| Key                    | Description                                                   |
+| ---------------------- | ------------------------------------------------------------- |
+| `CHAINID`              | sets the default chain id                                     |
+| `MAINNET_URI`          | API key Mainnet node                                          |
+| `ARBITRUM_URI`         | API key Arbitrum node                                         |
+| `MAINNET_GOERLI_URI`   | API key Mainnet Goerli node                                   |
+| `ARBITRUM_RINKEBY_URI` | API key Arbitrum Rinkeby node                                 |
+| `DODOC_ON_COMPILE`     | if `true`, docs will be generated on every compilation        |
+| `REPORT_GAS`           | if `true`, a gas report will be generated after running tests |
+| `SIZER_ON_COMPILE`     | if `true`, contract sizes will be output on every compilation |
+
+## Development
+
+Install dependencies via npm:
 
 ```bash
 npm install
 ```
 
-Next, we need to populate the .env file with these values. Copy the .env.example -> .env and fill out the value.
+Setup Husky to format code on commit:
 
 ```bash
-MAINNET_MNEMONIC=
-KOVAN_MNEMONIC=
-ARBITRUM_MNEMONIC=
-ARBITRUM_RINKEBY_MNEMONIC=
-TEST_MNEMONIC=
+npm prepare
+```
 
-MAINNET_URI=
-KOVAN_URI=
-ARBITRUM_URI=
-ARBITRUM_RINKEBY_URI=
-TEST_URI=
+## Testing
+
+Generate typechain typings:
+
+```bash
+npx hardhat typechain
+```
+
+Compile contracts:
+
+```bash
+npx hardhat compile
+```
+
+Run the test suite:
+
+```bash
+npx hardhat test
+```
+
+Activate gas usage reporting by setting the `REPORT_GAS` environment variable to `"true"`:
+
+```bash
+REPORT_GAS=true npx hardhat test
+```
+
+Generate a code coverage report using `solidity-coverage`:
+
+```bash
+npx hardhat coverage
 ```
