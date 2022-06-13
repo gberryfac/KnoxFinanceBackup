@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "@solidstate/contracts/security/Pausable.sol";
 import "@solidstate/contracts/token/ERC20/metadata/ERC20MetadataStorage.sol";
 import "@solidstate/contracts/token/ERC20/IERC20.sol";
 import "@solidstate/contracts/token/ERC4626/base/ERC4626BaseStorage.sol";
@@ -14,7 +13,7 @@ import "./internal/VaultInternal.sol";
 
 import "hardhat/console.sol";
 
-contract Vault is Pausable, VaultInternal {
+contract Vault is VaultInternal {
     using ERC20MetadataStorage for ERC20MetadataStorage.Layout;
     using ERC4626BaseStorage for ERC4626BaseStorage.Layout;
     using SafeERC20 for IERC20;
