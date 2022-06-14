@@ -11,7 +11,7 @@ import "./../interfaces/IQueue.sol";
 import "./../libraries/Constants.sol";
 import "./../libraries/Errors.sol";
 
-library Storage {
+library VaultStorage {
     using SafeERC20 for IERC20;
 
     /************************************************

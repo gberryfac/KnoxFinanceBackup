@@ -9,7 +9,7 @@ import "@solidstate/contracts/utils/SafeERC20.sol";
 import "./../../libraries/Errors.sol";
 
 import "./VaultInternal.sol";
-import "./../Storage.sol";
+import "./../VaultStorage.sol";
 
 import "hardhat/console.sol";
 
@@ -19,14 +19,14 @@ abstract contract QueueInternal is
     VaultInternal
 {
     using SafeERC20 for IERC20;
-    using Storage for Storage.Layout;
+    using VaultStorage for VaultStorage.Layout;
 
     /************************************************
      *  INPUT/OUTPUT
      ***********************************************/
 
     function _depositToQueue(
-        Storage.Layout storage l,
+        VaultStorage.Layout storage l,
         uint256 amount,
         address receiver
     ) internal whenNotPaused {
@@ -55,7 +55,7 @@ abstract contract QueueInternal is
         // emit DepositedToQueue(receiver, amount, l.epoch);
     }
 
-    function _withdrawFromQueue(Storage.Layout storage l, uint256 amount)
+    function _withdrawFromQueue(VaultStorage.Layout storage l, uint256 amount)
         internal
     {
         require(l.totalQueuedAssets - amount >= 0, "overdraft");
@@ -65,7 +65,7 @@ abstract contract QueueInternal is
         l.ERC20.safeTransfer(msg.sender, amount);
     }
 
-    function _maxRedeemShares(Storage.Layout storage l, address receiver)
+    function _maxRedeemShares(VaultStorage.Layout storage l, address receiver)
         internal
     {
         require(
@@ -89,7 +89,7 @@ abstract contract QueueInternal is
     }
 
     function _redeemSharesFromEpoch(
-        Storage.Layout storage l,
+        VaultStorage.Layout storage l,
         uint256 epoch,
         address receiver
     ) internal returns (uint256) {
@@ -113,11 +113,10 @@ abstract contract QueueInternal is
      *  VIEW
      ***********************************************/
 
-    function _previewUnredeemedShares(Storage.Layout storage l, address account)
-        internal
-        view
-        returns (uint256)
-    {
+    function _previewUnredeemedShares(
+        VaultStorage.Layout storage l,
+        address account
+    ) internal view returns (uint256) {
         uint256[] memory epochs = _tokensByAccount(account);
 
         uint256 unredeemedShares;
@@ -136,7 +135,7 @@ abstract contract QueueInternal is
     }
 
     function _previewUnredeemedSharesFromEpoch(
-        Storage.Layout storage l,
+        VaultStorage.Layout storage l,
         uint256 epoch,
         uint256 balance
     ) internal view returns (uint256) {

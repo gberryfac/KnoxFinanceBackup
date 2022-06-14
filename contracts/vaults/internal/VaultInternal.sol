@@ -8,20 +8,20 @@ import "@solidstate/contracts/utils/SafeERC20.sol";
 import "./../../libraries/Constants.sol";
 
 import "./AdminInternal.sol";
-import "./../Storage.sol";
+import "./../VaultStorage.sol";
 
 import "hardhat/console.sol";
 
 contract VaultInternal is AdminInternal, ERC4626Base {
     using SafeERC20 for IERC20;
-    using Storage for Storage.Layout;
+    using VaultStorage for VaultStorage.Layout;
 
     /************************************************
      *  OPERATIONS
      ***********************************************/
 
     function _processEpoch(
-        Storage.Layout storage l,
+        VaultStorage.Layout storage l,
         uint64 expiry,
         uint256 tokenId
     ) internal {
@@ -46,7 +46,9 @@ contract VaultInternal is AdminInternal, ERC4626Base {
      * @notice Transfers reserved liquidity from Premia pool to Vault.
      * @dev Should only be called if option's expired.
      */
-    function _withdrawReservedLiquidity(Storage.Layout storage l) internal {
+    function _withdrawReservedLiquidity(VaultStorage.Layout storage l)
+        internal
+    {
         // uint256 liquidityBefore = l.ERC20.balanceOf(address(this));
 
         uint256 reservedLiquidity =
@@ -64,7 +66,7 @@ contract VaultInternal is AdminInternal, ERC4626Base {
         // emit(liquidityBefore, liquidityAfter, reservedLiquidity);
     }
 
-    function _depositQueuedToVault(Storage.Layout storage l) internal {
+    function _depositQueuedToVault(VaultStorage.Layout storage l) internal {
         uint256 mintedShares = _deposit(l.totalQueuedAssets, address(this));
 
         l.totalQueuedAssets = 0;
@@ -83,7 +85,7 @@ contract VaultInternal is AdminInternal, ERC4626Base {
         // emit DepositQueuedToVault(pricePerShare, mintedShares);
     }
 
-    function _collectVaultFees(Storage.Layout storage l) internal {
+    function _collectVaultFees(VaultStorage.Layout storage l) internal {
         uint256 totalAssets = _totalAssets();
 
         uint256 vaultFee;
@@ -126,7 +128,7 @@ contract VaultInternal is AdminInternal, ERC4626Base {
         // );
     }
 
-    function _borrow(Storage.Layout storage l, uint256 amount) internal {
+    function _borrow(VaultStorage.Layout storage l, uint256 amount) internal {
         uint256 totalFreeLiquidity =
             l.ERC20.balanceOf(address(this)) - l.totalQueuedAssets;
 
@@ -136,7 +138,7 @@ contract VaultInternal is AdminInternal, ERC4626Base {
     }
 
     // function _totalBalance() internal view returns (uint256) {
-    //     Storage.Layout storage l = Storage.layout();
+    //     VaultStorage.Layout storage l = VaultStorage.layout();
 
     //     uint256 erc20Amount = l.ERC20.balanceOf(address(this));
     //     uint256 shortTokenAmount = l.Pool.balanceOf(address(this), l.tokenId);
@@ -158,7 +160,7 @@ contract VaultInternal is AdminInternal, ERC4626Base {
         override(ERC4626BaseInternal)
         returns (uint256)
     {
-        Storage.Layout storage l = Storage.layout();
+        VaultStorage.Layout storage l = VaultStorage.layout();
         uint256 erc20Amount = l.ERC20.balanceOf(address(this));
         uint256 shortTokenAmount = l.Pool.balanceOf(address(this), l.tokenId);
         return erc20Amount + shortTokenAmount - l.totalQueuedAssets;
@@ -174,7 +176,7 @@ contract VaultInternal is AdminInternal, ERC4626Base {
     //     override(ERC4626BaseInternal)
     //     returns (uint256)
     // {
-    //     Storage.Layout storage l = Storage.layout();
+    //     VaultStorage.Layout storage l = VaultStorage.layout();
     //     return l.lastTotalAssets;
     // }
 
@@ -262,7 +264,7 @@ contract VaultInternal is AdminInternal, ERC4626Base {
         address receiver,
         address owner
     ) internal override(ERC4626BaseInternal) returns (uint256) {
-        Storage.Layout storage l = Storage.layout();
+        VaultStorage.Layout storage l = VaultStorage.layout();
         l.Queue.maxRedeemShares(owner);
 
         require(
@@ -289,7 +291,7 @@ contract VaultInternal is AdminInternal, ERC4626Base {
         address receiver,
         address owner
     ) internal override(ERC4626BaseInternal) returns (uint256) {
-        Storage.Layout storage l = Storage.layout();
+        VaultStorage.Layout storage l = VaultStorage.layout();
         l.Queue.maxRedeemShares(owner);
 
         require(
@@ -344,7 +346,7 @@ contract VaultInternal is AdminInternal, ERC4626Base {
         IERC1155(address(this)).safeTransferFrom(
             address(this),
             receiver,
-            Storage.layout().tokenId,
+            VaultStorage.layout().tokenId,
             shortAssetAmount,
             ""
         );
@@ -361,7 +363,7 @@ contract VaultInternal is AdminInternal, ERC4626Base {
         view
         returns (uint256, uint256)
     {
-        Storage.Layout storage l = Storage.layout();
+        VaultStorage.Layout storage l = VaultStorage.layout();
 
         uint256 tokenId = l.tokenId;
 
