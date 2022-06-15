@@ -672,19 +672,13 @@ function pricePerShare(uint256 epoch) external view returns (uint256)
 ### processEpoch
 
 ```solidity
-function processEpoch(uint64 expiry, uint256 tokenId) external nonpayable
+function processEpoch() external nonpayable
 ```
 
 
 
 
 
-#### Parameters
-
-| Name | Type | Description |
-|---|---|---|
-| expiry | uint64 | undefined |
-| tokenId | uint256 | undefined |
 
 ### redeem
 
