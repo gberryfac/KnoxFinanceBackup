@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "./../../libraries/Constants.sol";
 import "./../../libraries/Helpers.sol";
 
 import "./BaseInternal.sol";
@@ -128,12 +127,12 @@ contract AdminInternal is BaseInternal {
         l.totalQueuedAssets = 0;
 
         uint256 _pricePerShare = 10**18;
-        uint256 epoch = l.epoch;
 
-        if (mintedShares > 0 && l.Queue.totalSupply(epoch) > 0) {
-            _pricePerShare =
-                (_pricePerShare * mintedShares) /
-                l.Queue.totalSupply(epoch);
+        uint256 epoch = l.epoch;
+        uint256 totalSupply = l.Vault.totalSupply(epoch);
+
+        if (mintedShares > 0 && totalSupply > 0) {
+            _pricePerShare = (_pricePerShare * mintedShares) / totalSupply;
         }
 
         l.pricePerShare[l.epoch] = _pricePerShare;

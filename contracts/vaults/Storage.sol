@@ -6,7 +6,7 @@ import "@solidstate/contracts/utils/SafeERC20.sol";
 
 import "./../interfaces/IDeltaPricer.sol";
 import "./../interfaces/IPremiaPool.sol";
-import "./../interfaces/IQueue.sol";
+import "./../interfaces/IVault.sol";
 
 import "./../libraries/Constants.sol";
 
@@ -19,10 +19,8 @@ library Storage {
 
     struct InitParams {
         bool isCall;
-        string name;
-        string symbol;
-        address asset;
-        address pool;
+        uint64 minimumContractSize;
+        int128 delta64x64;
     }
 
     struct InitProps {
@@ -30,6 +28,12 @@ library Storage {
         uint256 cap;
         uint256 managementFee;
         uint256 performanceFee;
+        string name;
+        string symbol;
+        address keeper;
+        address feeRecipient;
+        address pool;
+        address pricer;
     }
 
     /************************************************
@@ -99,8 +103,6 @@ library Storage {
         address keeper;
         // @notice
         address feeRecipient;
-        // @notice
-        address strategy;
         /************************************************
          * EXTERNAL CONTRACTS
          ***********************************************/
@@ -111,7 +113,7 @@ library Storage {
         // @notice
         IPremiaPool Pool;
         // @notice
-        IQueue Queue;
+        IVault Vault;
     }
 
     bytes32 internal constant LAYOUT_SLOT =
@@ -143,12 +145,8 @@ library Storage {
         l.keeper = newKeeper;
     }
 
-    function _setStrategy(address newStrategy) internal {
-        Layout storage l = layout();
-        require(newStrategy != address(0), "address not provided");
-        require(newStrategy != l.strategy, "new address equals old");
-        l.strategy = newStrategy;
-    }
+    // TODO:
+    function _setPricer(address newPricer) internal {}
 
     function _setManagementFee(uint256 newManagementFee) internal {
         Layout storage l = layout();

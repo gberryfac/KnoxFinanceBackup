@@ -29,19 +29,6 @@ abstract contract AccessInternal is OwnableInternal, PausableInternal {
         _;
     }
 
-    // TODO: Delete
-    // /**
-    //  * @dev Throws if called by any account other than authorized accounts.
-    //  */
-    // modifier onlyAuthorized() {
-    //     Storage.Layout storage l = Storage.layout();
-    //     require(
-    //         msg.sender == l.strategy || msg.sender == l.keeper,
-    //         "unauthorized"
-    //     );
-    //     _;
-    // }
-
     /**
      * @dev Throws if called by any account other than the keeper.
      */
@@ -50,14 +37,4 @@ abstract contract AccessInternal is OwnableInternal, PausableInternal {
         require(msg.sender == l.keeper, "!keeper");
         _;
     }
-
-    // TODO: Delete
-    // /**
-    //  * @dev Throws if called by any account other than the strategy.
-    //  */
-    // modifier onlyStrategy() {
-    //     Storage.Layout storage l = Storage.layout();
-    //     require(msg.sender == l.strategy, "!strategy");
-    //     _;
-    // }
 }

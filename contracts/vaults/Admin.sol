@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "./../libraries/Constants.sol";
-
 import "./internal/AdminInternal.sol";
 
 contract Admin is AdminInternal {
@@ -47,13 +45,8 @@ contract Admin is AdminInternal {
         Storage._setKeeper(newKeeper);
     }
 
-    /**
-     * @notice Sets the new strategy
-     * @param newStrategy is the address of the new strategy
-     */
-    function setStrategy(address newStrategy) external onlyOwner {
-        Storage._setStrategy(newStrategy);
-    }
+    // TODO:
+    function setPricer(address newPricer) external onlyOwner {}
 
     /**
      * @notice Sets the management fee for the vault

@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+import "@solidstate/contracts/token/ERC1155/IERC1155.sol";
 import "@solidstate/contracts/token/ERC4626/base/ERC4626Base.sol";
-
-import "./../../libraries/Constants.sol";
 
 import "./AccessInternal.sol";
 
@@ -116,7 +115,7 @@ contract BaseInternal is AccessInternal, ERC4626Base {
         address owner
     ) internal override(ERC4626BaseInternal) returns (uint256) {
         Storage.Layout storage l = Storage.layout();
-        l.Queue.maxRedeemShares(owner);
+        l.Vault.maxRedeemShares(owner);
 
         require(
             assetAmount <= _maxWithdraw(owner),
@@ -143,7 +142,7 @@ contract BaseInternal is AccessInternal, ERC4626Base {
         address owner
     ) internal override(ERC4626BaseInternal) returns (uint256) {
         Storage.Layout storage l = Storage.layout();
-        l.Queue.maxRedeemShares(owner);
+        l.Vault.maxRedeemShares(owner);
 
         require(
             shareAmount <= _maxRedeem(owner),

@@ -3,12 +3,12 @@ pragma solidity ^0.8.0;
 
 import "abdk-libraries-solidity/ABDKMath64x64.sol";
 
-import "./../../interfaces/IDelta.sol";
-import "./../../interfaces/IDeltaPricer.sol";
+// import "./../../interfaces/IDelta.sol";
+// import "./../../interfaces/IDeltaPricer.sol";
 
 import "./BaseInternal.sol";
 
-abstract contract AuctionInternal is IDelta, BaseInternal {
+abstract contract AuctionInternal is BaseInternal {
     using ABDKMath64x64 for int128;
     using ABDKMath64x64 for uint256;
     using SafeERC20 for IERC20;
@@ -38,7 +38,7 @@ abstract contract AuctionInternal is IDelta, BaseInternal {
         //         );
         //     // TODO: Change to '_underwrite' function
         //     _borrow(amount);
-        //     Asset.approve(address(l.Pool), amount);
+        //     Asset.approve(address(Pool), amount);
         //     (uint256 longTokenId, ) = l.Pool.writeFrom(
         //         address(Vault),
         //         msg.sender,
@@ -48,7 +48,7 @@ abstract contract AuctionInternal is IDelta, BaseInternal {
         //         option.isCall
         //     );
         //     emit Sold(msg.sender, contractSize, longTokenId);
-        //     Pool.setDivestmentTimestamp(option.expiry, option.isCall);
+        //     l.Pool.setDivestmentTimestamp(option.expiry, option.isCall);
     }
 
     function _exercise(
