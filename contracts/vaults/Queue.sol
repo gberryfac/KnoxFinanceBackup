@@ -3,13 +3,7 @@ pragma solidity ^0.8.0;
 
 import "@solidstate/contracts/introspection/ERC165Storage.sol";
 import "@solidstate/contracts/introspection/IERC165.sol";
-import "@solidstate/contracts/token/ERC20/IERC20.sol";
-import "@solidstate/contracts/token/ERC1155/enumerable/ERC1155Enumerable.sol";
-import "@solidstate/contracts/token/ERC1155/IERC1155.sol";
 import "@solidstate/contracts/utils/ReentrancyGuard.sol";
-import "@solidstate/contracts/utils/SafeERC20.sol";
-
-import "./../libraries/Errors.sol";
 
 import "./internal/QueueInternal.sol";
 

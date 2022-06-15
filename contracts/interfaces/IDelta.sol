@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-interface IStandardDelta {
-    event NextOptionSet(bool isCall, uint64 expiry, int128 strike64x64);
+interface IDelta {
+    event OptionParametersSet(bool isCall, uint64 expiry, int128 strike64x64);
 
     event Sold(address account, uint256 amount, uint256 indexed tokenId);
 

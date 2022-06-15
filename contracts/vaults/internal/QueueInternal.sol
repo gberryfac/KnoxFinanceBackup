@@ -1,45 +1,38 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "@solidstate/contracts/token/ERC20/IERC20.sol";
 import "@solidstate/contracts/token/ERC1155/base/ERC1155Base.sol";
 import "@solidstate/contracts/token/ERC1155/enumerable/ERC1155Enumerable.sol";
-import "@solidstate/contracts/utils/SafeERC20.sol";
 
-import "./../../libraries/Errors.sol";
-
-import "./VaultInternal.sol";
-import "./../VaultStorage.sol";
-
-import "hardhat/console.sol";
+import "./BaseInternal.sol";
 
 abstract contract QueueInternal is
     ERC1155Base,
     ERC1155Enumerable,
-    VaultInternal
+    BaseInternal
 {
     using SafeERC20 for IERC20;
-    using VaultStorage for VaultStorage.Layout;
+    using Storage for Storage.Layout;
 
     /************************************************
      *  INPUT/OUTPUT
      ***********************************************/
 
     function _depositToQueue(
-        VaultStorage.Layout storage l,
+        Storage.Layout storage l,
         uint256 amount,
         address receiver
     ) internal whenNotPaused {
-        require(amount > 0, Errors.VALUE_EXCEEDS_MINIMUM);
+        require(amount > 0, "value exceeds minimum");
 
         uint256 totalWithDepositedAmount =
             _totalAssets() + l.totalQueuedAssets + amount;
 
-        require(totalWithDepositedAmount <= l.cap, Errors.VAULT_CAP_EXCEEDED);
+        require(totalWithDepositedAmount <= l.cap, "vault cap exceeded");
 
         require(
             totalWithDepositedAmount >= l.minimumSupply,
-            Errors.DEPOSIT_MINIMUM_NOT_MET
+            "deposit minimum not met"
         );
 
         l.totalQueuedAssets += amount;
@@ -55,7 +48,7 @@ abstract contract QueueInternal is
         // emit DepositedToQueue(receiver, amount, l.epoch);
     }
 
-    function _withdrawFromQueue(VaultStorage.Layout storage l, uint256 amount)
+    function _withdrawFromQueue(Storage.Layout storage l, uint256 amount)
         internal
     {
         require(l.totalQueuedAssets - amount >= 0, "overdraft");
@@ -65,7 +58,7 @@ abstract contract QueueInternal is
         l.ERC20.safeTransfer(msg.sender, amount);
     }
 
-    function _maxRedeemShares(VaultStorage.Layout storage l, address receiver)
+    function _maxRedeemShares(Storage.Layout storage l, address receiver)
         internal
     {
         require(
@@ -89,7 +82,7 @@ abstract contract QueueInternal is
     }
 
     function _redeemSharesFromEpoch(
-        VaultStorage.Layout storage l,
+        Storage.Layout storage l,
         uint256 epoch,
         address receiver
     ) internal returns (uint256) {
@@ -113,10 +106,11 @@ abstract contract QueueInternal is
      *  VIEW
      ***********************************************/
 
-    function _previewUnredeemedShares(
-        VaultStorage.Layout storage l,
-        address account
-    ) internal view returns (uint256) {
+    function _previewUnredeemedShares(Storage.Layout storage l, address account)
+        internal
+        view
+        returns (uint256)
+    {
         uint256[] memory epochs = _tokensByAccount(account);
 
         uint256 unredeemedShares;
@@ -135,7 +129,7 @@ abstract contract QueueInternal is
     }
 
     function _previewUnredeemedSharesFromEpoch(
-        VaultStorage.Layout storage l,
+        Storage.Layout storage l,
         uint256 epoch,
         uint256 balance
     ) internal view returns (uint256) {

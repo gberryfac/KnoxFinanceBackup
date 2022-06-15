@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 import "@solidstate/contracts/token/ERC4626/IERC4626.sol";
 
 import "./IQueue.sol";
-import "../vaults/Storage.sol";
+import "./../vaults/Storage.sol";
 
 interface IKnox is IERC4626, IQueue {
     function initializeVault(
@@ -15,7 +15,7 @@ interface IKnox is IERC4626, IQueue {
         address _strategy
     ) external;
 
-    function processEpoch(uint64 expiry, uint256 tokenId) external;
+    function processEpoch() external;
 
     function withdrawReservedLiquidity() external;
 

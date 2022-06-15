@@ -24,4 +24,4 @@ interface IStrikeSelection {
     function snapToGrid(bool isCall, int128 n) external view returns (int128);
 }
 
-interface IStandardDeltaPricer is IStrikeSelection {}
+interface IDeltaPricer is IStrikeSelection {}
