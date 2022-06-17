@@ -4,11 +4,10 @@ pragma solidity ^0.8.0;
 import "@solidstate/contracts/token/ERC20/IERC20.sol";
 import "@solidstate/contracts/utils/SafeERC20.sol";
 
-import "./../interfaces/IDeltaPricer.sol";
-import "./../interfaces/IPremiaPool.sol";
-import "./../interfaces/IVault.sol";
+import "../interfaces/IDeltaPricer.sol";
+import "../interfaces/IPremiaPool.sol";
 
-import "./../libraries/Constants.sol";
+import "../libraries/Constants.sol";
 
 library Storage {
     using SafeERC20 for IERC20;
@@ -62,9 +61,9 @@ library Storage {
         // @notice Strike price of the option as a 64x64 bit fixed point number
         int128 strike64x64;
         // @notice
-        uint256 tokenId;
-        // @notice Asset held in vault
-        address asset;
+        uint256 optionTokenId;
+        // // @notice Asset held in vault
+        // address asset;
         /************************************************
          * AUCTION PARAMETERS
          ***********************************************/
@@ -78,7 +77,9 @@ library Storage {
          * VAULT STATE
          ***********************************************/
         // @notice
-        uint256 epoch;
+        uint64 epoch;
+        // @notice
+        uint256 claimTokenId;
         // @notice
         uint256 totalQueuedAssets;
         // @notice
@@ -108,12 +109,12 @@ library Storage {
          ***********************************************/
         // @notice
         IDeltaPricer Pricer;
-        // @notice
-        IERC20 ERC20;
-        // @notice
-        IPremiaPool Pool;
-        // @notice
-        IVault Vault;
+        // // @notice
+        // IERC20 ERC20;
+        // // @notice
+        // IPremiaPool Pool;
+        // // @notice
+        // IVault Vault;
     }
 
     bytes32 internal constant LAYOUT_SLOT =
@@ -219,29 +220,28 @@ library Storage {
         returns (
             bool,
             uint256,
-            uint256,
-            address
+            uint256
         )
     {
         Layout storage l = layout();
-        return (l.isCall, l.expiry, l.tokenId, l.asset);
+        return (l.isCall, l.expiry, l.optionTokenId);
     }
 
-    function _accountsByOption(uint256 id)
-        external
-        view
-        returns (address[] memory)
-    {
-        Layout storage l = layout();
-        return l.Pool.accountsByToken(id);
-    }
+    // function _accountsByOption(uint256 id)
+    //     external
+    //     view
+    //     returns (address[] memory)
+    // {
+    //     Layout storage l = layout();
+    //     return Pool.accountsByToken(id);
+    // }
 
-    function _optionsByAccount(address account)
-        external
-        view
-        returns (uint256[] memory)
-    {
-        Layout storage l = layout();
-        return l.Pool.tokensByAccount(account);
-    }
+    // function _optionsByAccount(address account)
+    //     external
+    //     view
+    //     returns (uint256[] memory)
+    // {
+    //     Layout storage l = layout();
+    //     return Pool.tokensByAccount(account);
+    // }
 }

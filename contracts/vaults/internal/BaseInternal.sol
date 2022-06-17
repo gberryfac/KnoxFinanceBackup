@@ -4,11 +4,29 @@ pragma solidity ^0.8.0;
 import "@solidstate/contracts/token/ERC1155/IERC1155.sol";
 import "@solidstate/contracts/token/ERC4626/base/ERC4626Base.sol";
 
+import "../IVault.sol";
+
 import "./AccessInternal.sol";
+
+import "hardhat/console.sol";
 
 contract BaseInternal is AccessInternal, ERC4626Base {
     using SafeERC20 for IERC20;
     using Storage for Storage.Layout;
+
+    IERC20 immutable ERC20;
+    IPremiaPool immutable Pool;
+    IVault immutable Vault;
+
+    constructor(bool isCall, address pool) {
+        Pool = IPremiaPool(pool);
+
+        PoolStorage.PoolSettings memory settings = Pool.getPoolSettings();
+        address asset = isCall ? settings.underlying : settings.base;
+
+        ERC20 = IERC20(asset);
+        Vault = IVault(address(this));
+    }
 
     /************************************************
      *  ERC4626 OVERRIDES
@@ -25,8 +43,11 @@ contract BaseInternal is AccessInternal, ERC4626Base {
         returns (uint256)
     {
         Storage.Layout storage l = Storage.layout();
-        uint256 erc20Amount = l.ERC20.balanceOf(address(this));
-        uint256 shortTokenAmount = l.Pool.balanceOf(address(this), l.tokenId);
+        uint256 erc20Amount = ERC20.balanceOf(address(this));
+        uint256 shortTokenAmount =
+            Pool.balanceOf(address(this), l.optionTokenId);
+
+        if (l.optionTokenId == 0) shortTokenAmount = 0;
         return erc20Amount + shortTokenAmount - l.totalQueuedAssets;
     }
 
@@ -114,8 +135,7 @@ contract BaseInternal is AccessInternal, ERC4626Base {
         address receiver,
         address owner
     ) internal override(ERC4626BaseInternal) returns (uint256) {
-        Storage.Layout storage l = Storage.layout();
-        l.Vault.maxRedeemShares(owner);
+        Vault.maxRedeemShares(owner);
 
         require(
             assetAmount <= _maxWithdraw(owner),
@@ -141,8 +161,7 @@ contract BaseInternal is AccessInternal, ERC4626Base {
         address receiver,
         address owner
     ) internal override(ERC4626BaseInternal) returns (uint256) {
-        Storage.Layout storage l = Storage.layout();
-        l.Vault.maxRedeemShares(owner);
+        Vault.maxRedeemShares(owner);
 
         require(
             shareAmount <= _maxRedeem(owner),
@@ -196,7 +215,7 @@ contract BaseInternal is AccessInternal, ERC4626Base {
         IERC1155(address(this)).safeTransferFrom(
             address(this),
             receiver,
-            Storage.layout().tokenId,
+            Storage.layout().optionTokenId,
             shortAssetAmount,
             ""
         );
@@ -215,16 +234,12 @@ contract BaseInternal is AccessInternal, ERC4626Base {
     {
         Storage.Layout storage l = Storage.layout();
 
-        uint256 tokenId = l.tokenId;
-
-        uint256 vaultAssetRatio =
-            l.ERC20.balanceOf(address(this)) / totalAssets;
+        uint256 vaultAssetRatio = ERC20.balanceOf(address(this)) / totalAssets;
         uint256 shortAssetRatio =
-            l.Pool.balanceOf(address(this), tokenId) / totalAssets;
+            Pool.balanceOf(address(this), l.optionTokenId) / totalAssets;
 
         uint256 vaultAssetAmount = assetAmount * vaultAssetRatio;
         uint256 shortAssetAmount = assetAmount * shortAssetRatio;
-
         return (vaultAssetAmount, shortAssetAmount);
     }
 }

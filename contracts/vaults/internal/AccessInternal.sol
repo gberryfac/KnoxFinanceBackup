@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 import "@solidstate/contracts/access/ownable/OwnableInternal.sol";
 import "@solidstate/contracts/security/PausableInternal.sol";
 
-import "./../Storage.sol";
+import "../Storage.sol";
 
 // TODO: Inherit Timelock protection
 abstract contract AccessInternal is OwnableInternal, PausableInternal {

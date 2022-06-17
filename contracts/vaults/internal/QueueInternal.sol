@@ -14,6 +14,8 @@ abstract contract QueueInternal is
     using SafeERC20 for IERC20;
     using Storage for Storage.Layout;
 
+    constructor(bool isCall, address pool) BaseInternal(isCall, pool) {}
+
     /************************************************
      *  INPUT/OUTPUT
      ***********************************************/
@@ -39,13 +41,13 @@ abstract contract QueueInternal is
 
         // redeems shares from previous epochs
         _maxRedeemShares(l, receiver);
-        _mint(receiver, l.epoch, amount, "");
+        _mint(receiver, l.claimTokenId, amount, "");
 
         // An approve() by the msg.sender is required beforehand
-        l.ERC20.safeTransferFrom(msg.sender, address(this), amount);
+        ERC20.safeTransferFrom(msg.sender, address(this), amount);
 
         // Note: Index receiver
-        // emit DepositedToQueue(receiver, amount, l.epoch);
+        // emit DepositedToQueue(receiver, amount, l.claimTokenId);
     }
 
     function _withdrawFromQueue(Storage.Layout storage l, uint256 amount)
@@ -54,8 +56,8 @@ abstract contract QueueInternal is
         require(l.totalQueuedAssets - amount >= 0, "overdraft");
         l.totalQueuedAssets -= amount;
 
-        _burn(msg.sender, l.epoch, amount);
-        l.ERC20.safeTransfer(msg.sender, amount);
+        _burn(msg.sender, l.claimTokenId, amount);
+        ERC20.safeTransfer(msg.sender, amount);
     }
 
     function _maxRedeemShares(Storage.Layout storage l, address receiver)
@@ -66,24 +68,29 @@ abstract contract QueueInternal is
             "ERC1155: caller is not owner nor approved"
         );
 
-        uint256[] memory epochs = _tokensByAccount(receiver);
+        uint256[] memory claimTokenIds = _tokensByAccount(receiver);
 
         uint256 unredeemedShares;
 
-        for (uint256 i; i < epochs.length; i++) {
-            uint256 epoch = epochs[i];
-            unredeemedShares += _redeemSharesFromEpoch(l, epoch, receiver);
+        for (uint256 i; i < claimTokenIds.length; i++) {
+            uint256 claimTokenId = claimTokenIds[i];
+
+            unredeemedShares += _redeemSharesFromEpoch(
+                l,
+                claimTokenId,
+                receiver
+            );
         }
 
         IERC20(address(this)).safeTransfer(receiver, unredeemedShares);
 
         // Note: Index receiver
-        // emit RedeemedShares(receiver, unredeemedShares, epoch);
+        // emit RedeemedShares(receiver, unredeemedShares, claimTokenId);
     }
 
     function _redeemSharesFromEpoch(
         Storage.Layout storage l,
-        uint256 epoch,
+        uint256 claimTokenId,
         address receiver
     ) internal returns (uint256) {
         require(
@@ -91,12 +98,16 @@ abstract contract QueueInternal is
             "ERC1155: caller is not owner nor approved"
         );
 
-        if (epoch < l.epoch) {
-            uint256 balance = _balanceOf(receiver, epoch);
-            _burn(receiver, epoch, balance);
+        if (claimTokenId < l.claimTokenId) {
+            uint256 claimTokenBalance = _balanceOf(receiver, claimTokenId);
+            _burn(receiver, claimTokenId, claimTokenBalance);
 
             return
-                _previewUnredeemedSharesFromEpoch(l, uint256(epoch), balance);
+                _previewUnredeemedSharesFromEpoch(
+                    l,
+                    uint256(claimTokenId),
+                    claimTokenBalance
+                );
         }
 
         return 0;
@@ -111,17 +122,17 @@ abstract contract QueueInternal is
         view
         returns (uint256)
     {
-        uint256[] memory epochs = _tokensByAccount(account);
+        uint256[] memory claimTokenIds = _tokensByAccount(account);
 
         uint256 unredeemedShares;
-        for (uint256 i; i < epochs.length; i++) {
-            uint256 epoch = epochs[i];
-            uint256 balance = _balanceOf(account, epoch);
+        for (uint256 i; i < claimTokenIds.length; i++) {
+            uint256 claimTokenId = claimTokenIds[i];
+            uint256 claimTokenBalance = _balanceOf(account, claimTokenId);
 
             unredeemedShares += _previewUnredeemedSharesFromEpoch(
                 l,
-                epoch,
-                balance
+                claimTokenId,
+                claimTokenBalance
             );
         }
 
@@ -130,11 +141,11 @@ abstract contract QueueInternal is
 
     function _previewUnredeemedSharesFromEpoch(
         Storage.Layout storage l,
-        uint256 epoch,
-        uint256 balance
+        uint256 claimTokenId,
+        uint256 claimTokenBalance
     ) internal view returns (uint256) {
-        if (epoch < l.epoch) {
-            return (balance * l.pricePerShare[epoch]) / 10**18;
+        if (claimTokenId < l.claimTokenId) {
+            return (claimTokenBalance * l.pricePerShare[claimTokenId]) / 10**18;
         }
 
         return 0;

@@ -12,7 +12,7 @@ contract Queue is QueueInternal, ReentrancyGuard {
     using SafeERC20 for IERC20;
     using Storage for Storage.Layout;
 
-    constructor() {
+    constructor(bool isCall, address pool) QueueInternal(isCall, pool) {
         ERC165Storage.Layout storage l = ERC165Storage.layout();
         l.setSupportedInterface(type(IERC165).interfaceId, true);
         l.setSupportedInterface(type(IERC1155).interfaceId, true);

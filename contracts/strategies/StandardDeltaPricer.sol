@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {IPremiaPool, PoolStorage} from "./../interfaces/IPremiaPool.sol";
+import {IPremiaPool, PoolStorage} from "../interfaces/IPremiaPool.sol";
 
 import "./StandardDeltaPricer/StandardDeltaPricerStorage.sol";
 import "./StandardDeltaPricer/StrikeSelection.sol";

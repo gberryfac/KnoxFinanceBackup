@@ -3,8 +3,8 @@ pragma solidity ^0.8.0;
 
 import "abdk-libraries-solidity/ABDKMath64x64.sol";
 
-// import "./../../interfaces/IDelta.sol";
-// import "./../../interfaces/IDeltaPricer.sol";
+// import "../../interfaces/IDelta.sol";
+// import "../../interfaces/IDeltaPricer.sol";
 
 import "./BaseInternal.sol";
 
@@ -13,6 +13,8 @@ abstract contract AuctionInternal is BaseInternal {
     using ABDKMath64x64 for uint256;
     using SafeERC20 for IERC20;
     using Storage for Storage.Layout;
+
+    constructor(bool isCall, address pool) BaseInternal(isCall, pool) {}
 
     /************************************************
      *  INPUT/OUTPUT
@@ -39,7 +41,7 @@ abstract contract AuctionInternal is BaseInternal {
         //     // TODO: Change to '_underwrite' function
         //     _borrow(amount);
         //     Asset.approve(address(Pool), amount);
-        //     (uint256 longTokenId, ) = l.Pool.writeFrom(
+        //     (uint256 longTokenId, ) = Pool.writeFrom(
         //         address(Vault),
         //         msg.sender,
         //         option.expiry,
@@ -48,7 +50,7 @@ abstract contract AuctionInternal is BaseInternal {
         //         option.isCall
         //     );
         //     emit Sold(msg.sender, contractSize, longTokenId);
-        //     l.Pool.setDivestmentTimestamp(option.expiry, option.isCall);
+        //     Pool.setDivestmentTimestamp(option.expiry, option.isCall);
     }
 
     function _exercise(
@@ -57,7 +59,7 @@ abstract contract AuctionInternal is BaseInternal {
         uint256 contractSize
     ) internal {
         Storage.Layout storage l = Storage.layout();
-        l.Pool.exerciseFrom(holder, longTokenId, contractSize);
+        Pool.exerciseFrom(holder, longTokenId, contractSize);
     }
 
     /************************************************

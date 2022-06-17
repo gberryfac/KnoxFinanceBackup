@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 import "@solidstate/contracts/token/ERC20/IERC20.sol";
 import "@solidstate/contracts/utils/SafeERC20.sol";
 
-import "./../interfaces/IWETH.sol";
+import "../interfaces/IWETH.sol";
 
 library Helpers {
     using SafeERC20 for IERC20;

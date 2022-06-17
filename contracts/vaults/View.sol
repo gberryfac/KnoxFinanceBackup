@@ -6,6 +6,8 @@ import "./internal/BaseInternal.sol";
 contract View is BaseInternal {
     using Storage for Storage.Layout;
 
+    constructor(bool isCall, address pool) BaseInternal(isCall, pool) {}
+
     function totalQueuedAssets() external view returns (uint256) {
         return Storage._totalQueuedAssets();
     }
@@ -24,26 +26,25 @@ contract View is BaseInternal {
         returns (
             bool,
             uint256,
-            uint256,
-            address
+            uint256
         )
     {
         return Storage._option();
     }
 
-    function accountsByOption(uint256 id)
-        external
-        view
-        returns (address[] memory)
-    {
-        return Storage._accountsByOption(id);
-    }
+    // function accountsByOption(uint256 id)
+    //     external
+    //     view
+    //     returns (address[] memory)
+    // {
+    //     return Storage._accountsByOption(id);
+    // }
 
-    function optionsByAccount(address account)
-        external
-        view
-        returns (uint256[] memory)
-    {
-        return Storage._optionsByAccount(account);
-    }
+    // function optionsByAccount(address account)
+    //     external
+    //     view
+    //     returns (uint256[] memory)
+    // {
+    //     return Storage._optionsByAccount(account);
+    // }
 }

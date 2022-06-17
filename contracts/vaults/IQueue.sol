@@ -1,12 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "@solidstate/contracts/token/ERC1155/base/IERC1155Base.sol";
+import "@solidstate/contracts/token/ERC1155/IERC1155.sol";
 import "@solidstate/contracts/token/ERC1155/enumerable/IERC1155Enumerable.sol";
 
-interface IQueue is IERC1155Base, IERC1155Enumerable {
-    function initializeQueue() external;
-
+interface IQueue is IERC1155, IERC1155Enumerable {
     function depositToQueue(uint256 amount) external;
 
     function depositToQueue(uint256 amount, address receiver) external;

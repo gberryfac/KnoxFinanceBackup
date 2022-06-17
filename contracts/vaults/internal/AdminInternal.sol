@@ -1,13 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "./../../libraries/Helpers.sol";
+import "../../libraries/Helpers.sol";
 
 import "./BaseInternal.sol";
 
 contract AdminInternal is BaseInternal {
     using SafeERC20 for IERC20;
     using Storage for Storage.Layout;
+
+    constructor(bool isCall, address pool) BaseInternal(isCall, pool) {}
 
     /************************************************
      *  OPERATIONS
@@ -24,21 +26,20 @@ contract AdminInternal is BaseInternal {
         _setAuctionPrices();
         _setAuctionWindow();
 
-        // TODO: Set this after auction ends/ options have been underwritten.
-        // l.tokenId = tokenId;
-
         Storage.Layout storage l = Storage.layout();
 
-        l.lastTotalAssets = _totalAssets();
         l.epoch++;
 
+        l.claimTokenId = _formatClaimTokenId(l.epoch);
+        l.lastTotalAssets = _totalAssets();
+
         // Note: index epoch
-        // emit SetNextEpoch(epoch, l.lastTotalAssets);
+        // emit SetNextEpoch(l.epoch, l.claimTokenId, l.lastTotalAssets);
     }
 
     function _processExpired() internal {
         Storage.Layout storage l = Storage.layout();
-        uint256[] memory tokenIds = l.Pool.tokensByAccount(address(this));
+        uint256[] memory tokenIds = Pool.tokensByAccount(address(this));
 
         for (uint256 i; i < tokenIds.length; i++) {
             if (
@@ -46,10 +47,10 @@ contract AdminInternal is BaseInternal {
                 tokenIds[i] != Constants.BASE_RESERVED_LIQ_TOKEN_ID
             ) {
                 uint256 tokenBalance =
-                    l.Pool.balanceOf(address(this), tokenIds[i]);
+                    Pool.balanceOf(address(this), tokenIds[i]);
 
                 if (tokenBalance >= l.minimumContractSize) {
-                    l.Pool.processExpired(tokenIds[i], tokenBalance);
+                    Pool.processExpired(tokenIds[i], tokenBalance);
                 }
             }
         }
@@ -57,19 +58,19 @@ contract AdminInternal is BaseInternal {
 
     function _withdrawReservedLiquidity() internal {
         Storage.Layout storage l = Storage.layout();
-        // uint256 liquidityBefore = l.ERC20.balanceOf(address(this));
+        // uint256 liquidityBefore = ERC20.balanceOf(address(this));
 
         uint256 reservedLiquidity =
-            l.Pool.balanceOf(
+            Pool.balanceOf(
                 address(this),
                 l.isCall
                     ? Constants.UNDERLYING_RESERVED_LIQ_TOKEN_ID
                     : Constants.BASE_RESERVED_LIQ_TOKEN_ID
             );
 
-        l.Pool.withdraw(reservedLiquidity, l.isCall);
+        Pool.withdraw(reservedLiquidity, l.isCall);
 
-        // uint256 liquidityAfter = l.ERC20.balanceOf(address(this));
+        // uint256 liquidityAfter = ERC20.balanceOf(address(this));
 
         // emit(liquidityBefore, liquidityAfter, reservedLiquidity);
     }
@@ -104,12 +105,12 @@ contract AdminInternal is BaseInternal {
 
                 vaultFee = performanceFeeInAsset + managementFeeInAsset;
 
-                l.ERC20.safeTransfer(l.feeRecipient, vaultFee);
+                ERC20.safeTransfer(l.feeRecipient, vaultFee);
             }
         }
 
         if (vaultFee > 0) {
-            l.ERC20.safeTransfer(l.feeRecipient, vaultFee);
+            ERC20.safeTransfer(l.feeRecipient, vaultFee);
         }
 
         // emit DisbursedVaultFees(
@@ -121,15 +122,13 @@ contract AdminInternal is BaseInternal {
 
     function _depositQueuedToVault() internal {
         Storage.Layout storage l = Storage.layout();
-
         uint256 mintedShares = _deposit(l.totalQueuedAssets, address(this));
 
         l.totalQueuedAssets = 0;
-
         uint256 _pricePerShare = 10**18;
 
         uint256 epoch = l.epoch;
-        uint256 totalSupply = l.Vault.totalSupply(epoch);
+        uint256 totalSupply = Vault.totalSupply(epoch);
 
         if (mintedShares > 0 && totalSupply > 0) {
             _pricePerShare = (_pricePerShare * mintedShares) / totalSupply;
@@ -174,19 +173,23 @@ contract AdminInternal is BaseInternal {
 
     // // TODO: Change to '_underwrite' function
     // function _borrow(Storage.Layout storage l, uint256 amount) internal {
-    //     uint256 totalFreeLiquidity = l.ERC20.balanceOf(address(this)) -
+    //     uint256 totalFreeLiquidity = ERC20.balanceOf(address(this)) -
     //         l.totalQueuedAssets;
 
     //     require(totalFreeLiquidity >= amount, Errors.FREE_LIQUIDTY_EXCEEDED);
 
-    //     l.ERC20.safeTransfer(l.strategy, amount);
+    //     ERC20.safeTransfer(l.strategy, amount);
     // }
 
     /************************************************
      * HELPERS
      ***********************************************/
 
-    function _getNextFriday() internal view returns (uint64) {
+    function _getNextFriday() private view returns (uint64) {
         return uint64(Helpers.getNextFriday(block.timestamp));
+    }
+
+    function _formatClaimTokenId(uint64 epoch) private view returns (uint256) {
+        return (uint256(uint160(address(this))) << 16) + uint16(epoch);
     }
 }

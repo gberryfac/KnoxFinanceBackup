@@ -5,8 +5,6 @@ import "@solidstate/contracts/utils/ReentrancyGuard.sol";
 
 import "abdk-libraries-solidity/ABDKMath64x64.sol";
 
-// import "./../interfaces/IDeltaPricer.sol";
-
 import "./internal/AuctionInternal.sol";
 
 contract Auction is AuctionInternal, ReentrancyGuard {
@@ -14,6 +12,8 @@ contract Auction is AuctionInternal, ReentrancyGuard {
     using ABDKMath64x64 for uint256;
     using SafeERC20 for IERC20;
     using Storage for Storage.Layout;
+
+    constructor(bool isCall, address pool) AuctionInternal(isCall, pool) {}
 
     /************************************************
      *  INPUT/OUTPUT
@@ -51,7 +51,7 @@ contract Auction is AuctionInternal, ReentrancyGuard {
         returns (address[] memory)
     {
         Storage.Layout storage l = Storage.layout();
-        return l.Pool.accountsByToken(id);
+        return Pool.accountsByToken(id);
     }
 
     function optionsByAccount(address account)
@@ -60,6 +60,6 @@ contract Auction is AuctionInternal, ReentrancyGuard {
         returns (uint256[] memory)
     {
         Storage.Layout storage l = Storage.layout();
-        return l.Pool.tokensByAccount(account);
+        return Pool.tokensByAccount(account);
     }
 }
