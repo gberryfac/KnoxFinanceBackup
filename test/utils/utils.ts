@@ -57,7 +57,6 @@ export async function setERC20Balance(
   balance: string,
   slot: number
 ) {
-  const key = ethers.utils.hexlify(ethers.utils.zeroPad(account, 32));
   const index = ethers.utils.solidityKeccak256(
     ["uint256", "uint256"],
     [account, slot]

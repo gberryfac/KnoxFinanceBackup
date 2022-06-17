@@ -5,10 +5,10 @@ import { fixedFromFloat } from "@premia/utils";
 import {
   TestABDKMath64x64Token,
   TestABDKMath64x64Token__factory,
-} from "./../../types";
+} from "../../types";
 
 import { expect } from "chai";
-import { assert } from "../helpers/assertions";
+import { assert } from "../utils/assertions";
 
 const decimalValues = ["0", "1", "2.718281828459045", "9223372036854775807"];
 

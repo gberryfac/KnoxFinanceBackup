@@ -18,7 +18,7 @@
     "artifacts": "readonly"
   },
   "rules": {
-    "@typescript-eslint/no-explicit-any": "error",
+    "@typescript-eslint/no-explicit-any": "off",
     "accessor-pairs": "error",
     "array-bracket-newline": "off",
     "array-bracket-spacing": ["error", "never"],
@@ -87,7 +87,7 @@
     "line-comment-position": "off",
     "linebreak-style": "off",
     "lines-around-comment": "off",
-    "lines-between-class-members": "error",
+    "lines-between-class-members": "off",
     "max-classes-per-file": "error",
     "max-depth": "error",
     "max-len": "off",
@@ -168,7 +168,7 @@
     "no-throw-literal": "error",
     "no-trailing-spaces": "error",
     "no-undef-init": "error",
-    "no-undefined": "error",
+    "no-undefined": "warn",
     "no-underscore-dangle": "off",
     "no-unmodified-loop-condition": "error",
     "no-unneeded-ternary": "error",

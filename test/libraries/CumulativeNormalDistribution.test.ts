@@ -6,8 +6,8 @@ const { parseEther } = ethers.utils;
 
 import { expect } from "chai";
 
-import * as fixtures from "../helpers/fixtures";
-import * as types from "../helpers/types";
+import * as fixtures from "../utils/fixtures";
+import * as types from "../utils/types";
 
 import { FixedPointX64 } from "web3-units";
 

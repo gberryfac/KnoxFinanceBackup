@@ -1,15 +1,15 @@
 import { ethers } from "hardhat";
-const { BigNumber, provider } = ethers;
+const { provider } = ethers;
 
 import {
   Helpers,
   TestHelpers,
   Helpers__factory,
   TestHelpers__factory,
-} from "./../../types";
+} from "../../types";
 
-import { assert } from "../helpers/assertions";
-import * as time from "../helpers/time";
+import { assert } from "../utils/assertions";
+import * as time from "../utils/time";
 
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 

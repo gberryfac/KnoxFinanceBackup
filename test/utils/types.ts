@@ -1,3 +1,4 @@
+import { BigNumber } from "ethers";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 
 export type Pool = {
@@ -44,4 +45,21 @@ export type Addresses = {
   vault?: string;
   spotOracle?: string;
   volatilityOracle?: string;
+};
+
+export type Params = {
+  name: string;
+  tokenName: string;
+  tokenSymbol: string;
+  tokenDecimals: number;
+  asset: Asset;
+  delta: number;
+  pool: Pool;
+  depositAmount: BigNumber;
+  cap: BigNumber;
+  minimumSupply: string;
+  minimumContractSize: string;
+  managementFee: BigNumber;
+  performanceFee: BigNumber;
+  isCall: boolean;
 };

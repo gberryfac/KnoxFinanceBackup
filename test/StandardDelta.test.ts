@@ -9,11 +9,11 @@ import { fixedFromFloat } from "@premia/utils";
 import { expect } from "chai";
 import moment from "moment-timezone";
 
-import * as time from "./helpers/time";
-import * as fixtures from "./helpers/fixtures";
-import * as types from "./helpers/types";
+import * as time from "./utils/time";
+import * as fixtures from "./utils/fixtures";
+import * as types from "./utils/types";
 
-import { assert } from "./helpers/assertions";
+import { assert } from "./utils/assertions";
 
 import {
   ADDRESS_ZERO,

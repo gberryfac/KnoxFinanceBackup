@@ -10,15 +10,15 @@ import {
   MockSpotPriceOracle__factory,
   MockVolatilityOracle__factory,
   StandardDeltaPricer__factory,
-} from "./../types";
+} from "../types";
 
 import { fixedFromFloat, fixedToNumber } from "@premia/utils";
 
-import * as assets from "./helpers/assets";
-import * as time from "./helpers/time";
+import * as assets from "./utils/assets";
+import * as time from "./utils/time";
 
 import { expect } from "chai";
-import { assert } from "./helpers/assertions";
+import { assert } from "./utils/assertions";
 
 import { ADDRESS_ZERO } from "../constants";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";

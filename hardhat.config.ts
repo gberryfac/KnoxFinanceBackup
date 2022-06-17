@@ -3,6 +3,7 @@ import "@nomiclabs/hardhat-ethers";
 import "@nomiclabs/hardhat-waffle";
 import "@primitivefi/hardhat-dodoc";
 import "@typechain/hardhat";
+import "hardhat-abi-exporter";
 import "hardhat-contract-sizer";
 import "hardhat-gas-reporter";
 import "hardhat-tracer";
@@ -12,8 +13,13 @@ require("dotenv").config();
 
 import { TEST_URI, BLOCK_NUMBER } from "./constants";
 
-let { MAINNET_URI, DODOC_ON_COMPILE, REPORT_GAS, SIZER_ON_COMPILE } =
-  process.env;
+let {
+  MAINNET_URI,
+  ARBITRUM_URI,
+  DODOC_ON_COMPILE,
+  REPORT_GAS,
+  SIZER_ON_COMPILE,
+} = process.env;
 
 // Defaults to CHAINID=42161 so things will run with mainnet fork if not specified
 const CHAINID = process.env.CHAINID ? Number(process.env.CHAINID) : 42161;
@@ -62,6 +68,10 @@ const config: HardhatUserConfig = {
     },
     mainnet: {
       url: MAINNET_URI,
+      chainId: CHAINID,
+    },
+    arbitrum: {
+      url: ARBITRUM_URI,
       chainId: CHAINID,
     },
   },

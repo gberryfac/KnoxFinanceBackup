@@ -8,6 +8,7 @@ import * as utils from "./utils";
 import * as types from "./types";
 
 import { WETH_ADDRESS, SLOTS } from "../../constants";
+import { IAsset } from "../../types";
 
 const chainId = network.config.chainId;
 
@@ -56,7 +57,7 @@ export async function impersonateWhale(
   depositAmount: BigNumber,
   signers: types.Signers,
   addresses: types.Addresses
-): Promise<[types.Signers, types.Addresses, Contract]> {
+): Promise<[types.Signers, types.Addresses, IAsset]> {
   addresses.buyer = buyer;
 
   const whaleSigner = await utils.impersonateWhale(addresses.buyer, "1500");
