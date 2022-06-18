@@ -73,8 +73,6 @@ export function describeBehaviorOfBase(
       skips
     );
 
-    // TODO: ERC165 behavior
-
     describe.skip("#withdraw", () => {
       time.revertToSnapshotAfterEach(async () => {
         await assetContract

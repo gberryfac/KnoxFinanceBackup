@@ -4,15 +4,16 @@ pragma solidity ^0.8.0;
 import {
     AggregatorInterface,
     IVolatilitySurfaceOracle
-} from "../../interfaces/Oracles.sol";
+} from "../interfaces/Oracles.sol";
 
-import "./StandardDeltaPricerSchema.sol";
+import "./PricerSchema.sol";
 
-contract StandardDeltaPricerStorage {
+// TODO: Switch to diamond storage pattern
+contract PricerStorage {
     AggregatorInterface public BaseSpotOracle;
     AggregatorInterface public UnderlyingSpotOracle;
 
     IVolatilitySurfaceOracle public IVolOracle;
 
-    StandardDeltaPricerSchema.AssetProperties public assetProperties;
+    PricerSchema.AssetProperties public assetProperties;
 }

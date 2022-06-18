@@ -5,11 +5,11 @@ import {
   MockPremiaPool,
   MockSpotPriceOracle,
   MockVolatilityOracle,
-  StandardDeltaPricer,
+  Pricer,
   MockPremiaPool__factory,
   MockSpotPriceOracle__factory,
   MockVolatilityOracle__factory,
-  StandardDeltaPricer__factory,
+  Pricer__factory,
 } from "../types";
 
 import { fixedFromFloat, fixedToNumber } from "@premia/utils";
@@ -40,7 +40,7 @@ let mockPremiaPool: MockPremiaPool;
 let mockBaseSpotPriceOracle: MockSpotPriceOracle;
 let mockUnderlyingSpotPriceOracle: MockSpotPriceOracle;
 let mockVolatilityOracle: MockVolatilityOracle;
-let standardDeltaPricer: StandardDeltaPricer;
+let standardDeltaPricer: Pricer;
 let signer: SignerWithAddress;
 
 describe.only("Standard Delta Pricer Unit Tests", () => {
@@ -66,7 +66,7 @@ describe.only("Standard Delta Pricer Unit Tests", () => {
       signer
     ).deploy(fixedFromFloat("0.9"));
 
-    standardDeltaPricer = await new StandardDeltaPricer__factory(signer).deploy(
+    standardDeltaPricer = await new Pricer__factory(signer).deploy(
       mockPremiaPool.address,
       mockVolatilityOracle.address
     );
@@ -79,7 +79,7 @@ describe.only("Standard Delta Pricer Unit Tests", () => {
 
     it("should revert if pool address is 0x0", async () => {
       await expect(
-        new StandardDeltaPricer__factory(signer).deploy(
+        new Pricer__factory(signer).deploy(
           ADDRESS_ZERO,
           mockVolatilityOracle.address
         )
@@ -88,10 +88,7 @@ describe.only("Standard Delta Pricer Unit Tests", () => {
 
     it("should revert if volatility oracle address is 0x0", async () => {
       await expect(
-        new StandardDeltaPricer__factory(signer).deploy(
-          mockPremiaPool.address,
-          ADDRESS_ZERO
-        )
+        new Pricer__factory(signer).deploy(mockPremiaPool.address, ADDRESS_ZERO)
       ).to.be.revertedWith("0");
     });
 
@@ -111,14 +108,14 @@ describe.only("Standard Delta Pricer Unit Tests", () => {
       );
 
       await expect(
-        new StandardDeltaPricer__factory(signer).deploy(
+        new Pricer__factory(signer).deploy(
           mockPremiaPool.address,
           mockVolatilityOracle.address
         )
       ).to.be.revertedWith("oracle decimals must match");
     });
 
-    it("should initialize StandardDeltaPricer with correct values", async () => {
+    it("should initialize Pricer with correct values", async () => {
       // Check Addresses
       assert.equal(
         await standardDeltaPricer.IVolOracle(),
@@ -185,12 +182,13 @@ describe.only("Standard Delta Pricer Unit Tests", () => {
         signer
       ).deploy(0);
 
-      const testStandardDeltaPricer = await new StandardDeltaPricer__factory(
-        signer
-      ).deploy(mockPremiaPool.address, mockVolatilityOracle.address);
+      const testPricer = await new Pricer__factory(signer).deploy(
+        mockPremiaPool.address,
+        mockVolatilityOracle.address
+      );
 
       await expect(
-        testStandardDeltaPricer.getDeltaStrikePrice64x64(
+        testPricer.getDeltaStrikePrice64x64(
           params.isCall,
           params.expiry,
           params.delta64x64

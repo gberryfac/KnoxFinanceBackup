@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {IStrikeSelection} from "../../interfaces/IDeltaPricer.sol";
+import {IStrikeSelection} from "../../interfaces/IPricer.sol";
 import {
     AggregatorInterface,
     IVolatilitySurfaceOracle
-} from "../../interfaces/Oracles.sol";
+} from "../interfaces/Oracles.sol";
 
 import {
     ABDKMath64x64,
@@ -13,9 +13,9 @@ import {
 } from "../../libraries/ABDKMath64x64Token.sol";
 import "../../libraries/CumulativeNormalDistribution.sol";
 
-import "./StandardDeltaPricerStorage.sol";
+import "./PricerStorage.sol";
 
-contract StrikeSelection is IStrikeSelection, StandardDeltaPricerStorage {
+contract StrikeSelection is IStrikeSelection, PricerStorage {
     using ABDKMath64x64 for int128;
     using ABDKMath64x64 for uint256;
     using ABDKMath64x64Token for int128;

@@ -237,12 +237,8 @@ function behavesLikeOptionsVault(params: {
       addresses.helpers = helpersLibrary.address;
       addresses.vault = vaultContract.address;
 
-      pricerContract = await getContractFactory("StandardDeltaPricer").then(
-        (contract) =>
-          contract.deploy(
-            params.pool,
-            PREMIA_VOLATILITY_SURFACE_ORACLE[chainId]
-          )
+      pricerContract = await getContractFactory("Pricer").then((contract) =>
+        contract.deploy(params.pool, PREMIA_VOLATILITY_SURFACE_ORACLE[chainId])
       );
 
       addresses.pricer = pricerContract.address;

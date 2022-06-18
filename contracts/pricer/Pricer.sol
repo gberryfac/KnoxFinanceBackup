@@ -3,10 +3,10 @@ pragma solidity ^0.8.0;
 
 import {IPremiaPool, PoolStorage} from "../interfaces/IPremiaPool.sol";
 
-import "./StandardDeltaPricer/StandardDeltaPricerStorage.sol";
-import "./StandardDeltaPricer/StrikeSelection.sol";
+import "./PricerStorage.sol";
+import "./StrikeSelection.sol";
 
-contract StandardDeltaPricer is StandardDeltaPricerStorage, StrikeSelection {
+contract Pricer is PricerStorage, StrikeSelection {
     constructor(address _pool, address _volatilityOracle) {
         require(_pool != address(0), "address not provided");
         require(_volatilityOracle != address(0), "address not provided");

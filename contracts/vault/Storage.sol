@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 import "@solidstate/contracts/token/ERC20/IERC20.sol";
 import "@solidstate/contracts/utils/SafeERC20.sol";
 
-import "../interfaces/IDeltaPricer.sol";
+import "../interfaces/IPricer.sol";
 import "../interfaces/IPremiaPool.sol";
 
 import "../libraries/Constants.sol";
@@ -108,7 +108,7 @@ library Storage {
          * EXTERNAL CONTRACTS
          ***********************************************/
         // @notice
-        IDeltaPricer Pricer;
+        IPricer Pricer;
         // // @notice
         // IERC20 ERC20;
         // // @notice

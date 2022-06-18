@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 import "abdk-libraries-solidity/ABDKMath64x64.sol";
 
 // import "../../interfaces/IDelta.sol";
-// import "../../interfaces/IDeltaPricer.sol";
+// import "../../interfaces/IPricer.sol";
 
 import "./BaseInternal.sol";
 
