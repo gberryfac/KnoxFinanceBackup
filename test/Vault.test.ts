@@ -12,8 +12,8 @@ import {
 } from "../types";
 
 import * as assets from "./utils/assets";
-import * as fixtures from "./utils/fixtures";
 import * as types from "./utils/types";
+import * as accounts from "./utils/accounts";
 
 import { describeBehaviorOfAdmin } from "../spec/Admin.behavior";
 import { describeBehaviorOfBase } from "../spec/Base.behavior";
@@ -111,10 +111,10 @@ function behavesLikeVault(params: types.Params) {
     let v: VaultUtil;
 
     before(async function () {
-      signers = await fixtures.getSigners();
-      addresses = await fixtures.getAddresses(signers);
+      signers = await accounts.getSigners();
+      addresses = await accounts.getAddresses(signers);
 
-      [signers, addresses, assetContract] = await fixtures.impersonateWhale(
+      [signers, addresses, assetContract] = await accounts.impersonateWhale(
         params.asset.buyer,
         params.asset.address,
         params.depositAmount,

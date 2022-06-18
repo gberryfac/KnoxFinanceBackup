@@ -9,11 +9,10 @@ import { fixedFromFloat } from "@premia/utils";
 import { expect } from "chai";
 import moment from "moment-timezone";
 
-import * as time from "./utils/time";
-import * as fixtures from "./utils/fixtures";
-import * as types from "./utils/types";
-
+import * as accounts from "./utils/accounts";
 import { assert } from "./utils/assertions";
+import * as time from "./utils/time";
+import * as types from "./utils/types";
 
 import {
   ADDRESS_ZERO,
@@ -46,7 +45,7 @@ const chainId = network.config.chainId;
 moment.tz.setDefault("UTC");
 
 let block;
-describe("Standard Delta Strategy Unit Tests", () => {
+describe.skip("Standard Delta Strategy Unit Tests", () => {
   behavesLikeOptionsVault({
     buyer: DAI_WHALE_ADDRESS[chainId],
     name: `Knox ETH Delta Vault (Put)`,
@@ -202,10 +201,10 @@ function behavesLikeOptionsVault(params: {
       initSnapshotId = await time.takeSnapshot();
       block = await provider.getBlock(await provider.getBlockNumber());
 
-      signers = await fixtures.getSigners();
-      addresses = await fixtures.getAddresses(signers);
+      signers = await accounts.getSigners();
+      addresses = await accounts.getAddresses(signers);
 
-      [signers, addresses] = await fixtures.impersonateWhale(
+      [signers, addresses] = await accounts.impersonateWhale(
         params.buyer,
         params.asset,
         params.depositAmount,

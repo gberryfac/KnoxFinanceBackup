@@ -6,7 +6,7 @@ const { parseEther } = ethers.utils;
 
 import { expect } from "chai";
 
-import * as fixtures from "../utils/fixtures";
+import * as accounts from "../utils/accounts";
 import * as types from "../utils/types";
 
 import { FixedPointX64 } from "web3-units";
@@ -71,8 +71,8 @@ describe.only("CumulativeNormalDistribution", () => {
   let cdfLibrary: Contract;
 
   before(async function () {
-    signers = await fixtures.getSigners();
-    addresses = await fixtures.getAddresses(signers);
+    signers = await accounts.getSigners();
+    addresses = await accounts.getAddresses(signers);
 
     cdfLibrary = await getContractFactory(
       "TestCumulativeNormalDistribution"

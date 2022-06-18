@@ -15,6 +15,7 @@ export type Asset = {
 };
 
 export type Signers = {
+  deployer: SignerWithAddress;
   admin: SignerWithAddress;
   lp1: SignerWithAddress;
   lp2: SignerWithAddress;
@@ -27,6 +28,7 @@ export type Signers = {
 };
 
 export type Addresses = {
+  deployer: string;
   admin: string;
   lp1: string;
   lp2: string;
@@ -37,9 +39,6 @@ export type Addresses = {
   buyer?: string;
   pool?: string;
   helpers?: string;
-  vaultDisplay?: string;
-  vaultLifecycle?: string;
-  vaultLogic?: string;
   pricer?: string;
   strategy?: string;
   vault?: string;

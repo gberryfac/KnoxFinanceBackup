@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {IStrikeSelection} from "../../interfaces/IPricer.sol";
+import {IStrikeSelection} from "./IPricer.sol";
 import {
     AggregatorInterface,
     IVolatilitySurfaceOracle
@@ -10,8 +10,8 @@ import {
 import {
     ABDKMath64x64,
     ABDKMath64x64Token
-} from "../../libraries/ABDKMath64x64Token.sol";
-import "../../libraries/CumulativeNormalDistribution.sol";
+} from "../libraries/ABDKMath64x64Token.sol";
+import "../libraries/CumulativeNormalDistribution.sol";
 
 import "./PricerStorage.sol";
 

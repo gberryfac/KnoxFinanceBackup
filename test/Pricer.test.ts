@@ -2,8 +2,6 @@ import { ethers } from "hardhat";
 const { BigNumber, provider } = ethers;
 
 import {
-  MockPremiaPool,
-  MockSpotPriceOracle,
   MockVolatilityOracle,
   Pricer,
   MockPremiaPool__factory,
@@ -15,10 +13,11 @@ import {
 import { fixedFromFloat, fixedToNumber } from "@premia/utils";
 
 import * as assets from "./utils/assets";
+import { assert } from "./utils/assertions";
 import * as time from "./utils/time";
+import { MockPremiaPoolUtil } from "./utils/MockUtil";
 
 import { expect } from "chai";
-import { assert } from "./utils/assertions";
 
 import { ADDRESS_ZERO } from "../constants";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
@@ -36,38 +35,35 @@ const params = {
 
 let block;
 
-let mockPremiaPool: MockPremiaPool;
-let mockBaseSpotPriceOracle: MockSpotPriceOracle;
-let mockUnderlyingSpotPriceOracle: MockSpotPriceOracle;
+let mockPremiaPool: MockPremiaPoolUtil;
 let mockVolatilityOracle: MockVolatilityOracle;
-let standardDeltaPricer: Pricer;
-let signer: SignerWithAddress;
+let pricer: Pricer;
+let deployer: SignerWithAddress;
 
-describe.only("Standard Delta Pricer Unit Tests", () => {
+describe.only("Pricer Unit Tests", () => {
   before(async () => {
-    [signer] = await ethers.getSigners();
+    [deployer] = await ethers.getSigners();
 
-    mockBaseSpotPriceOracle = await new MockSpotPriceOracle__factory(
-      signer
-    ).deploy(8, 100000000);
-
-    mockUnderlyingSpotPriceOracle = await new MockSpotPriceOracle__factory(
-      signer
-    ).deploy(8, 200000000);
-
-    mockPremiaPool = await new MockPremiaPool__factory(signer).deploy(
-      params.underlying.address,
-      params.base.address,
-      mockUnderlyingSpotPriceOracle.address,
-      mockBaseSpotPriceOracle.address
+    mockPremiaPool = await MockPremiaPoolUtil.deploy(
+      {
+        oracleDecimals: 8,
+        oraclePrice: 200000000,
+        asset: params.underlying,
+      },
+      {
+        oracleDecimals: 8,
+        oraclePrice: 100000000,
+        asset: params.base,
+      },
+      deployer
     );
 
     mockVolatilityOracle = await new MockVolatilityOracle__factory(
-      signer
+      deployer
     ).deploy(fixedFromFloat("0.9"));
 
-    standardDeltaPricer = await new Pricer__factory(signer).deploy(
-      mockPremiaPool.address,
+    pricer = await new Pricer__factory(deployer).deploy(
+      mockPremiaPool.pool.address,
       mockVolatilityOracle.address
     );
 
@@ -79,28 +75,52 @@ describe.only("Standard Delta Pricer Unit Tests", () => {
 
     it("should revert if pool address is 0x0", async () => {
       await expect(
-        new Pricer__factory(signer).deploy(
+        new Pricer__factory(deployer).deploy(
           ADDRESS_ZERO,
           mockVolatilityOracle.address
         )
-      ).to.be.revertedWith("0");
+      ).to.be.revertedWith("address not provided");
     });
 
     it("should revert if volatility oracle address is 0x0", async () => {
       await expect(
-        new Pricer__factory(signer).deploy(mockPremiaPool.address, ADDRESS_ZERO)
-      ).to.be.revertedWith("0");
+        new Pricer__factory(deployer).deploy(
+          mockPremiaPool.pool.address,
+          ADDRESS_ZERO
+        )
+      ).to.be.revertedWith("address not provided");
+    });
+
+    it("should initialize Pricer with correct values", async () => {
+      // Check Addresses
+      assert.equal(await pricer.IVolOracle(), mockVolatilityOracle.address);
+
+      assert.equal(
+        await pricer.BaseSpotOracle(),
+        mockPremiaPool.baseSpotPriceOracle.address
+      );
+
+      assert.equal(
+        await pricer.UnderlyingSpotOracle(),
+        mockPremiaPool.underlyingSpotPriceOracle.address
+      );
+
+      // Check Asset Properties
+      const { base, underlying } = await pricer.assetProperties();
+
+      assert.equal(base, params.base.address);
+      assert.equal(underlying, params.underlying.address);
     });
 
     it("should revert if base and underlying decimals do not match", async () => {
       const mockBaseSpotPriceOracle = await new MockSpotPriceOracle__factory(
-        signer
+        deployer
       ).deploy(18, 100000000);
 
       const mockUnderlyingSpotPriceOracle =
-        await new MockSpotPriceOracle__factory(signer).deploy(8, 200000000);
+        await new MockSpotPriceOracle__factory(deployer).deploy(8, 200000000);
 
-      const mockPremiaPool = await new MockPremiaPool__factory(signer).deploy(
+      const mockPremiaPool = await new MockPremiaPool__factory(deployer).deploy(
         ADDRESS_ZERO,
         ADDRESS_ZERO,
         mockUnderlyingSpotPriceOracle.address,
@@ -108,35 +128,11 @@ describe.only("Standard Delta Pricer Unit Tests", () => {
       );
 
       await expect(
-        new Pricer__factory(signer).deploy(
+        new Pricer__factory(deployer).deploy(
           mockPremiaPool.address,
           mockVolatilityOracle.address
         )
       ).to.be.revertedWith("oracle decimals must match");
-    });
-
-    it("should initialize Pricer with correct values", async () => {
-      // Check Addresses
-      assert.equal(
-        await standardDeltaPricer.IVolOracle(),
-        mockVolatilityOracle.address
-      );
-
-      assert.equal(
-        await standardDeltaPricer.BaseSpotOracle(),
-        mockBaseSpotPriceOracle.address
-      );
-
-      assert.equal(
-        await standardDeltaPricer.UnderlyingSpotOracle(),
-        mockUnderlyingSpotPriceOracle.address
-      );
-
-      // Check Asset Properties
-      const { base, underlying } = await standardDeltaPricer.assetProperties();
-
-      assert.equal(base, params.base.address);
-      assert.equal(underlying, params.underlying.address);
     });
   });
 
@@ -144,10 +140,7 @@ describe.only("Standard Delta Pricer Unit Tests", () => {
     time.revertToSnapshotAfterEach(async () => {});
 
     it("should convert price correctly", async () => {
-      assert.equal(
-        fixedToNumber(await standardDeltaPricer.latestAnswer64x64()),
-        2
-      );
+      assert.equal(fixedToNumber(await pricer.latestAnswer64x64()), 2);
     });
   });
 
@@ -156,7 +149,7 @@ describe.only("Standard Delta Pricer Unit Tests", () => {
 
     it("should revert if block timestamp >= expiry", async () => {
       assert.bnEqual(
-        await standardDeltaPricer.getTimeToMaturity64x64(block.timestamp),
+        await pricer.getTimeToMaturity64x64(block.timestamp),
         BigNumber.from("0")
       );
     });
@@ -166,9 +159,7 @@ describe.only("Standard Delta Pricer Unit Tests", () => {
 
       // truncates the last 3 digits of timestamp
       assert.bnEqual(
-        (await standardDeltaPricer.getTimeToMaturity64x64(params.expiry)).div(
-          1000
-        ),
+        (await pricer.getTimeToMaturity64x64(params.expiry)).div(1000),
         fixedFromFloat(expected).div(1000)
       );
     });
@@ -179,11 +170,11 @@ describe.only("Standard Delta Pricer Unit Tests", () => {
 
     it("should revert if iv_atm <= 0", async () => {
       const mockVolatilityOracle = await new MockVolatilityOracle__factory(
-        signer
+        deployer
       ).deploy(0);
 
-      const testPricer = await new Pricer__factory(signer).deploy(
-        mockPremiaPool.address,
+      const testPricer = await new Pricer__factory(deployer).deploy(
+        mockPremiaPool.pool.address,
         mockVolatilityOracle.address
       );
 
@@ -198,7 +189,7 @@ describe.only("Standard Delta Pricer Unit Tests", () => {
 
     it("should revert if tau <= 0", async () => {
       await expect(
-        standardDeltaPricer.getDeltaStrikePrice64x64(
+        pricer.getDeltaStrikePrice64x64(
           params.isCall,
           block.timestamp,
           params.delta64x64
@@ -207,7 +198,7 @@ describe.only("Standard Delta Pricer Unit Tests", () => {
     });
 
     it("should calculate delta strike price for call option", async () => {
-      const strike = await standardDeltaPricer.getDeltaStrikePrice64x64(
+      const strike = await pricer.getDeltaStrikePrice64x64(
         params.isCall,
         params.expiry,
         params.delta64x64
@@ -217,7 +208,7 @@ describe.only("Standard Delta Pricer Unit Tests", () => {
     });
 
     it("should calculate delta strike price for put option", async () => {
-      const strike = await standardDeltaPricer.getDeltaStrikePrice64x64(
+      const strike = await pricer.getDeltaStrikePrice64x64(
         !params.isCall,
         params.expiry,
         fixedFromFloat(0.25)
@@ -233,28 +224,19 @@ describe.only("Standard Delta Pricer Unit Tests", () => {
     it("should not round if already round", async () => {
       const n = fixedFromFloat(4500);
       const answer = 4500;
-      assert.equal(
-        fixedToNumber(await standardDeltaPricer.snapToGrid(true, n)),
-        answer
-      );
+      assert.equal(fixedToNumber(await pricer.snapToGrid(true, n)), answer);
     });
 
     it("should round up if call option", async () => {
       const n = fixedFromFloat(4401);
       const answer = 4500;
-      assert.equal(
-        fixedToNumber(await standardDeltaPricer.snapToGrid(true, n)),
-        answer
-      );
+      assert.equal(fixedToNumber(await pricer.snapToGrid(true, n)), answer);
     });
 
     it("should round down if put option", async () => {
       const n = fixedFromFloat(4599);
       const answer = 4500;
-      assert.equal(
-        fixedToNumber(await standardDeltaPricer.snapToGrid(false, n)),
-        answer
-      );
+      assert.equal(fixedToNumber(await pricer.snapToGrid(false, n)), answer);
     });
   });
 });
