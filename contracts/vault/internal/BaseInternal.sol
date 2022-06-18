@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 import "@solidstate/contracts/token/ERC1155/IERC1155.sol";
-import "@solidstate/contracts/token/ERC4626/base/ERC4626Base.sol";
+import "@solidstate/contracts/token/ERC4626/base/ERC4626BaseInternal.sol";
 
 import "../IVault.sol";
 
@@ -10,7 +10,7 @@ import "./AccessInternal.sol";
 
 import "hardhat/console.sol";
 
-contract BaseInternal is AccessInternal, ERC4626Base {
+contract BaseInternal is AccessInternal, ERC4626BaseInternal {
     using SafeERC20 for IERC20;
     using Storage for Storage.Layout;
 
@@ -60,6 +60,7 @@ contract BaseInternal is AccessInternal, ERC4626Base {
      */
     function _deposit(uint256 assetAmount, address receiver)
         internal
+        virtual
         override(ERC4626BaseInternal)
         onlyKeeper
         returns (uint256)
@@ -85,6 +86,7 @@ contract BaseInternal is AccessInternal, ERC4626Base {
      */
     function _mint(uint256 shareAmount, address receiver)
         internal
+        virtual
         override(ERC4626BaseInternal)
         onlyKeeper
         returns (uint256)
@@ -125,6 +127,7 @@ contract BaseInternal is AccessInternal, ERC4626Base {
 
     /**
      * @notice execute a withdrawal of assets on behalf of given address
+     * @dev this function may not be called while the auction is in progress
      * @param assetAmount quantity of assets to withdraw
      * @param receiver recipient of assets resulting from withdrawal
      * @param owner holder of shares to be redeemed
@@ -134,7 +137,13 @@ contract BaseInternal is AccessInternal, ERC4626Base {
         uint256 assetAmount,
         address receiver,
         address owner
-    ) internal override(ERC4626BaseInternal) returns (uint256) {
+    )
+        internal
+        virtual
+        override(ERC4626BaseInternal)
+        AuctionInactive
+        returns (uint256)
+    {
         Vault.maxRedeemShares(owner);
 
         require(
@@ -151,6 +160,7 @@ contract BaseInternal is AccessInternal, ERC4626Base {
 
     /**
      * @notice execute a redemption of shares on behalf of given address
+     * @dev this function may not be called while the auction is in progress
      * @param shareAmount quantity of shares to redeem
      * @param receiver recipient of assets resulting from withdrawal
      * @param owner holder of shares to be redeemed
@@ -160,7 +170,13 @@ contract BaseInternal is AccessInternal, ERC4626Base {
         uint256 shareAmount,
         address receiver,
         address owner
-    ) internal override(ERC4626BaseInternal) returns (uint256) {
+    )
+        internal
+        virtual
+        override(ERC4626BaseInternal)
+        AuctionInactive
+        returns (uint256)
+    {
         Vault.maxRedeemShares(owner);
 
         require(

@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "@solidstate/contracts/token/ERC1155/base/ERC1155Base.sol";
-import "@solidstate/contracts/token/ERC1155/enumerable/ERC1155Enumerable.sol";
+import "@solidstate/contracts/token/ERC1155/base/ERC1155BaseInternal.sol";
+import "@solidstate/contracts/token/ERC1155/enumerable/ERC1155EnumerableInternal.sol";
 
 import "./BaseInternal.sol";
 
 abstract contract QueueInternal is
-    ERC1155Base,
-    ERC1155Enumerable,
-    BaseInternal
+    BaseInternal,
+    ERC1155BaseInternal,
+    ERC1155EnumerableInternal
 {
     using SafeERC20 for IERC20;
     using Storage for Storage.Layout;
@@ -63,11 +63,6 @@ abstract contract QueueInternal is
     function _maxRedeemShares(Storage.Layout storage l, address receiver)
         internal
     {
-        require(
-            receiver == msg.sender || isApprovedForAll(receiver, msg.sender),
-            "ERC1155: caller is not owner nor approved"
-        );
-
         uint256[] memory claimTokenIds = _tokensByAccount(receiver);
 
         uint256 unredeemedShares;
@@ -93,11 +88,6 @@ abstract contract QueueInternal is
         uint256 claimTokenId,
         address receiver
     ) internal returns (uint256) {
-        require(
-            receiver == msg.sender || isApprovedForAll(receiver, msg.sender),
-            "ERC1155: caller is not owner nor approved"
-        );
-
         if (claimTokenId < l.claimTokenId) {
             uint256 claimTokenBalance = _balanceOf(receiver, claimTokenId);
             _burn(receiver, claimTokenId, claimTokenBalance);
