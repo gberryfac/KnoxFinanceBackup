@@ -24,7 +24,7 @@ contract Auction is AuctionInternal, ReentrancyGuard {
      */
     function purchase(uint256 contractSize, uint256 maxCost)
         external
-        isActive
+        AuctionActive
         nonReentrant
     {
         _purchase(contractSize);
