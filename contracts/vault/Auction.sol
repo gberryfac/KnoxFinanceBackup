@@ -19,12 +19,15 @@ contract Auction is AuctionInternal, ReentrancyGuard {
      *  INPUT/OUTPUT
      ***********************************************/
 
+    // TODO:
+    function swapAndPurchase() external auctionActive nonReentrant {}
+
     /**
      * @notice Initiates the option sale
      */
     function purchase(uint256 contractSize, uint256 maxCost)
         external
-        AuctionActive
+        auctionActive
         nonReentrant
     {
         _purchase(contractSize);
@@ -39,27 +42,5 @@ contract Auction is AuctionInternal, ReentrancyGuard {
         uint256 contractSize
     ) external nonReentrant {
         _exercise(holder, longTokenId, contractSize);
-    }
-
-    /************************************************
-     * VIEW
-     ***********************************************/
-
-    function accountsByOption(uint256 id)
-        external
-        view
-        returns (address[] memory)
-    {
-        Storage.Layout storage l = Storage.layout();
-        return Pool.accountsByToken(id);
-    }
-
-    function optionsByAccount(address account)
-        external
-        view
-        returns (uint256[] memory)
-    {
-        Storage.Layout storage l = Storage.layout();
-        return Pool.tokensByAccount(account);
     }
 }

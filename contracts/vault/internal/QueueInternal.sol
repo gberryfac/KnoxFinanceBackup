@@ -24,7 +24,7 @@ abstract contract QueueInternal is
         Storage.Layout storage l,
         uint256 amount,
         address receiver
-    ) internal whenNotPaused {
+    ) internal {
         require(amount > 0, "value exceeds minimum");
 
         uint256 totalWithDepositedAmount =
@@ -54,9 +54,8 @@ abstract contract QueueInternal is
         internal
     {
         require(l.totalDeposits - amount >= 0, "overdraft");
-        l.totalDeposits -= amount;
-
         _burn(msg.sender, l.claimTokenId, amount);
+        l.totalDeposits -= amount;
         ERC20.safeTransfer(msg.sender, amount);
     }
 

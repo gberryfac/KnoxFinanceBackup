@@ -218,14 +218,14 @@ contract Admin is AdminInternal {
     /**
      * @notice
      */
-    function setAuctionPrices() external AuctionInactive onlyKeeper {
+    function setAuctionPrices() external auctionInactive onlyKeeper {
         _setAuctionPrices();
     }
 
     /**
      * @notice Sets the start and end time of the auction.
      */
-    function setAuctionWindow() external AuctionInactive onlyKeeper {
+    function setAuctionWindow() external auctionInactive onlyKeeper {
         _setAuctionWindow();
     }
 }

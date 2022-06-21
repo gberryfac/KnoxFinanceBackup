@@ -29,8 +29,14 @@ contract Queue is
     /************************************************
      *  INPUT/OUTPUT
      ***********************************************/
+    // TODO:
+    function swapAndDepositToQueue() external auctionActive nonReentrant {}
 
-    function depositToQueue(uint256 amount) external nonReentrant {
+    function depositToQueue(uint256 amount)
+        external
+        nonReentrant
+        whenNotPaused
+    {
         Storage.Layout storage l = Storage.layout();
         _depositToQueue(l, amount, msg.sender);
     }
@@ -38,6 +44,7 @@ contract Queue is
     function depositToQueue(uint256 amount, address receiver)
         external
         nonReentrant
+        whenNotPaused
     {
         Storage.Layout storage l = Storage.layout();
         _depositToQueue(l, amount, receiver);

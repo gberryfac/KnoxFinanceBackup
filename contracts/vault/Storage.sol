@@ -175,7 +175,7 @@ library Storage {
             "invalid fee amount"
         );
 
-        // We are dividing annualized withdrawal fee by num weeks in a year
+        // Divides annualized withdrawal fee by number of weeks in a year
         uint256 tmpWithdrawalFee =
             (newWithdrawalFee * Constants.FEE_MULTIPLIER) /
                 Constants.WEEKS_PER_YEAR;

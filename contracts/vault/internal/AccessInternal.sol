@@ -13,7 +13,7 @@ abstract contract AccessInternal is OwnableInternal, PausableInternal {
     /**
      * @dev Throws if auction is not active.
      */
-    modifier AuctionActive() {
+    modifier auctionActive() {
         Storage.Layout storage l = Storage.layout();
         require(l.saleWindow[0] <= block.timestamp, "auction has not started!");
         require(l.saleWindow[1] >= block.timestamp, "auction has ended!");
@@ -23,7 +23,7 @@ abstract contract AccessInternal is OwnableInternal, PausableInternal {
     /**
      * @dev Throws if auction is active.
      */
-    modifier AuctionInactive() {
+    modifier auctionInactive() {
         Storage.Layout storage l = Storage.layout();
         require(l.saleWindow[0] >= block.timestamp, "auction has started!");
         require(l.saleWindow[1] <= block.timestamp, "auction has not ended!");

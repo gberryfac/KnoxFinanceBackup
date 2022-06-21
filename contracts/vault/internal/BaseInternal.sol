@@ -143,7 +143,7 @@ contract BaseInternal is AccessInternal, ERC4626BaseInternal {
         internal
         virtual
         override(ERC4626BaseInternal)
-        AuctionInactive
+        auctionInactive
         returns (uint256)
     {
         Vault.maxRedeemShares(owner);
@@ -176,7 +176,7 @@ contract BaseInternal is AccessInternal, ERC4626BaseInternal {
         internal
         virtual
         override(ERC4626BaseInternal)
-        AuctionInactive
+        auctionInactive
         returns (uint256)
     {
         Vault.maxRedeemShares(owner);
