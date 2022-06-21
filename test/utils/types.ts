@@ -58,7 +58,7 @@ export type Params = {
   cap: BigNumber;
   minimumSupply: string;
   minimumContractSize: string;
-  managementFee: BigNumber;
   performanceFee: BigNumber;
+  withdrawalFee: BigNumber;
   isCall: boolean;
 };

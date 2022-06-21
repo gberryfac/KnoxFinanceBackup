@@ -36,8 +36,8 @@ describe("Vault Unit Tests", () => {
     cap: parseUnits("5000000", assets.DAI.decimals),
     minimumSupply: BigNumber.from("10").pow("3").toString(),
     minimumContractSize: BigNumber.from("10").pow("17").toString(),
-    managementFee: BigNumber.from("2000000"),
     performanceFee: BigNumber.from("20000000"),
+    withdrawalFee: BigNumber.from("2000000"),
     isCall: false,
   });
 
@@ -53,8 +53,8 @@ describe("Vault Unit Tests", () => {
     cap: parseUnits("1000", assets.ETH.decimals),
     minimumSupply: BigNumber.from("10").pow("10").toString(),
     minimumContractSize: BigNumber.from("10").pow("17").toString(),
-    managementFee: BigNumber.from("2000000"),
     performanceFee: BigNumber.from("20000000"),
+    withdrawalFee: BigNumber.from("2000000"),
     isCall: true,
   });
 
@@ -70,8 +70,8 @@ describe("Vault Unit Tests", () => {
     cap: parseUnits("100", assets.BTC.decimals),
     minimumSupply: BigNumber.from("10").pow("3").toString(),
     minimumContractSize: BigNumber.from("10").pow("7").toString(),
-    managementFee: BigNumber.from("2000000"),
     performanceFee: BigNumber.from("20000000"),
+    withdrawalFee: BigNumber.from("2000000"),
     isCall: true,
   });
 
@@ -87,8 +87,8 @@ describe("Vault Unit Tests", () => {
     cap: parseUnits("100000", assets.LINK.decimals),
     minimumSupply: BigNumber.from("10").pow("10").toString(),
     minimumContractSize: BigNumber.from("10").pow("17").toString(),
-    managementFee: BigNumber.from("1000000"),
     performanceFee: BigNumber.from("30000000"),
+    withdrawalFee: BigNumber.from("1000000"),
     isCall: true,
   });
 });

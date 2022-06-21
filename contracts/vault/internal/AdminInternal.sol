@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+import "abdk-libraries-solidity/ABDKMath64x64.sol";
+
 import "../../libraries/Helpers.sol";
 
 import "./BaseInternal.sol";
 
 contract AdminInternal is BaseInternal {
+    using ABDKMath64x64 for int128;
     using SafeERC20 for IERC20;
     using Storage for Storage.Layout;
 
@@ -21,20 +24,12 @@ contract AdminInternal is BaseInternal {
         _collectVaultFees();
 
         _depositQueuedToVault();
+
+        _setNextEpoch();
         _setOptionParameters();
 
         _setAuctionPrices();
         _setAuctionWindow();
-
-        Storage.Layout storage l = Storage.layout();
-
-        l.epoch++;
-
-        l.claimTokenId = _formatClaimTokenId(l.epoch);
-        l.lastTotalAssets = _totalAssets();
-
-        // Note: index epoch
-        // emit SetNextEpoch(l.epoch, l.claimTokenId, l.lastTotalAssets);
     }
 
     function _processExpired() internal {
@@ -58,7 +53,6 @@ contract AdminInternal is BaseInternal {
 
     function _withdrawReservedLiquidity() internal {
         Storage.Layout storage l = Storage.layout();
-        // uint256 liquidityBefore = ERC20.balanceOf(address(this));
 
         uint256 reservedLiquidity =
             Pool.balanceOf(
@@ -70,61 +64,55 @@ contract AdminInternal is BaseInternal {
 
         Pool.withdraw(reservedLiquidity, l.isCall);
 
-        // uint256 liquidityAfter = ERC20.balanceOf(address(this));
-
-        // emit(liquidityBefore, liquidityAfter, reservedLiquidity);
+        // emit ReservedLiquidityWithdrawn(reservedLiquidity);
     }
 
     function _collectVaultFees() internal {
         Storage.Layout storage l = Storage.layout();
 
-        uint256 totalAssets = _totalAssets();
+        int128 spot64x64 = Pool.getPriceAfter64x64(l.expiry);
+        uint256 intrinsicValue = 0;
 
-        uint256 vaultFee;
-        uint256 performanceFeeInAsset;
-        uint256 managementFeeInAsset;
+        if (l.isCall && spot64x64 > l.strike64x64) {
+            intrinsicValue = spot64x64.sub(l.strike64x64).mulu(
+                l.totalShortAssets
+            );
+        } else if (!l.isCall && l.strike64x64 > spot64x64) {
+            intrinsicValue = l.strike64x64.sub(spot64x64).mulu(
+                l.totalShortAssets
+            );
+        }
 
-        if (l.lastTotalAssets > 0) {
-            // TODO: Remove in favor of withdrawal fee
-            managementFeeInAsset = l.managementFee > 0
-                ? ((totalAssets * l.managementFee) / 100) *
-                    Constants.FEE_MULTIPLIER
-                : 0;
+        uint256 netIncome = l.totalPremiums - intrinsicValue;
 
+        if (netIncome > 0) {
             /**
-             * Take performance fee ONLY if difference between last week and this week's
-             * vault deposits, taking into account pending deposits and withdrawals, is
-             * positive. If it is negative, last week's option expired ITM past breakeven,
-             * and the vault took a loss so we do not collect performance fee for last week
+             * Take performance fee ONLY if premium remaining after the option expires is positive.
+             * If it is negative, last week's option expired ITM past breakeven, and the vault took
+             * a loss so we do not collect performance fee for last week.
              */
-            if (totalAssets > l.lastTotalAssets) {
-                performanceFeeInAsset = l.performanceFee > 0
-                    ? ((totalAssets - l.lastTotalAssets) * l.performanceFee) /
-                        (100 * Constants.FEE_MULTIPLIER)
-                    : 0;
+            uint256 performanceFeeInAsset =
+                (netIncome * l.performanceFee) /
+                    (100 * Constants.FEE_MULTIPLIER);
 
-                vaultFee = performanceFeeInAsset + managementFeeInAsset;
-
-                ERC20.safeTransfer(l.feeRecipient, vaultFee);
-            }
+            ERC20.safeTransfer(l.feeRecipient, performanceFeeInAsset);
         }
 
-        if (vaultFee > 0) {
-            ERC20.safeTransfer(l.feeRecipient, vaultFee);
-        }
+        l.totalPremiums = 0;
 
-        // emit DisbursedVaultFees(
-        //     vaultFee,
-        //     managementFeeInAsset,
+        // Note: index epoch
+        // emit CollectPerformanceFee(
+        //     l.epoch
+        //     netIncome
         //     performanceFeeInAsset
         // );
     }
 
     function _depositQueuedToVault() internal {
         Storage.Layout storage l = Storage.layout();
-        uint256 mintedShares = _deposit(l.totalQueuedAssets, address(this));
+        uint256 mintedShares = _deposit(l.totalDeposits, address(this));
 
-        l.totalQueuedAssets = 0;
+        l.totalDeposits = 0;
         uint256 _pricePerShare = 10**18;
 
         uint256 epoch = l.epoch;
@@ -137,6 +125,17 @@ contract AdminInternal is BaseInternal {
         l.pricePerShare[l.epoch] = _pricePerShare;
 
         // emit DepositQueuedToVault(pricePerShare, mintedShares);
+    }
+
+    function _setNextEpoch() internal {
+        Storage.Layout storage l = Storage.layout();
+        l.epoch++;
+
+        l.claimTokenId = _formatClaimTokenId(l.epoch);
+        l.totalShortAssets = 0;
+
+        // Note: index epoch
+        // emit SetNextEpoch(l.epoch, l.claimTokenId);
     }
 
     function _setOptionParameters() internal {
@@ -172,9 +171,10 @@ contract AdminInternal is BaseInternal {
     }
 
     // // TODO: Change to '_underwrite' function
+    // // TODO: When a position is underwritten update l.totalShortAssets
     // function _borrow(Storage.Layout storage l, uint256 amount) internal {
     //     uint256 totalFreeLiquidity = ERC20.balanceOf(address(this)) -
-    //         l.totalQueuedAssets;
+    //         l.totalDeposits;
 
     //     require(totalFreeLiquidity >= amount, Errors.FREE_LIQUIDTY_EXCEEDED);
 

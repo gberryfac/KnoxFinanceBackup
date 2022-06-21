@@ -28,13 +28,19 @@ contract BaseInternal is AccessInternal, ERC4626BaseInternal {
         Vault = IVault(address(this));
     }
 
+    function _totalCollateralAssets() internal view returns (uint256) {
+        Storage.Layout storage l = Storage.layout();
+        return
+            ERC20.balanceOf(address(this)) - l.totalPremiums - l.totalDeposits;
+    }
+
     /************************************************
      *  ERC4626 OVERRIDES
      ***********************************************/
 
     /**
-     * @notice get the total quantity of the assets managed by the vault sans queued assets
-     * @return total managed asset amount
+     * @notice get the total quantity of the assets managed by the vault
+     * @return total active asset amount
      */
     function _totalAssets()
         internal
@@ -43,12 +49,8 @@ contract BaseInternal is AccessInternal, ERC4626BaseInternal {
         returns (uint256)
     {
         Storage.Layout storage l = Storage.layout();
-        uint256 erc20Amount = ERC20.balanceOf(address(this));
-        uint256 shortTokenAmount =
-            Pool.balanceOf(address(this), l.optionTokenId);
-
-        if (l.optionTokenId == 0) shortTokenAmount = 0;
-        return erc20Amount + shortTokenAmount - l.totalQueuedAssets;
+        uint256 totalCollateralAssets = _totalCollateralAssets();
+        return totalCollateralAssets + l.totalShortAssets + l.totalPremiums;
     }
 
     /**
@@ -221,41 +223,113 @@ contract BaseInternal is AccessInternal, ERC4626BaseInternal {
 
         _burn(owner, shareAmount);
 
-        (uint256 vaultAssetAmount, uint256 shortAssetAmount) =
-            _balanceDisbursement(assetAmount, _totalAssets());
+        (
+            uint256 collateralAssetAmount,
+            uint256 premiumAssetAmount,
+            uint256 shortAssetAmount
+        ) = _calculateDistribution(assetAmount);
 
-        // TODO: Calculate and deduct Withdrawal fee
+        Storage.Layout storage l = Storage.layout();
 
-        IERC20(_asset()).safeTransfer(receiver, vaultAssetAmount);
+        l.totalPremiums -= premiumAssetAmount;
+        l.totalShortAssets -= shortAssetAmount;
 
-        IERC1155(address(this)).safeTransferFrom(
-            address(this),
-            receiver,
-            Storage.layout().optionTokenId,
-            shortAssetAmount,
-            ""
+        (
+            uint256 collateralAssetAmountSansFee,
+            uint256 shortAssetAmountSansFee
+        ) =
+            _collectWithdrawalFee(
+                collateralAssetAmount,
+                premiumAssetAmount,
+                shortAssetAmount
+            );
+
+        _transferAssets(
+            collateralAssetAmountSansFee,
+            shortAssetAmountSansFee,
+            receiver
         );
 
-        emit Withdraw(caller, receiver, owner, assetAmount, shareAmount);
+        emit Withdraw(
+            caller,
+            receiver,
+            owner,
+            collateralAssetAmountSansFee + shortAssetAmountSansFee,
+            shareAmount
+        );
     }
 
     /************************************************
      *  HELPERS
      ***********************************************/
 
-    function _balanceDisbursement(uint256 assetAmount, uint256 totalAssets)
+    function _calculateDistribution(uint256 assetAmount)
         private
         view
-        returns (uint256, uint256)
+        returns (
+            uint256,
+            uint256,
+            uint256
+        )
     {
         Storage.Layout storage l = Storage.layout();
+        uint256 totalAssets = _totalAssets();
 
-        uint256 vaultAssetRatio = ERC20.balanceOf(address(this)) / totalAssets;
-        uint256 shortAssetRatio =
-            Pool.balanceOf(address(this), l.optionTokenId) / totalAssets;
+        uint256 collateralAssetRatio = l.totalCollateralAssets / totalAssets;
+        uint256 premiumRatio = l.totalPremiums / totalAssets;
+        uint256 shortAssetRatio = l.totalShortAssets / totalAssets;
 
-        uint256 vaultAssetAmount = assetAmount * vaultAssetRatio;
+        uint256 collateralAssetAmount = assetAmount * collateralAssetRatio;
+        uint256 premiumAssetAmount = assetAmount * premiumRatio;
         uint256 shortAssetAmount = assetAmount * shortAssetRatio;
-        return (vaultAssetAmount, shortAssetAmount);
+
+        return (collateralAssetAmount, premiumAssetAmount, shortAssetAmount);
+    }
+
+    function _collectWithdrawalFee(
+        uint256 collateralAssetAmount,
+        uint256 premiumAssetAmount,
+        uint256 shortAssetAmount
+    ) private returns (uint256, uint256) {
+        Storage.Layout storage l = Storage.layout();
+
+        uint256 multiplier = (100 * Constants.FEE_MULTIPLIER);
+
+        uint256 feesInCollateralAsset =
+            ((collateralAssetAmount + premiumAssetAmount) * l.withdrawalFee) /
+                multiplier;
+
+        uint256 feesInShortAsset =
+            (shortAssetAmount * l.withdrawalFee) / multiplier;
+
+        _transferAssets(
+            feesInCollateralAsset,
+            feesInShortAsset,
+            l.feeRecipient
+        );
+
+        // Note: index address
+        // emit CollectWithdrawalFee(msg.sender, feesInCollateralAsset, feesInShortAsset)
+
+        return (
+            collateralAssetAmount + premiumAssetAmount - feesInCollateralAsset,
+            shortAssetAmount - feesInShortAsset
+        );
+    }
+
+    function _transferAssets(
+        uint256 collateralAmount,
+        uint256 shortAmount,
+        address receiver
+    ) private {
+        IERC20(_asset()).safeTransfer(receiver, collateralAmount);
+
+        IERC1155(address(this)).safeTransferFrom(
+            address(this),
+            receiver,
+            Storage.layout().optionTokenId,
+            shortAmount,
+            ""
+        );
     }
 }

@@ -28,7 +28,7 @@ abstract contract QueueInternal is
         require(amount > 0, "value exceeds minimum");
 
         uint256 totalWithDepositedAmount =
-            _totalAssets() + l.totalQueuedAssets + amount;
+            _totalAssets() + l.totalDeposits + amount;
 
         require(totalWithDepositedAmount <= l.cap, "vault cap exceeded");
 
@@ -37,7 +37,7 @@ abstract contract QueueInternal is
             "deposit minimum not met"
         );
 
-        l.totalQueuedAssets += amount;
+        l.totalDeposits += amount;
 
         // redeems shares from previous epochs
         _maxRedeemShares(l, receiver);
@@ -53,8 +53,8 @@ abstract contract QueueInternal is
     function _withdrawFromQueue(Storage.Layout storage l, uint256 amount)
         internal
     {
-        require(l.totalQueuedAssets - amount >= 0, "overdraft");
-        l.totalQueuedAssets -= amount;
+        require(l.totalDeposits - amount >= 0, "overdraft");
+        l.totalDeposits -= amount;
 
         _burn(msg.sender, l.claimTokenId, amount);
         ERC20.safeTransfer(msg.sender, amount);

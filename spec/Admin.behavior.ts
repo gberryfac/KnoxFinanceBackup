@@ -55,16 +55,16 @@ export function describeBehaviorOfAdmin(
         let totalAssets = await instance.totalAssets();
         assert.isTrue(totalAssets.isZero());
 
-        let totalQueuedAssets = await instance.totalQueuedAssets();
-        assert.bnEqual(totalQueuedAssets, params.depositAmount);
+        let totalDeposits = await instance.totalDeposits();
+        assert.bnEqual(totalDeposits, params.depositAmount);
 
         await instance.connect(signers.keeper)["processEpoch(bool)"](false);
 
         totalAssets = await instance.totalAssets();
         assert.bnEqual(totalAssets, params.depositAmount);
 
-        totalQueuedAssets = await instance.totalQueuedAssets();
-        assert.isTrue(totalQueuedAssets.isZero());
+        totalDeposits = await instance.totalDeposits();
+        assert.isTrue(totalDeposits.isZero());
       });
 
       it("should update the Vault state when processEpoch is called", async () => {

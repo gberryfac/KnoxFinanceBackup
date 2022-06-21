@@ -19,6 +19,9 @@ contract Admin is AdminInternal {
      *  INITIALIZATION
      ***********************************************/
 
+    /**
+     * @notice
+     */
     function init(
         Storage.InitParams memory _initParams,
         Storage.InitProps memory _initProps
@@ -56,8 +59,8 @@ contract Admin is AdminInternal {
             l.cap = _initProps.cap;
 
             l.performanceFee = _initProps.performanceFee;
-            l.managementFee =
-                (_initProps.managementFee * Constants.FEE_MULTIPLIER) /
+            l.withdrawalFee =
+                (_initProps.withdrawalFee * Constants.FEE_MULTIPLIER) /
                 Constants.WEEKS_PER_YEAR;
 
             l.keeper = _initProps.keeper;
@@ -123,19 +126,19 @@ contract Admin is AdminInternal {
     function setPricer(address newPricer) external onlyOwner {}
 
     /**
-     * @notice Sets the management fee for the vault
-     * @param newManagementFee is the management fee (6 decimals). ex: 2 * 10 ** 6 = 2%
-     */
-    function setManagementFee(uint256 newManagementFee) external onlyOwner {
-        Storage._setManagementFee(newManagementFee);
-    }
-
-    /**
      * @notice Sets the performance fee for the vault
      * @param newPerformanceFee is the performance fee (6 decimals). ex: 20 * 10 ** 6 = 20%
      */
     function setPerformanceFee(uint256 newPerformanceFee) external onlyOwner {
         Storage._setPerformanceFee(newPerformanceFee);
+    }
+
+    /**
+     * @notice Sets the withdrawal fee for the vault
+     * @param newWithdrawalFee is the withdrawal fee (6 decimals). ex: 2 * 10 ** 6 = 2%
+     */
+    function setWithdrawalFee(uint256 newWithdrawalFee) external onlyOwner {
+        Storage._setWithdrawalFee(newWithdrawalFee);
     }
 
     /**
@@ -184,12 +187,25 @@ contract Admin is AdminInternal {
         _withdrawReservedLiquidity();
     }
 
+    /**
+     * @notice
+     */
+    function collectVaultFees() external isExpired onlyKeeper {
+        _collectVaultFees();
+    }
+
+    /**
+     * @notice
+     */
     function depositQueuedToVault() external isExpired onlyKeeper {
         _depositQueuedToVault();
     }
 
-    function collectVaultFees() external isExpired onlyKeeper {
-        _collectVaultFees();
+    /**
+     * @notice
+     */
+    function setNextEpoch() external isExpired onlyKeeper {
+        _setNextEpoch();
     }
 
     /**
@@ -200,16 +216,16 @@ contract Admin is AdminInternal {
     }
 
     /**
-     * @notice Sets the start and end time of the auction.
+     * @notice
      */
-    function setAuctionPrices() external isExpired onlyKeeper {
+    function setAuctionPrices() external AuctionInactive onlyKeeper {
         _setAuctionPrices();
     }
 
     /**
      * @notice Sets the start and end time of the auction.
      */
-    function setAuctionWindow() external isExpired onlyKeeper {
+    function setAuctionWindow() external AuctionInactive onlyKeeper {
         _setAuctionWindow();
     }
 }

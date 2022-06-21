@@ -51,10 +51,10 @@ interface IAdmin {
     function setPricer(address newPricer) external;
 
     /**
-     * @notice Sets the management fee for the vault
-     * @param newManagementFee is the management fee (6 decimals). ex: 2 * 10 ** 6 = 2%
+     * @notice Sets the withdrawal fee for the vault
+     * @param newWithdrawalFee is the withdrawal fee (6 decimals). ex: 2 * 10 ** 6 = 2%
      */
-    function setManagementFee(uint256 newManagementFee) external;
+    function setWithdrawalFee(uint256 newWithdrawalFee) external;
 
     /**
      * @notice Sets the performance fee for the vault

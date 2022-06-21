@@ -66,8 +66,8 @@ describe.skip("Standard Delta Strategy Unit Tests", () => {
     cap: parseUnits("5000000", DAI_DECIMALS),
     minimumSupply: BigNumber.from("10").pow("3").toString(),
     minimumContractSize: BigNumber.from("10").pow("17").toString(),
-    managementFee: BigNumber.from("2000000"),
     performanceFee: BigNumber.from("20000000"),
+    withdrawalFee: BigNumber.from("2000000"),
     isCall: false,
   });
 
@@ -91,8 +91,8 @@ describe.skip("Standard Delta Strategy Unit Tests", () => {
     cap: parseUnits("1000", WETH_DECIMALS),
     minimumSupply: BigNumber.from("10").pow("10").toString(),
     minimumContractSize: BigNumber.from("10").pow("17").toString(),
-    managementFee: BigNumber.from("2000000"),
     performanceFee: BigNumber.from("20000000"),
+    withdrawalFee: BigNumber.from("2000000"),
     isCall: true,
   });
 
@@ -116,8 +116,8 @@ describe.skip("Standard Delta Strategy Unit Tests", () => {
     cap: parseUnits("100", WBTC_DECIMALS),
     minimumSupply: BigNumber.from("10").pow("3").toString(),
     minimumContractSize: BigNumber.from("10").pow("7").toString(),
-    managementFee: BigNumber.from("2000000"),
     performanceFee: BigNumber.from("20000000"),
+    withdrawalFee: BigNumber.from("2000000"),
     isCall: true,
   });
 
@@ -141,8 +141,8 @@ describe.skip("Standard Delta Strategy Unit Tests", () => {
     cap: parseUnits("100000", LINK_DECIMALS),
     minimumSupply: BigNumber.from("10").pow("10").toString(),
     minimumContractSize: BigNumber.from("10").pow("17").toString(),
-    managementFee: BigNumber.from("1000000"),
     performanceFee: BigNumber.from("30000000"),
+    withdrawalFee: BigNumber.from("1000000"),
     isCall: true,
   });
 });
@@ -167,8 +167,8 @@ function behavesLikeOptionsVault(params: {
   cap: BigNumber;
   minimumSupply: string;
   minimumContractSize: string;
-  managementFee: BigNumber;
   performanceFee: BigNumber;
+  withdrawalFee: BigNumber;
   isCall: boolean;
 }) {
   let signers: types.Signers;

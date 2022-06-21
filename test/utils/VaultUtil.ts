@@ -56,8 +56,8 @@ export class VaultUtil {
     const initProps = {
       minimumSupply: params.minimumSupply,
       cap: params.cap,
-      managementFee: params.managementFee,
       performanceFee: params.performanceFee,
+      withdrawalFee: params.withdrawalFee,
       name: params.tokenName,
       symbol: params.tokenSymbol,
       keeper: addresses.keeper,

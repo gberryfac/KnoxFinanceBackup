@@ -26,8 +26,8 @@ library Storage {
     struct InitProps {
         uint64 minimumSupply;
         uint256 cap;
-        uint256 managementFee;
         uint256 performanceFee;
+        uint256 withdrawalFee;
         string name;
         string symbol;
         address keeper;
@@ -63,8 +63,6 @@ library Storage {
         int128 strike64x64;
         // @notice
         uint256 optionTokenId;
-        // // @notice Asset held in vault
-        // address asset;
         /************************************************
          * AUCTION PARAMETERS
          ***********************************************/
@@ -75,6 +73,19 @@ library Storage {
         // @notice
         uint256[2] saleWindow;
         /************************************************
+         * VAULT ACCOUNTING
+         ***********************************************/
+        // @notice
+        uint256 totalCollateralAssets;
+        // @notice
+        uint256 totalShortAssets;
+        // @notice
+        uint256 totalPremiums;
+        // @notice
+        uint256 totalDeposits;
+        // @notice
+        uint256 totalWithdrawals;
+        /************************************************
          * VAULT STATE
          ***********************************************/
         // @notice
@@ -82,22 +93,18 @@ library Storage {
         // @notice
         uint256 claimTokenId;
         // @notice
-        uint256 totalQueuedAssets;
-        // @notice
-        uint256 lastTotalAssets;
-        // @notice
         mapping(uint256 => uint256) pricePerShare;
         /************************************************
          * VAULT PROPERTIES
          ***********************************************/
         // @notice
-        uint256 cap;
-        // @notice
-        uint256 managementFee;
-        // @notice
         uint64 minimumSupply;
         // @notice
+        uint256 cap;
+        // @notice
         uint256 performanceFee;
+        // @notice
+        uint256 withdrawalFee;
         /************************************************
          * ACTORS
          ***********************************************/
@@ -110,12 +117,6 @@ library Storage {
          ***********************************************/
         // @notice
         IPricer Pricer;
-        // // @notice
-        // IERC20 ERC20;
-        // // @notice
-        // IPremiaPool Pool;
-        // // @notice
-        // IVault Vault;
     }
 
     bytes32 internal constant LAYOUT_SLOT =
@@ -136,7 +137,6 @@ library Storage {
         Layout storage l = layout();
         require(newFeeRecipient != address(0), "address not provided");
         require(newFeeRecipient != l.feeRecipient, "new address equals old");
-
         l.feeRecipient = newFeeRecipient;
     }
 
@@ -147,25 +147,11 @@ library Storage {
         l.keeper = newKeeper;
     }
 
-    // TODO:
-    function _setPricer(address newPricer) internal {}
-
-    function _setManagementFee(uint256 newManagementFee) internal {
+    function _setPricer(address newPricer) internal {
         Layout storage l = layout();
-
-        require(
-            newManagementFee < 100 * Constants.FEE_MULTIPLIER,
-            "invalid fee amount"
-        );
-
-        // We are dividing annualized management fee by num weeks in a year
-        uint256 tmpManagementFee =
-            (newManagementFee * Constants.FEE_MULTIPLIER) /
-                Constants.WEEKS_PER_YEAR;
-
-        // emit ManagementFeeSet(l.managementFee, newManagementFee);
-
-        l.managementFee = tmpManagementFee;
+        require(newPricer != address(0), "address not provided");
+        require(newPricer != address(l.Pricer), "new address equals old");
+        l.Pricer = IPricer(newPricer);
     }
 
     function _setPerformanceFee(uint256 newPerformanceFee) internal {
@@ -179,6 +165,24 @@ library Storage {
         // emit PerformanceFeeSet(l.performanceFee, newPerformanceFee);
 
         l.performanceFee = newPerformanceFee;
+    }
+
+    function _setWithdrawalFee(uint256 newWithdrawalFee) internal {
+        Layout storage l = layout();
+
+        require(
+            newWithdrawalFee < 100 * Constants.FEE_MULTIPLIER,
+            "invalid fee amount"
+        );
+
+        // We are dividing annualized withdrawal fee by num weeks in a year
+        uint256 tmpWithdrawalFee =
+            (newWithdrawalFee * Constants.FEE_MULTIPLIER) /
+                Constants.WEEKS_PER_YEAR;
+
+        // emit WithdrawalFeeSet(l.withdrawalFee, newWithdrawalFee);
+
+        l.withdrawalFee = tmpWithdrawalFee;
     }
 
     function _setCap(uint256 newCap) internal {
@@ -200,9 +204,9 @@ library Storage {
      *  VIEW
      ***********************************************/
 
-    function _totalQueuedAssets() internal view returns (uint256) {
+    function _totalDeposits() internal view returns (uint256) {
         Layout storage l = layout();
-        return l.totalQueuedAssets;
+        return l.totalDeposits;
     }
 
     function _epoch() internal view returns (uint256) {
@@ -227,22 +231,4 @@ library Storage {
         Layout storage l = layout();
         return (l.isCall, l.expiry, l.optionTokenId);
     }
-
-    // function _accountsByOption(uint256 id)
-    //     external
-    //     view
-    //     returns (address[] memory)
-    // {
-    //     Layout storage l = layout();
-    //     return Pool.accountsByToken(id);
-    // }
-
-    // function _optionsByAccount(address account)
-    //     external
-    //     view
-    //     returns (uint256[] memory)
-    // {
-    //     Layout storage l = layout();
-    //     return Pool.tokensByAccount(account);
-    // }
 }
