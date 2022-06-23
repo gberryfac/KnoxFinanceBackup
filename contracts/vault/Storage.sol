@@ -61,8 +61,8 @@ library Storage {
         uint64 minimumContractSize;
         // @notice Delta used to calculate strike price as a 64x64 bit fixed point number
         int128 delta64x64;
-        // @notice mapping of options by epoch
-        mapping(uint256 => Option) options;
+        // @notice maps epoch to option
+        mapping(uint64 => Option) options;
         /************************************************
          * AUCTION PARAMETERS
          ***********************************************/
@@ -92,8 +92,8 @@ library Storage {
         uint64 epoch;
         // @notice
         uint256 claimTokenId;
-        // @notice
-        mapping(uint256 => uint256) pricePerShare;
+        // @notice maps epoch to claim token price per share
+        mapping(uint64 => uint256) pricePerShare;
         /************************************************
          * VAULT PROPERTIES
          ***********************************************/
@@ -214,12 +214,12 @@ library Storage {
         return l.epoch;
     }
 
-    function _pricePerShare(uint256 epoch) internal view returns (uint256) {
+    function _pricePerShare(uint64 epoch) internal view returns (uint256) {
         Layout storage l = layout();
         return l.pricePerShare[epoch];
     }
 
-    function _optionByEpoch(uint256 epoch)
+    function _optionByEpoch(uint64 epoch)
         internal
         view
         returns (Option memory)

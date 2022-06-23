@@ -16,11 +16,11 @@ contract View is BaseInternal {
         return Storage._epoch();
     }
 
-    function pricePerShare(uint256 epoch) external view returns (uint256) {
+    function pricePerShare(uint64 epoch) external view returns (uint256) {
         return Storage._pricePerShare(epoch);
     }
 
-    function optionByEpoch(uint256 epoch)
+    function optionByEpoch(uint64 epoch)
         external
         view
         returns (Storage.Option memory)

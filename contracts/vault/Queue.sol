@@ -55,7 +55,7 @@ contract Queue is
         _withdrawFromQueue(l, amount);
     }
 
-    function redeemSharesFromEpoch(uint256 epoch, address receiver)
+    function redeemSharesFromEpoch(uint64 epoch, address receiver)
         external
         nonReentrant
     {
@@ -91,7 +91,7 @@ contract Queue is
         return _previewUnredeemedShares(l, account);
     }
 
-    function previewUnredeemedSharesFromEpoch(uint256 epoch, uint256 balance)
+    function previewUnredeemedSharesFromEpoch(uint64 epoch, uint256 balance)
         external
         view
         returns (uint256)

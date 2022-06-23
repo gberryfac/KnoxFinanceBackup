@@ -6,7 +6,7 @@ interface IView {
 
     function epoch() external view returns (uint256);
 
-    function pricePerShare(uint256 epoch) external view returns (uint256);
+    function pricePerShare(uint64 epoch) external view returns (uint256);
 
     function option()
         external

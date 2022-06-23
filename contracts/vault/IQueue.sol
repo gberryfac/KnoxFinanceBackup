@@ -13,7 +13,7 @@ interface IQueue is IERC1155, IERC1155Enumerable {
 
     function maxRedeemShares(address receiver) external;
 
-    function previewUnredeemedSharesFromEpoch(uint256 epoch, uint256 balance)
+    function previewUnredeemedSharesFromEpoch(uint64 epoch, uint256 balance)
         external
         view
         returns (uint256);
