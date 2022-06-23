@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "@solidstate/contracts/token/ERC20/IERC20.sol";
-import "@solidstate/contracts/utils/SafeERC20.sol";
-
 import "../pricer/IPricer.sol";
 
 import "../interfaces/IPremiaPool.sol";
@@ -11,8 +8,6 @@ import "../interfaces/IPremiaPool.sol";
 import "../libraries/Constants.sol";
 
 library Storage {
-    using SafeERC20 for IERC20;
-
     /************************************************
      *  INITIALIZATION STRUCTS
      ***********************************************/
@@ -36,6 +31,15 @@ library Storage {
         address pricer;
     }
 
+    struct Option {
+        // @notice Timestamp when the current option expires
+        uint64 expiry;
+        // @notice Strike price of the option as a 64x64 bit fixed point number
+        int128 strike64x64;
+        // @notice
+        uint256 optionTokenId;
+    }
+
     /************************************************
      *  LAYOUT
      ***********************************************/
@@ -55,14 +59,10 @@ library Storage {
         bool isCall;
         // @notice Minimum amount of the underlying a strategy will sell
         uint64 minimumContractSize;
-        // @notice Timestamp when the current option expires
-        uint64 expiry;
         // @notice Delta used to calculate strike price as a 64x64 bit fixed point number
         int128 delta64x64;
-        // @notice Strike price of the option as a 64x64 bit fixed point number
-        int128 strike64x64;
-        // @notice
-        uint256 optionTokenId;
+        // @notice mapping of options by epoch
+        mapping(uint256 => Option) options;
         /************************************************
          * AUCTION PARAMETERS
          ***********************************************/
@@ -219,16 +219,12 @@ library Storage {
         return l.pricePerShare[epoch];
     }
 
-    function _option()
+    function _optionByEpoch(uint256 epoch)
         internal
         view
-        returns (
-            bool,
-            uint256,
-            uint256
-        )
+        returns (Option memory)
     {
         Layout storage l = layout();
-        return (l.isCall, l.expiry, l.optionTokenId);
+        return l.options[epoch];
     }
 }

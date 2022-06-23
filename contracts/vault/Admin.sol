@@ -22,6 +22,7 @@ contract Admin is AdminInternal {
     /**
      * @notice
      */
+    // TODO: Rename initialize()
     function init(
         Storage.InitParams memory _initParams,
         Storage.InitProps memory _initProps
@@ -103,6 +104,38 @@ contract Admin is AdminInternal {
     }
 
     /************************************************
+     *  INITIALIZE AUCTION
+     ***********************************************/
+
+    /**
+     * @notice
+     */
+    function initializeAuction() external onlyKeeper {
+        _initializeAuction();
+    }
+
+    /**
+     * @notice Sets the parameters for the next option to be sold
+     */
+    function setOptionParameters() external onlyKeeper {
+        _setOptionParameters();
+    }
+
+    /**
+     * @notice
+     */
+    function setAuctionPrices() external onlyKeeper {
+        _setAuctionPrices();
+    }
+
+    /**
+     * @notice Sets the start and end time of the auction.
+     */
+    function setAuctionWindow() external onlyKeeper {
+        _setAuctionWindow();
+    }
+
+    /************************************************
      *  ADMIN
      ***********************************************/
 
@@ -156,76 +189,54 @@ contract Admin is AdminInternal {
     //  */
     function setAuctionWindowOffsets(uint16 start, uint16 end)
         external
-        isExpired
         onlyOwner
     {
         Storage._setAuctionWindowOffsets(start, end);
     }
 
     /************************************************
-     *  OPERATIONS
+     *  PROCESS EPOCH
      ***********************************************/
 
     /**
      * @notice Prepares the strategy and initiates the next round of option sales
      */
-    function processEpoch(bool processExpired) external isExpired onlyKeeper {
+    function processEpoch(bool processExpired) external onlyKeeper {
         _processEpoch(processExpired);
     }
 
     /**
      * @notice Processes expired options
      */
-    function processExpired() external isExpired onlyKeeper {
+    function processExpired() external onlyKeeper {
         _processExpired();
     }
 
     /**
      * @notice Transfers reserved liquidity from Premia pool to Vault.
      */
-    function withdrawReservedLiquidity() external isExpired onlyKeeper {
+    function withdrawReservedLiquidity() external onlyKeeper {
         _withdrawReservedLiquidity();
     }
 
     /**
      * @notice
      */
-    function collectVaultFees() external isExpired onlyKeeper {
+    function collectVaultFees() external onlyKeeper {
         _collectVaultFees();
     }
 
     /**
      * @notice
      */
-    function depositQueuedToVault() external isExpired onlyKeeper {
+    function depositQueuedToVault() external onlyKeeper {
         _depositQueuedToVault();
     }
 
     /**
      * @notice
      */
-    function setNextEpoch() external isExpired onlyKeeper {
+    function setNextEpoch() external onlyKeeper {
         _setNextEpoch();
-    }
-
-    /**
-     * @notice Sets the parameters for the next option to be sold
-     */
-    function setOptionParameters() external isExpired onlyKeeper {
-        _setOptionParameters();
-    }
-
-    /**
-     * @notice
-     */
-    function setAuctionPrices() external auctionInactive onlyKeeper {
-        _setAuctionPrices();
-    }
-
-    /**
-     * @notice Sets the start and end time of the auction.
-     */
-    function setAuctionWindow() external auctionInactive onlyKeeper {
-        _setAuctionWindow();
     }
 }

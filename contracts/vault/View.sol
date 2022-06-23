@@ -20,16 +20,12 @@ contract View is BaseInternal {
         return Storage._pricePerShare(epoch);
     }
 
-    function option()
+    function optionByEpoch(uint256 epoch)
         external
         view
-        returns (
-            bool,
-            uint256,
-            uint256
-        )
+        returns (Storage.Option memory)
     {
-        return Storage._option();
+        return Storage._optionByEpoch(epoch);
     }
 
     function accountsByOption(uint256 id)

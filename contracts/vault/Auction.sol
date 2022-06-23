@@ -32,15 +32,4 @@ contract Auction is AuctionInternal, ReentrancyGuard {
     {
         _purchase(contractSize);
     }
-
-    /**
-     * @notice Exercises In-The-Money options
-     */
-    function exercise(
-        address holder,
-        uint256 longTokenId,
-        uint256 contractSize
-    ) external nonReentrant {
-        _exercise(holder, longTokenId, contractSize);
-    }
 }

@@ -28,6 +28,14 @@ contract BaseInternal is AccessInternal, ERC4626BaseInternal {
         Vault = IVault(address(this));
     }
 
+    function _exercise(
+        address holder,
+        uint256 longTokenId,
+        uint256 contractSize
+    ) internal {
+        Pool.exerciseFrom(holder, longTokenId, contractSize);
+    }
+
     function _totalCollateralAssets() internal view returns (uint256) {
         Storage.Layout storage l = Storage.layout();
         return
@@ -322,12 +330,14 @@ contract BaseInternal is AccessInternal, ERC4626BaseInternal {
         uint256 shortAmount,
         address receiver
     ) private {
-        IERC20(_asset()).safeTransfer(receiver, collateralAmount);
+        Storage.Layout storage l = Storage.layout();
+        Storage.Option memory option = l.options[l.epoch];
 
+        IERC20(_asset()).safeTransfer(receiver, collateralAmount);
         IERC1155(address(this)).safeTransferFrom(
             address(this),
             receiver,
-            Storage.layout().optionTokenId,
+            option.optionTokenId,
             shortAmount,
             ""
         );

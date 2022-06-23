@@ -35,7 +35,8 @@ abstract contract AccessInternal is OwnableInternal, PausableInternal {
      */
     modifier isExpired() {
         Storage.Layout storage l = Storage.layout();
-        require(block.timestamp >= l.expiry, "Option has not expired!");
+        Storage.Option memory option = l.options[l.epoch];
+        require(block.timestamp >= option.expiry, "Option has not expired!");
         _;
     }
 

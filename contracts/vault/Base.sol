@@ -11,6 +11,17 @@ contract Base is BaseInternal, ERC4626Base {
 
     constructor(bool isCall, address pool) BaseInternal(isCall, pool) {}
 
+    /**
+     * @notice Exercises In-The-Money options
+     */
+    function exercise(
+        address holder,
+        uint256 longTokenId,
+        uint256 contractSize
+    ) external {
+        _exercise(holder, longTokenId, contractSize);
+    }
+
     /************************************************
      *  ERC4626 OVERRIDES
      ***********************************************/
