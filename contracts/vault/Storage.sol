@@ -92,8 +92,8 @@ library Storage {
         uint64 epoch;
         // @notice
         uint256 claimTokenId;
-        // @notice maps epoch to claim token price per share
-        mapping(uint64 => uint256) pricePerShare;
+        // @notice maps claim token id to claim token price
+        mapping(uint256 => uint256) pricePerShare;
         /************************************************
          * VAULT PROPERTIES
          ***********************************************/

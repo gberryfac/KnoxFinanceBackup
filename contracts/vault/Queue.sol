@@ -37,8 +37,7 @@ contract Queue is
         nonReentrant
         whenNotPaused
     {
-        Storage.Layout storage l = Storage.layout();
-        _depositToQueue(l, amount, msg.sender);
+        _depositToQueue(amount, msg.sender);
     }
 
     function depositToQueue(uint256 amount, address receiver)
@@ -46,13 +45,11 @@ contract Queue is
         nonReentrant
         whenNotPaused
     {
-        Storage.Layout storage l = Storage.layout();
-        _depositToQueue(l, amount, receiver);
+        _depositToQueue(amount, receiver);
     }
 
     function withdrawFromQueue(uint256 amount) external nonReentrant {
-        Storage.Layout storage l = Storage.layout();
-        _withdrawFromQueue(l, amount);
+        _withdrawFromQueue(amount);
     }
 
     function redeemSharesFromEpoch(uint64 epoch, address receiver)
@@ -63,9 +60,7 @@ contract Queue is
             receiver == msg.sender || isApprovedForAll(receiver, msg.sender),
             "ERC1155: caller is not owner nor approved"
         );
-
-        Storage.Layout storage l = Storage.layout();
-        _redeemSharesFromEpoch(l, epoch, receiver);
+        _redeemSharesFromEpoch(epoch, receiver);
     }
 
     function maxRedeemShares(address receiver) external nonReentrant {
@@ -74,8 +69,7 @@ contract Queue is
             "ERC1155: caller is not owner nor approved"
         );
 
-        Storage.Layout storage l = Storage.layout();
-        _maxRedeemShares(l, receiver);
+        _maxRedeemShares(receiver);
     }
 
     /************************************************
@@ -87,8 +81,7 @@ contract Queue is
         view
         returns (uint256)
     {
-        Storage.Layout storage l = Storage.layout();
-        return _previewUnredeemedShares(l, account);
+        return _previewUnredeemedShares(account);
     }
 
     function previewUnredeemedSharesFromEpoch(uint64 epoch, uint256 balance)
@@ -96,8 +89,7 @@ contract Queue is
         view
         returns (uint256)
     {
-        Storage.Layout storage l = Storage.layout();
-        return _previewUnredeemedSharesFromEpoch(l, epoch, balance);
+        return _previewUnredeemedSharesFromEpoch(epoch, balance);
     }
 
     /************************************************
