@@ -12,7 +12,7 @@ const assertBNEqual = (
   expectedBN: BigNumber,
   context?: string
 ) => {
-  _assert.strictEqual(actualBN.toString(), expectedBN.toString(), context);
+  assert.strictEqual(actualBN.toString(), expectedBN.toString(), context);
 };
 
 /**
@@ -26,7 +26,7 @@ const assertBNNotEqual = (
   expectedBN: BigNumber,
   context?: string
 ) => {
-  _assert.notStrictEqual(actualBN.toString(), expectedBN.toString(), context);
+  assert.notStrictEqual(actualBN.toString(), expectedBN.toString(), context);
 };
 
 /**
