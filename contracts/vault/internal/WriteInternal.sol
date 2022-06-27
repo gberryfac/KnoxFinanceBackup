@@ -5,7 +5,7 @@ import "abdk-libraries-solidity/ABDKMath64x64.sol";
 
 import "./BaseInternal.sol";
 
-abstract contract AuctionInternal is BaseInternal {
+abstract contract WriteInternal is BaseInternal {
     using ABDKMath64x64 for int128;
     using ABDKMath64x64 for uint256;
     using SafeERC20 for IERC20;

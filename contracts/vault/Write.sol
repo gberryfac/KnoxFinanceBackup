@@ -3,24 +3,33 @@ pragma solidity ^0.8.0;
 
 import "@solidstate/contracts/utils/ReentrancyGuard.sol";
 
-import "abdk-libraries-solidity/ABDKMath64x64.sol";
+import "./internal/WriteInternal.sol";
 
-import "./internal/AuctionInternal.sol";
-
-contract Auction is AuctionInternal, ReentrancyGuard {
+contract Write is WriteInternal, ReentrancyGuard {
     using ABDKMath64x64 for int128;
     using ABDKMath64x64 for uint256;
     using SafeERC20 for IERC20;
     using Storage for Storage.Layout;
 
-    constructor(bool isCall, address pool) AuctionInternal(isCall, pool) {}
+    constructor(bool isCall, address pool) WriteInternal(isCall, pool) {}
 
     /************************************************
      *  INPUT/OUTPUT
      ***********************************************/
 
     // TODO:
+    function swapAndPreOrder() external auctionActive nonReentrant {}
+
+    // TODO:
     function swapAndPurchase() external auctionActive nonReentrant {}
+
+    // function preOrder(uint256 price, uint256 size)
+    //     external
+    //     auctionActive
+    //     nonReentrant
+    //     returns (uint256)
+    // {
+    // }
 
     /**
      * @notice Initiates the option sale

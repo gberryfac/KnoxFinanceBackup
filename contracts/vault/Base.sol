@@ -11,6 +11,10 @@ contract Base is BaseInternal, ERC4626Base {
 
     constructor(bool isCall, address pool) BaseInternal(isCall, pool) {}
 
+    function totalCollateral() external view returns (uint256) {
+        return _totalCollateral();
+    }
+
     /**
      * @notice Exercises In-The-Money options
      */

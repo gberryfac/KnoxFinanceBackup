@@ -47,7 +47,13 @@ contract AdminInternal is BaseInternal {
     }
 
     // TODO:
-    function _setAuctionPrices() internal {}
+    function _setAuctionPrices() internal {
+        // Get deltaStrikeOffset64x64
+        // If deltaStrike64x64 <= deltaStrikeOffset64x64
+        // // Skip auction
+        // Get maxPrice
+        // Get minPrice
+    }
 
     function _setAuctionWindow() internal {
         Storage.Layout storage l = Storage.layout();
@@ -60,8 +66,12 @@ contract AdminInternal is BaseInternal {
         // emit SaleWindowSet(startTimestamp, l.saleWindow[0], l.saleWindow[1]);
     }
 
+    /************************************************
+     *  FINALIZE AUCTION
+     ***********************************************/
+
     // // TODO: Change to '_underwrite' function
-    // // TODO: When a position is underwritten update l.totalShortAssets
+    // // TODO: When a position is underwritten update l.totalShort
     // function _borrow(Storage.Layout storage l, uint256 amount) internal {
     //     uint256 totalFreeLiquidity = ERC20.balanceOf(address(this)) -
     //         l.totalDeposits;
@@ -127,16 +137,12 @@ contract AdminInternal is BaseInternal {
         int128 strike64x64 = option.strike64x64;
 
         int128 spot64x64 = Pool.getPriceAfter64x64(expiry);
-        uint256 intrinsicValue = 0;
+        uint256 intrinsicValue;
 
         if (l.isCall && spot64x64 > strike64x64) {
-            intrinsicValue = spot64x64.sub(strike64x64).mulu(
-                l.totalShortAssets
-            );
+            intrinsicValue = spot64x64.sub(strike64x64).mulu(l.totalShort);
         } else if (!l.isCall && strike64x64 > spot64x64) {
-            intrinsicValue = strike64x64.sub(spot64x64).mulu(
-                l.totalShortAssets
-            );
+            intrinsicValue = strike64x64.sub(spot64x64).mulu(l.totalShort);
         }
 
         uint256 netIncome = l.totalPremiums - intrinsicValue;
@@ -185,7 +191,7 @@ contract AdminInternal is BaseInternal {
         Storage.Layout storage l = Storage.layout();
 
         l.claimTokenId = _formatClaimTokenId(l.epoch);
-        l.totalShortAssets = 0;
+        l.totalShort = 0;
 
         l.epoch++;
 

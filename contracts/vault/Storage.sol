@@ -76,9 +76,9 @@ library Storage {
          * VAULT ACCOUNTING
          ***********************************************/
         // @notice
-        uint256 totalCollateralAssets;
+        uint256 totalCollateral;
         // @notice
-        uint256 totalShortAssets;
+        uint256 totalShort;
         // @notice
         uint256 totalPremiums;
         // @notice

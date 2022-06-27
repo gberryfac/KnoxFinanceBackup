@@ -36,7 +36,7 @@ contract BaseInternal is AccessInternal, ERC4626BaseInternal {
         Pool.exerciseFrom(holder, longTokenId, contractSize);
     }
 
-    function _totalCollateralAssets() internal view returns (uint256) {
+    function _totalCollateral() internal view returns (uint256) {
         Storage.Layout storage l = Storage.layout();
         return
             ERC20.balanceOf(address(this)) - l.totalPremiums - l.totalDeposits;
@@ -57,8 +57,7 @@ contract BaseInternal is AccessInternal, ERC4626BaseInternal {
         returns (uint256)
     {
         Storage.Layout storage l = Storage.layout();
-        uint256 totalCollateralAssets = _totalCollateralAssets();
-        return totalCollateralAssets + l.totalShortAssets + l.totalPremiums;
+        return _totalCollateral() + l.totalShort + l.totalPremiums;
     }
 
     /**
@@ -126,7 +125,7 @@ contract BaseInternal is AccessInternal, ERC4626BaseInternal {
         uint256 assetAmount,
         uint256 shareAmount
     ) private {
-        IERC20(_asset()).safeTransfer(address(this), assetAmount);
+        ERC20.safeTransfer(address(this), assetAmount);
 
         _mint(receiver, shareAmount);
 
@@ -240,7 +239,7 @@ contract BaseInternal is AccessInternal, ERC4626BaseInternal {
         Storage.Layout storage l = Storage.layout();
 
         l.totalPremiums -= premiumAssetAmount;
-        l.totalShortAssets -= shortAssetAmount;
+        l.totalShort -= shortAssetAmount;
 
         (
             uint256 collateralAssetAmountSansFee,
@@ -283,9 +282,9 @@ contract BaseInternal is AccessInternal, ERC4626BaseInternal {
         Storage.Layout storage l = Storage.layout();
         uint256 totalAssets = _totalAssets();
 
-        uint256 collateralAssetRatio = l.totalCollateralAssets / totalAssets;
+        uint256 collateralAssetRatio = l.totalCollateral / totalAssets;
         uint256 premiumRatio = l.totalPremiums / totalAssets;
-        uint256 shortAssetRatio = l.totalShortAssets / totalAssets;
+        uint256 shortAssetRatio = l.totalShort / totalAssets;
 
         uint256 collateralAssetAmount = assetAmount * collateralAssetRatio;
         uint256 premiumAssetAmount = assetAmount * premiumRatio;
@@ -332,9 +331,13 @@ contract BaseInternal is AccessInternal, ERC4626BaseInternal {
     ) private {
         Storage.Layout storage l = Storage.layout();
         Storage.Option memory option = l.options[l.epoch];
+        IERC1155 ERC1155 = IERC1155(address(this));
 
-        IERC20(_asset()).safeTransfer(receiver, collateralAmount);
-        IERC1155(address(this)).safeTransferFrom(
+        if (collateralAmount > 0) {
+            ERC20.safeTransfer(receiver, collateralAmount);
+        }
+
+        ERC1155.safeTransferFrom(
             address(this),
             receiver,
             option.optionTokenId,
