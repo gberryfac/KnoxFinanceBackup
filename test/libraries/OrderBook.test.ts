@@ -27,12 +27,7 @@ describe.only("OrderBook", () => {
       contract.deploy()
     );
 
-    instance = await new TestOrderBook__factory(
-      {
-        "contracts/libraries/OrderBook.sol:OrderBook": library.address,
-      },
-      signer1
-    ).deploy();
+    instance = await new TestOrderBook__factory(signer1).deploy();
   });
 
   describe("#head", () => {

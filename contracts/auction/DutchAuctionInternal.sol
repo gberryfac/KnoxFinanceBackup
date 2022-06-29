@@ -307,43 +307,46 @@ contract DutchAuctionInternal is IDutchAuction {
         DutchAuctionStorage.Layout storage l = DutchAuctionStorage.layout();
         OrderBook.Index storage orderbook = l.orderbooks[epoch];
 
-        uint256 next = orderbook._head();
-        uint256 length = orderbook._length();
-        uint256 lastPrice = _lastPrice(epoch);
-
-        uint256 totalCollateralUsed;
-        uint256 totalCollateral = l.auctions[epoch].totalCollateral;
-
-        uint256 id;
-        uint256 price;
-        uint256 size;
-        address buyer;
-
         uint256 refund;
         uint256 fill;
 
-        for (uint256 i = 1; i <= length; i++) {
-            (id, price, size, buyer) = orderbook._getOrder(next);
+        {
+            uint256 next = orderbook._head();
+            uint256 lastPrice = _lastPrice(epoch);
 
-            if (buyer == msg.sender) {
-                if (price >= lastPrice) {
-                    if (totalCollateralUsed + size >= totalCollateral) {
-                        uint256 remainder =
-                            totalCollateral - totalCollateralUsed;
+            uint256 totalCollateralUsed;
+            uint256 totalCollateral = l.auctions[epoch].totalCollateral;
 
-                        fill += remainder;
-                        uint256 paid = price * size;
-                        uint256 cost = lastPrice * remainder;
-                        refund += paid - cost;
-                    } else fill += size;
-                } else refund += price * size;
+            uint256 id;
+            uint256 price;
+            uint256 size;
+            address buyer;
+
+            for (uint256 i = 1; i <= orderbook._length(); i++) {
+                (id, price, size, buyer) = orderbook._getOrder(next);
+
+                if (buyer == msg.sender) {
+                    if (price >= lastPrice) {
+                        if (totalCollateralUsed + size >= totalCollateral) {
+                            uint256 remainder =
+                                totalCollateral - totalCollateralUsed;
+
+                            fill += remainder;
+                            uint256 paid = price * size;
+                            uint256 cost = lastPrice * remainder;
+                            refund += paid - cost;
+                        } else fill += size;
+                    } else refund += price * size;
+                }
+
+                totalCollateralUsed += size;
+
+                next = orderbook._getNextOrder(next);
+                orderbook._remove(id);
             }
-
-            next = orderbook._getNextOrder(next);
-            orderbook._remove(id);
         }
 
-        l.claimsByBuyer[buyer].remove(epoch);
+        l.claimsByBuyer[msg.sender].remove(epoch);
 
         // TODO: Check if option expired ITM
         // // if it has, adjust the ERC20/Long balances
@@ -351,7 +354,7 @@ contract DutchAuctionInternal is IDutchAuction {
         if (fill > 0) {
             ERC1155.safeTransferFrom(
                 address(this),
-                buyer,
+                msg.sender,
                 l.auctions[epoch].longTokenId,
                 fill,
                 ""
@@ -359,7 +362,7 @@ contract DutchAuctionInternal is IDutchAuction {
         }
 
         if (refund > 0) {
-            ERC20.safeTransfer(buyer, refund);
+            ERC20.safeTransfer(msg.sender, refund);
         }
     }
 

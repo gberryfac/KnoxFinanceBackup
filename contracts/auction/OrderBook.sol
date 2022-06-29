@@ -25,7 +25,7 @@ library OrderBook {
 
     /// @dev Retrieve the highest bid in the order book.
     /// @param index The index that the order is part of.
-    function _head(Index storage index) external view returns (uint256) {
+    function _head(Index storage index) internal view returns (uint256) {
         return index.head;
     }
 
