@@ -26,26 +26,33 @@ contract DutchAuction is IDutchAuction, ReentrancyGuard {
     mapping(uint64 => OrderBook.Index) orderbooks;
     mapping(address => EnumerableSet.UintSet) claimsByBuyer;
 
-    address immutable keeper;
     IERC20 immutable ERC20;
     IERC1155 immutable ERC1155;
     IVault immutable Vault;
 
     constructor(
         address asset,
-        address _keeper,
         address pool,
         address vault
     ) {
-        keeper = _keeper;
         ERC20 = IERC20(asset);
         ERC1155 = IERC1155(pool);
         Vault = IVault(vault);
     }
 
-    function initializeAuction(InitAuction memory initAuction) external {
+    /**
+     * @dev Throws if called by any account other than the keeper.
+     */
+    modifier onlyVault() {
+        require(msg.sender == address(Vault), "!vault");
+        _;
+    }
+
+    function initializeAuction(InitAuction memory initAuction)
+        external
+        onlyVault
+    {
         // TODO: Input validation
-        require(msg.sender == keeper, "!keeper");
         require(initAuction.minPrice > 0, "minPrice <= 0");
 
         require(
@@ -272,10 +279,13 @@ contract DutchAuction is IDutchAuction, ReentrancyGuard {
         return totalCollateralUsed;
     }
 
-    function _setLongTokenId(uint64 epoch, uint256 longTokenId) internal {
+    // TODO: Move onlyVault to External function
+    function _setLongTokenId(uint64 epoch, uint256 longTokenId)
+        internal
+        onlyVault
+    {
         // modifier: reject if auction is not finalized
         // modifier: reject if auction is processed
-        require(msg.sender == keeper, "!keeper");
         require(auctions[epoch].longTokenId != 0);
         auctions[epoch].longTokenId = longTokenId;
     }
