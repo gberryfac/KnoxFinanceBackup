@@ -5,13 +5,13 @@ pragma solidity 0.8.6;
 /// @dev     ONLY FOR TESTING PURPOSES.
 
 import "abdk-libraries-solidity/ABDKMath64x64.sol";
-import "../libraries/CumulativeNormalDistribution.sol";
+import "../pricer/OptionStatistics.sol";
 
-contract TestCumulativeNormalDistribution {
+contract TestOptionStatistics {
     using ABDKMath64x64 for int128;
     using ABDKMath64x64 for uint256;
-    using CumulativeNormalDistribution for int128;
-    using CumulativeNormalDistribution for uint256;
+    using OptionStatistics for int128;
+    using OptionStatistics for uint256;
 
     uint256 public constant PRECISION = 1e18;
 
@@ -30,17 +30,12 @@ contract TestCumulativeNormalDistribution {
         }
     }
 
-    function cdf(uint256 x, bool isNegative) public pure returns (int128 y) {
-        int128 p = toSigned(x, isNegative);
-        y = p.getCDF();
-    }
-
-    function inverseCDF(uint256 x, bool isNegative)
-        public
+    function invCDF(uint256 x, bool isNegative)
+        external
         pure
         returns (int128 y)
     {
         int128 p = toSigned(x, isNegative);
-        y = p.getInverseCDF();
+        y = p.invCDF();
     }
 }

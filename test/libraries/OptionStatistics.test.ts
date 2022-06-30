@@ -1,15 +1,15 @@
 import { ethers } from "hardhat";
-import { Contract } from "ethers";
-
-const { getContractFactory } = ethers;
 const { parseEther } = ethers.utils;
+
+import {
+  TestOptionStatistics,
+  TestOptionStatistics__factory,
+} from "../../types";
 
 import { expect } from "chai";
 
-import * as accounts from "../utils/accounts";
-import * as types from "../utils/types";
-
 import { FixedPointX64 } from "web3-units";
+import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 
 const POSITIVE = false;
 const NEGATIVE = true;
@@ -65,36 +65,16 @@ const icdfs = {
   [0.99]: 2.326347874040841100886,
 };
 
-describe.only("CumulativeNormalDistribution", () => {
-  let signers: types.Signers;
-  let addresses: types.Addresses;
-  let cdfLibrary: Contract;
+describe.only("OptionStatistics", () => {
+  let signer: SignerWithAddress;
+  let instance: TestOptionStatistics;
 
   before(async function () {
-    signers = await accounts.getSigners();
-    addresses = await accounts.getAddresses(signers);
-
-    cdfLibrary = await getContractFactory(
-      "TestCumulativeNormalDistribution"
-    ).then((contract) => contract.deploy());
+    [signer] = await ethers.getSigners();
+    instance = await new TestOptionStatistics__factory(signer).deploy();
   });
 
-  describe("#getCDF", () => {
-    for (let x in cdfs) {
-      const expected = +cdfs[x];
-      const tolerance = maxError.cdf + (+x <= 0.1 && +x >= -0.1 ? 0.55e-3 : 0);
-      const isNegative = Number(x) < 0;
-      const num = isNegative ? (+x * -1).toString() : x;
-
-      it(`value of ${x} equals ${expected}`, async function () {
-        const value = await cdfLibrary.cdf(parseEther(num), isNegative);
-        const actual = new FixedPointX64(value).parsed;
-        expect(expected).to.be.closeTo(actual, tolerance);
-      });
-    }
-  });
-
-  describe("#getInverseCDF", () => {
+  describe("#invCDF", () => {
     for (let x in icdfs) {
       const expected = +icdfs[x];
       const tolerance =
@@ -103,7 +83,7 @@ describe.only("CumulativeNormalDistribution", () => {
           : maxError.centralInverseCDF;
 
       it(`value of ${x} equals ${expected}`, async function () {
-        const value = await cdfLibrary.inverseCDF(parseEther(x), POSITIVE);
+        const value = await instance.invCDF(parseEther(x), POSITIVE);
         const actual = new FixedPointX64(value).parsed;
         expect(expected).to.be.closeTo(actual, tolerance);
       });
@@ -111,25 +91,25 @@ describe.only("CumulativeNormalDistribution", () => {
 
     it("should revert values less than or equal to 0", async () => {
       await expect(
-        cdfLibrary.inverseCDF(parseEther("100"), NEGATIVE)
+        instance.invCDF(parseEther("100"), NEGATIVE)
       ).to.be.revertedWith("InverseOutOfBounds");
       await expect(
-        cdfLibrary.inverseCDF(parseEther("0.001"), NEGATIVE)
+        instance.invCDF(parseEther("0.001"), NEGATIVE)
       ).to.be.revertedWith("InverseOutOfBounds");
       await expect(
-        cdfLibrary.inverseCDF(parseEther("0.0"), POSITIVE)
+        instance.invCDF(parseEther("0.0"), POSITIVE)
       ).to.be.revertedWith("InverseOutOfBounds");
     });
 
     it("should revert values greater than or equal to 1", async function () {
       await expect(
-        cdfLibrary.inverseCDF(parseEther("1"), POSITIVE)
+        instance.invCDF(parseEther("1"), POSITIVE)
       ).to.be.revertedWith("InverseOutOfBounds");
       await expect(
-        cdfLibrary.inverseCDF(parseEther("1.001"), POSITIVE)
+        instance.invCDF(parseEther("1.001"), POSITIVE)
       ).to.be.revertedWith("InverseOutOfBounds");
       await expect(
-        cdfLibrary.inverseCDF(parseEther("100"), POSITIVE)
+        instance.invCDF(parseEther("100"), POSITIVE)
       ).to.be.revertedWith("InverseOutOfBounds");
     });
   });

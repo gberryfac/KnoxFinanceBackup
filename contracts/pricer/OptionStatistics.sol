@@ -3,54 +3,17 @@ pragma solidity ^0.8.4;
 
 import "abdk-libraries-solidity/ABDKMath64x64.sol";
 
-/// @title   Cumulative Normal Distribution Math Library
-/// @author  Primitive
-library CumulativeNormalDistribution {
+library OptionStatistics {
     using ABDKMath64x64 for int128;
     using ABDKMath64x64 for uint256;
+
+    // Inspired by Primitive Finance's Cumulative Normal Distribution Math Library
+    // https://github.com/primitivefinance/rmm-core
 
     /// @notice Thrown on passing an arg that is out of the input range for these math functions
     error InverseOutOfBounds(int128 value);
 
     int128 public constant ONE_INT = 0x10000000000000000;
-    int128 public constant TWO_INT = 0x20000000000000000;
-    int128 public constant CDF0 = 0x53dd02a4f5ee2e46;
-    int128 public constant CDF1 = 0x413c831bb169f874;
-    int128 public constant CDF2 = -0x48d4c730f051a5fe;
-    int128 public constant CDF3 = 0x16a09e667f3bcc908;
-    int128 public constant CDF4 = -0x17401c57014c38f14;
-    int128 public constant CDF5 = 0x10fb844255a12d72e;
-
-    /// @notice Uses Abramowitz and Stegun approximation:
-    ///         https://en.wikipedia.org/wiki/Abramowitz_and_Stegun
-    /// @dev    Maximum error: 3.15x10-3
-    /// @return Standard Normal Cumulative Distribution Function of `x`
-    function getCDF(int128 x) internal pure returns (int128) {
-        int128 z = x.div(CDF3);
-        int128 t = ONE_INT.div(ONE_INT.add(CDF0.mul(z.abs())));
-        int128 erf = getErrorFunction(z, t);
-        if (z < 0) {
-            erf = erf.neg();
-        }
-        int128 result = (HALF_INT).mul(ONE_INT.add(erf));
-        return result;
-    }
-
-    /// @notice Uses Abramowitz and Stegun approximation:
-    ///         https://en.wikipedia.org/wiki/Error_function
-    /// @dev    Maximum error: 1.5×10−7
-    /// @return Error Function for approximating the Standard Normal CDF
-    function getErrorFunction(int128 z, int128 t)
-        internal
-        pure
-        returns (int128)
-    {
-        int128 step1 = t.mul(CDF3.add(t.mul(CDF4.add(t.mul(CDF5)))));
-        int128 step2 = CDF1.add(t.mul(CDF2.add(step1)));
-        int128 result = ONE_INT.sub(t.mul(step2.mul((z.mul(z).neg()).exp())));
-        return result;
-    }
-
     int128 public constant HALF_INT = 0x8000000000000000;
     int128 public constant INVERSE0 = 0x26A8F3C1F21B336E;
     int128 public constant INVERSE1 = -0x87C57E5DA70D3C90;
@@ -65,7 +28,7 @@ library CumulativeNormalDistribution {
     /// @dev     Source: https://arxiv.org/pdf/1002.0567.pdf
     ///          Maximum error of central region is 1.16x10−4
     /// @return  fcentral(p) = q * (a2 + (a1r + a0) / (r^2 + b1r +b0))
-    function getInverseCDF(int128 p) internal pure returns (int128) {
+    function invCDF(int128 p) internal pure returns (int128) {
         if (p >= ONE_INT || p <= 0) revert InverseOutOfBounds(p);
         // Short circuit for the central region, central region inclusive of tails
         if (p <= HIGH_TAIL && p >= LOW_TAIL) {

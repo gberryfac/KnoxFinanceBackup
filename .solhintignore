@@ -1,4 +1,2 @@
 node_modules/
-migrations/
-contracts/vendor/
-contracts/libraries/CumulativeNormalDistribution.sol
+contracts/pricer/OptionStatistics.sol
