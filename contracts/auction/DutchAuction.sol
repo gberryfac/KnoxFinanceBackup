@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+import "@solidstate/contracts/utils/ReentrancyGuard.sol";
+
 import "./DutchAuctionInternal.sol";
+import "./IDutchAuction.sol";
 
 // TODO: Switch to stage modifiers
-contract DutchAuction is DutchAuctionInternal, ReentrancyGuard {
+contract DutchAuction is DutchAuctionInternal, IDutchAuction, ReentrancyGuard {
     constructor(
         address asset,
         address pool,

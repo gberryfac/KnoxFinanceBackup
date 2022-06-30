@@ -5,16 +5,14 @@ import "abdk-libraries-solidity/ABDKMath64x64.sol";
 
 import "@solidstate/contracts/token/ERC1155/IERC1155.sol";
 import "@solidstate/contracts/token/ERC20/IERC20.sol";
-import "@solidstate/contracts/utils/ReentrancyGuard.sol";
 import "@solidstate/contracts/utils/SafeERC20.sol";
 
 import "./DutchAuctionStorage.sol";
-import "./IDutchAuction.sol";
 
 import "../vault/IVault.sol";
 
 // TODO: Switch to stage modifiers
-contract DutchAuctionInternal is IDutchAuction {
+contract DutchAuctionInternal {
     using ABDKMath64x64 for int128;
     using ABDKMath64x64 for uint256;
     using EnumerableSet for EnumerableSet.UintSet;
@@ -114,6 +112,13 @@ contract DutchAuctionInternal is IDutchAuction {
     /************************************************
      *  AUCTION ORDER
      ***********************************************/
+
+    event OrderAdded(
+        address indexed buyer,
+        uint256 price,
+        uint256 size,
+        bool isLimitOrder
+    );
 
     function _addLimitOrder(
         uint64 epoch,

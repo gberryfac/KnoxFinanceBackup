@@ -1,38 +1,43 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-struct InitAuction {
-    uint64 epoch;
-    uint256 totalCollateral;
-    uint256 startTime;
-    uint256 endTime;
-    uint256 maxPrice;
-    uint256 minPrice;
-    uint256 minSize;
-}
-
-struct Auction {
-    bool initialized;
-    bool finalized;
-    bool processed;
-    uint256 startTime;
-    uint256 endTime;
-    uint256 maxPrice;
-    uint256 minPrice;
-    uint256 minSize;
-    uint256 totalCollateral;
-    uint256 totalCollateralUsed;
-    uint256 totalPremiums;
-    uint256 totalTime;
-    uint256 lastPrice;
-    uint256 longTokenId;
-}
+import "./DutchAuctionStorage.sol";
 
 interface IDutchAuction {
-    event OrderAdded(
-        address indexed buyer,
+    function initializeAuction(
+        DutchAuctionStorage.InitAuction memory initAuction
+    ) external;
+
+    function lastPrice(uint64 epoch) external view returns (uint256);
+
+    function priceCurve(uint64 epoch) external view returns (uint256);
+
+    function clearingPrice(uint64 epoch) external view returns (uint256);
+
+    function addLimitOrder(
+        uint64 epoch,
         uint256 price,
-        uint256 size,
-        bool isLimitOrder
-    );
+        uint256 size
+    ) external returns (uint256);
+
+    function cancelLimitOrder(uint64 epoch, uint256 id) external returns (bool);
+
+    function addOrder(uint64 epoch, uint256 size) external returns (uint256);
+
+    function processOrders(uint64 epoch) external returns (bool);
+
+    function finalizeAuction(uint64 epoch) external returns (bool);
+
+    function transferPremium(uint64 epoch) external returns (uint256);
+
+    function setLongTokenId(uint64 epoch, uint256 longTokenId) external;
+
+    function processAuction(uint64 epoch) external;
+
+    function withdraw(uint64 epoch) external;
+
+    function claimsByBuyer(address buyer)
+        external
+        view
+        returns (uint64[] memory);
 }
