@@ -1,32 +1,62 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {IPremiaPool, PoolStorage} from "../interfaces/IPremiaPool.sol";
+import "./PricerInternal.sol";
 
-import "./PricerStorage.sol";
-import "./StrikeSelection.sol";
+contract Pricer is IPricer, PricerInternal {
+    constructor(address pool, address volatilityOracle)
+        PricerInternal(pool, volatilityOracle)
+    {}
 
-contract Pricer is PricerStorage, StrikeSelection {
-    constructor(address _pool, address _volatilityOracle) {
-        require(_pool != address(0), "address not provided");
-        require(_volatilityOracle != address(0), "address not provided");
+    function latestAnswer64x64() external view returns (int128) {
+        return _latestAnswer64x64();
+    }
 
-        IVolOracle = IVolatilitySurfaceOracle(_volatilityOracle);
+    function getTimeToMaturity64x64(uint64 expiry)
+        external
+        view
+        returns (int128)
+    {
+        return _getTimeToMaturity64x64(expiry);
+    }
 
-        PoolStorage.PoolSettings memory settings =
-            IPremiaPool(_pool).getPoolSettings();
+    function getAnnualizedVolatility64x64(
+        int128 spot64x64,
+        int128 strike64x64,
+        int128 timeToMaturity64x64
+    ) external view returns (int128) {
+        return
+            _getAnnualizedVolatility64x64(
+                spot64x64,
+                strike64x64,
+                timeToMaturity64x64
+            );
+    }
 
-        assetProperties.base = settings.base;
-        assetProperties.underlying = settings.underlying;
+    function getBlackScholesPrice64x64(
+        int128 spot64x64,
+        int128 strike64x64,
+        int128 timeToMaturity64x64,
+        bool isCall
+    ) external view returns (int128) {
+        return
+            _getBlackScholesPrice64x64(
+                spot64x64,
+                strike64x64,
+                timeToMaturity64x64,
+                isCall
+            );
+    }
 
-        BaseSpotOracle = AggregatorInterface(settings.baseOracle);
-        UnderlyingSpotOracle = AggregatorInterface(settings.underlyingOracle);
+    function getDeltaStrikePrice64x64(
+        bool isCall,
+        uint64 expiry,
+        int128 delta64x64
+    ) external view returns (int128) {
+        return _getDeltaStrikePrice64x64(isCall, expiry, delta64x64);
+    }
 
-        uint8 decimals = UnderlyingSpotOracle.decimals();
-
-        require(
-            BaseSpotOracle.decimals() == decimals,
-            "oracle decimals must match"
-        );
+    function snapToGrid(bool isCall, int128 n) external pure returns (int128) {
+        return _snapToGrid(isCall, n);
     }
 }

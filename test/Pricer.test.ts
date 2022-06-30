@@ -106,7 +106,8 @@ describe.only("Pricer Unit Tests", () => {
       );
 
       // Check Asset Properties
-      const { base, underlying } = await pricer.assetProperties();
+      const base = await pricer.base();
+      const underlying = await pricer.underlying();
 
       assert.equal(base, params.base.address);
       assert.equal(underlying, params.underlying.address);
