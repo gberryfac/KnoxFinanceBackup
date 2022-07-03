@@ -73,6 +73,8 @@ contract DutchAuctionInternal {
             0,
             0
         );
+
+        // emit AuctionInitialized();
     }
 
     /************************************************
@@ -119,6 +121,11 @@ contract DutchAuctionInternal {
         uint256 size,
         bool isLimitOrder
     );
+
+    // TODO: add _addLimitOrderFor()
+    // TODO: add _cancelLimitOrderFor()
+    // TODO: add _addOrderFor()
+    // TODO: add _withdrawOrderFor()
 
     function _addLimitOrder(
         uint64 epoch,
@@ -249,19 +256,20 @@ contract DutchAuctionInternal {
         return false;
     }
 
-    function _transferPremium(uint64 epoch) internal returns (uint256) {
+    function _transferPremium(uint64 epoch) internal {
         // modifier: reject if auction is not finalized
         // modifier: reject if auction is processed
         DutchAuctionStorage.Layout storage l = DutchAuctionStorage.layout();
 
         uint256 lastPrice = _lastPrice(epoch);
         uint256 totalCollateralUsed = l.auctions[epoch].totalCollateralUsed;
+
+        require(l.auctions[epoch].totalPremiums <= 0, "premiums transferred");
+
         uint256 totalPremiums = lastPrice * totalCollateralUsed;
-
         l.auctions[epoch].totalPremiums = totalPremiums;
-        ERC20.safeTransfer(address(Vault), totalPremiums);
 
-        return totalCollateralUsed;
+        ERC20.safeTransfer(address(Vault), totalPremiums);
     }
 
     function _setLongTokenId(uint64 epoch, uint256 longTokenId) internal {
@@ -285,14 +293,11 @@ contract DutchAuctionInternal {
                 ERC1155.balanceOf(address(this), longTokenId);
 
             require(
-                l.auctions[epoch].totalPremiums != 0,
+                l.auctions[epoch].totalPremiums > 0,
                 "premiums not transferred"
             );
 
-            require(
-                l.auctions[epoch].longTokenId != 0,
-                "long token id not set"
-            );
+            require(l.auctions[epoch].longTokenId > 0, "long token id not set");
 
             require(
                 longTokenBalance >= totalCollateralUsed,
@@ -310,51 +315,19 @@ contract DutchAuctionInternal {
     function _withdraw(uint64 epoch) internal {
         // modifier: reject if auction is not processed
         DutchAuctionStorage.Layout storage l = DutchAuctionStorage.layout();
-        OrderBook.Index storage orderbook = l.orderbooks[epoch];
 
-        uint256 refund;
-        uint256 fill;
-
-        {
-            uint256 next = orderbook._head();
-            uint256 lastPrice = _lastPrice(epoch);
-
-            uint256 totalCollateralUsed;
-            uint256 totalCollateral = l.auctions[epoch].totalCollateral;
-
-            uint256 id;
-            uint256 price;
-            uint256 size;
-            address buyer;
-
-            for (uint256 i = 1; i <= orderbook._length(); i++) {
-                (id, price, size, buyer) = orderbook._getOrder(next);
-
-                if (buyer == msg.sender) {
-                    if (price >= lastPrice) {
-                        if (totalCollateralUsed + size >= totalCollateral) {
-                            uint256 remainder =
-                                totalCollateral - totalCollateralUsed;
-
-                            fill += remainder;
-                            uint256 paid = price * size;
-                            uint256 cost = lastPrice * remainder;
-                            refund += paid - cost;
-                        } else fill += size;
-                    } else refund += price * size;
-                }
-
-                totalCollateralUsed += size;
-
-                next = orderbook._getNextOrder(next);
-                orderbook._remove(id);
-            }
-        }
+        (uint256 refund, uint256 fill) = _getWithdrawAmounts(epoch);
 
         l.claimsByBuyer[msg.sender].remove(epoch);
 
-        // TODO: Check if option expired ITM
-        // // if it has, adjust the ERC20/Long balances
+        (bool expired, uint256 intrinsicValue) =
+            Vault.getIntrinsicValue(epoch, fill);
+
+        if (expired) {
+            // If expired ITM, adjust refund
+            if (intrinsicValue > 0) refund += intrinsicValue;
+            fill = 0;
+        }
 
         if (fill > 0) {
             ERC1155.safeTransferFrom(
@@ -369,11 +342,74 @@ contract DutchAuctionInternal {
         if (refund > 0) {
             ERC20.safeTransfer(msg.sender, refund);
         }
+
+        // emit Withdrawn()
+    }
+
+    function _getWithdrawAmounts(uint64 epoch)
+        private
+        returns (uint256, uint256)
+    {
+        DutchAuctionStorage.Layout storage l = DutchAuctionStorage.layout();
+        OrderBook.Index storage orderbook = l.orderbooks[epoch];
+
+        uint256 refund;
+        uint256 fill;
+
+        uint256 next = orderbook._head();
+        uint256 lastPrice = _lastPrice(epoch);
+
+        uint256 totalCollateralUsed;
+        uint256 totalCollateral = l.auctions[epoch].totalCollateral;
+
+        uint256 id;
+        uint256 price;
+        uint256 size;
+        address buyer;
+
+        for (uint256 i = 1; i <= orderbook._length(); i++) {
+            (id, price, size, buyer) = orderbook._getOrder(next);
+
+            if (buyer == msg.sender) {
+                if (price >= lastPrice) {
+                    if (totalCollateralUsed + size >= totalCollateral) {
+                        uint256 remainder =
+                            totalCollateral - totalCollateralUsed;
+
+                        fill += remainder;
+                        uint256 paid = price * size;
+                        uint256 cost = lastPrice * remainder;
+                        refund += paid - cost;
+                    } else fill += size;
+                } else refund += price * size;
+            }
+
+            totalCollateralUsed += size;
+
+            next = orderbook._getNextOrder(next);
+            orderbook._remove(id);
+        }
+
+        return (refund, fill);
     }
 
     /************************************************
      *  VIEW
      ***********************************************/
+
+    function _isFinalized(uint64 epoch) internal view returns (bool) {
+        DutchAuctionStorage.Layout storage l = DutchAuctionStorage.layout();
+        return l.auctions[epoch].finalized;
+    }
+
+    function _totalCollateralUsed(uint64 epoch)
+        internal
+        view
+        returns (uint256)
+    {
+        DutchAuctionStorage.Layout storage l = DutchAuctionStorage.layout();
+        return l.auctions[epoch].totalCollateralUsed;
+    }
 
     function _claimsByBuyer(address buyer)
         internal

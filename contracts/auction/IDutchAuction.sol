@@ -28,13 +28,17 @@ interface IDutchAuction {
 
     function finalizeAuction(uint64 epoch) external returns (bool);
 
-    function transferPremium(uint64 epoch) external returns (uint256);
+    function transferPremium(uint64 epoch) external;
 
     function setLongTokenId(uint64 epoch, uint256 longTokenId) external;
 
     function processAuction(uint64 epoch) external;
 
     function withdraw(uint64 epoch) external;
+
+    function isFinalized(uint64 epoch) external view returns (bool);
+
+    function totalCollateralUsed(uint64 epoch) external view returns (uint256);
 
     function claimsByBuyer(address buyer)
         external

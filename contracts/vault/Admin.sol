@@ -67,6 +67,9 @@ contract Admin is AdminInternal {
             l.keeper = _initProps.keeper;
             l.feeRecipient = _initProps.feeRecipient;
 
+            l.Auction = IDutchAuction(_initProps.auction);
+            l.Pricer = IPricer(_initProps.pricer);
+
             l.startOffset = 2 hours;
             l.endOffset = 4 hours;
         }
@@ -101,38 +104,6 @@ contract Admin is AdminInternal {
      */
     function unpause() external onlyOwner {
         _unpause();
-    }
-
-    /************************************************
-     *  INITIALIZE AUCTION
-     ***********************************************/
-
-    /**
-     * @notice
-     */
-    function initializeAuction() external onlyKeeper {
-        _initializeAuction();
-    }
-
-    /**
-     * @notice Sets the parameters for the next option to be sold
-     */
-    function setOptionParameters() external onlyKeeper {
-        _setOptionParameters();
-    }
-
-    /**
-     * @notice
-     */
-    function setAuctionPrices() external onlyKeeper {
-        _setAuctionPrices();
-    }
-
-    /**
-     * @notice Sets the start and end time of the auction.
-     */
-    function setAuctionWindow() external onlyKeeper {
-        _setAuctionWindow();
     }
 
     /************************************************
@@ -195,13 +166,52 @@ contract Admin is AdminInternal {
     }
 
     /************************************************
+     *  INITIALIZE AUCTION
+     ***********************************************/
+
+    /**
+     * @notice
+     */
+    function setAndInitializeAuction() external {
+        _setAndInitializeAuction();
+    }
+
+    /**
+     * @notice Sets the parameters for the next option to be sold
+     */
+    function setOptionParameters() external onlyKeeper {
+        _setOptionParameters();
+    }
+
+    /**
+     * @notice
+     */
+    function setAuctionPrices() external onlyKeeper {
+        _setAuctionPrices();
+    }
+
+    /**
+     * @notice Sets the start and end time of the auction.
+     */
+    function setAuctionWindow() external onlyKeeper {
+        _setAuctionWindow();
+    }
+
+    /**
+     * @notice
+     */
+    function initializeAuction() external onlyKeeper {
+        _initializeAuction();
+    }
+
+    /************************************************
      *  PROCESS EPOCH
      ***********************************************/
 
     /**
      * @notice Prepares the strategy and initiates the next round of option sales
      */
-    function processEpoch(bool processExpired) external onlyKeeper {
+    function processEpoch(bool processExpired) external {
         _processEpoch(processExpired);
     }
 
@@ -238,5 +248,41 @@ contract Admin is AdminInternal {
      */
     function setNextEpoch() external onlyKeeper {
         _setNextEpoch();
+    }
+
+    /************************************************
+     *  PROCESS AUCTION
+     ***********************************************/
+
+    /**
+     * @notice
+     */
+    function processAuction() external {
+        _processAuction();
+    }
+
+    /************************************************
+     * HELPERS
+     ***********************************************/
+
+    function formatClaimTokenId(uint64 epoch) external view returns (uint256) {
+        return _formatClaimTokenId(epoch);
+    }
+
+    // TODO:
+    function parseClaimTokenId(uint256 claimTokenId)
+        external
+        view
+        returns (uint64)
+    {
+        return _parseClaimTokenId(claimTokenId);
+    }
+
+    function getIntrinsicValue(uint64 epoch, uint256 size)
+        external
+        view
+        returns (bool, uint256)
+    {
+        return _getIntrinsicValue(epoch, size);
     }
 }

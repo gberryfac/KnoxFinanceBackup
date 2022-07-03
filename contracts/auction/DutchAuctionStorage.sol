@@ -8,7 +8,6 @@ import "./OrderBook.sol";
 library DutchAuctionStorage {
     struct InitAuction {
         uint64 epoch;
-        uint256 totalCollateral;
         uint256 startTime;
         uint256 endTime;
         uint256 maxPrice;

@@ -51,6 +51,11 @@ contract DutchAuction is DutchAuctionInternal, IDutchAuction, ReentrancyGuard {
      *  AUCTION ORDER
      ***********************************************/
 
+    // TODO: add addLimitOrderFor()
+    // TODO: add cancelLimitOrderFor()
+    // TODO: add addOrderFor()
+    // TODO: add withdrawOrderFor()
+
     // @notice
     function addLimitOrder(
         uint64 epoch,
@@ -91,8 +96,8 @@ contract DutchAuction is DutchAuctionInternal, IDutchAuction, ReentrancyGuard {
         return _finalizeAuction(epoch);
     }
 
-    function transferPremium(uint64 epoch) external returns (uint256) {
-        return _transferPremium(epoch);
+    function transferPremium(uint64 epoch) external {
+        _transferPremium(epoch);
     }
 
     function setLongTokenId(uint64 epoch, uint256 longTokenId)
@@ -117,6 +122,14 @@ contract DutchAuction is DutchAuctionInternal, IDutchAuction, ReentrancyGuard {
     /************************************************
      *  VIEW
      ***********************************************/
+
+    function isFinalized(uint64 epoch) external view returns (bool) {
+        return _isFinalized(epoch);
+    }
+
+    function totalCollateralUsed(uint64 epoch) external view returns (uint256) {
+        return _totalCollateralUsed(epoch);
+    }
 
     function claimsByBuyer(address buyer)
         external
