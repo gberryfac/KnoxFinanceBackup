@@ -11,27 +11,27 @@ import "../interfaces/IPremiaPool.sol";
 
 import "../libraries/Constants.sol";
 
-library Storage {
+library VaultStorage {
     /************************************************
      *  INITIALIZATION STRUCTS
      ***********************************************/
 
-    struct InitParams {
+    struct InitProxy {
         bool isCall;
         uint64 minimumContractSize;
         int128 delta64x64;
-    }
-
-    struct InitProps {
         uint256 performanceFee;
         uint256 withdrawalFee;
         string name;
         string symbol;
-        address auction;
         address keeper;
         address feeRecipient;
-        address queue;
         address pool;
+    }
+
+    struct InitImpl {
+        address auction;
+        address queue;
         address pricer;
     }
 
@@ -85,8 +85,10 @@ library Storage {
         // @notice
         uint256 minPrice;
         /************************************************
-         * VAULT ACCOUNTING
+         * VAULT STATE
          ***********************************************/
+        // @notice
+        uint64 epoch;
         // @notice
         uint256 totalCollateral;
         // @notice
@@ -96,22 +98,12 @@ library Storage {
         // @notice
         uint256 totalWithdrawals;
         /************************************************
-         * VAULT STATE
-         ***********************************************/
-        // @notice
-        uint64 epoch;
-        /************************************************
          * VAULT PROPERTIES
          ***********************************************/
         // @notice
         uint256 performanceFee;
         // @notice
         uint256 withdrawalFee;
-        /************************************************
-         * ACTORS
-         ***********************************************/
-        // @notice
-        address keeper;
         // @notice
         address feeRecipient;
         /************************************************
@@ -139,34 +131,23 @@ library Storage {
      *  ADMIN
      ***********************************************/
 
-    // TODO: Move Layout storage l to arguements
-    function _setFeeRecipient(address newFeeRecipient) internal {
-        Layout storage l = layout();
+    function _setFeeRecipient(Layout storage l, address newFeeRecipient)
+        internal
+    {
         require(newFeeRecipient != address(0), "address not provided");
         require(newFeeRecipient != l.feeRecipient, "new address equals old");
         l.feeRecipient = newFeeRecipient;
     }
 
-    // TODO: Move Layout storage l to arguements
-    function _setKeeper(address newKeeper) internal {
-        Layout storage l = layout();
-        require(newKeeper != address(0), "address not provided");
-        require(newKeeper != l.keeper, "new address equals old");
-        l.keeper = newKeeper;
-    }
-
-    // TODO: Move Layout storage l to arguements
-    function _setPricer(address newPricer) internal {
-        Layout storage l = layout();
+    function _setPricer(Layout storage l, address newPricer) internal {
         require(newPricer != address(0), "address not provided");
         require(newPricer != address(l.Pricer), "new address equals old");
         l.Pricer = IPricer(newPricer);
     }
 
-    // TODO: Move Layout storage l to arguements
-    function _setPerformanceFee(uint256 newPerformanceFee) internal {
-        Layout storage l = layout();
-
+    function _setPerformanceFee(Layout storage l, uint256 newPerformanceFee)
+        internal
+    {
         require(
             newPerformanceFee < 100 * Constants.FEE_MULTIPLIER,
             "invalid fee amount"
@@ -177,10 +158,9 @@ library Storage {
         l.performanceFee = newPerformanceFee;
     }
 
-    // TODO: Move Layout storage l to arguements
-    function _setWithdrawalFee(uint256 newWithdrawalFee) internal {
-        Layout storage l = layout();
-
+    function _setWithdrawalFee(Layout storage l, uint256 newWithdrawalFee)
+        internal
+    {
         require(
             newWithdrawalFee < 100 * Constants.FEE_MULTIPLIER,
             "invalid fee amount"
@@ -196,9 +176,11 @@ library Storage {
         l.withdrawalFee = tmpWithdrawalFee;
     }
 
-    // TODO: Move Layout storage l to arguements
-    function _setAuctionWindowOffsets(uint16 start, uint16 end) internal {
-        Layout storage l = layout();
+    function _setAuctionWindowOffsets(
+        Layout storage l,
+        uint16 start,
+        uint16 end
+    ) internal {
         l.startOffset = start;
         l.endOffset = end;
     }
@@ -207,19 +189,15 @@ library Storage {
      *  VIEW
      ***********************************************/
 
-    // TODO: Move Layout storage l to arguements
-    function _epoch() internal view returns (uint64) {
-        Layout storage l = layout();
+    function _epoch(Layout storage l) internal view returns (uint64) {
         return l.epoch;
     }
 
-    // TODO: Move Layout storage l to arguements
-    function _optionByEpoch(uint64 epoch)
+    function _optionByEpoch(Layout storage l, uint64 epoch)
         internal
         view
         returns (Option memory)
     {
-        Layout storage l = layout();
         return l.options[epoch];
     }
 }

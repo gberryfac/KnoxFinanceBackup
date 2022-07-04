@@ -17,7 +17,6 @@ import * as accounts from "./utils/accounts";
 
 import { describeBehaviorOfAdmin } from "../spec/Admin.behavior";
 import { describeBehaviorOfBase } from "../spec/Base.behavior";
-import { describeBehaviorOfQueue } from "../spec/Queue.behavior";
 
 import { VaultUtil } from "./utils/VaultUtil";
 
@@ -132,7 +131,10 @@ function behavesLikeVault(params: types.Params) {
       );
 
       addresses.pool = pool.address;
+
+      addresses.auction = ADDRESS_ONE;
       addresses.pricer = ADDRESS_ONE;
+      addresses.queue = ADDRESS_ONE;
 
       v = await VaultUtil.deploy(assetContract, params, signers, addresses);
 
@@ -163,19 +165,6 @@ function behavesLikeVault(params: types.Params) {
         supply: ethers.constants.Zero,
       },
       ["::ERC4626Base"]
-    );
-
-    describeBehaviorOfQueue(
-      {
-        deploy: async () => instance,
-        getVaultUtil: async () => v,
-        interfaceIds: undefined as any,
-        transfer: undefined as any,
-        mintERC1155: undefined as any,
-        burnERC1155: undefined as any,
-        tokenId: undefined as any,
-      },
-      ["::ERC165", "::ERC1155Enumerable"]
     );
   });
 }

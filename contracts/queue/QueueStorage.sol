@@ -1,14 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "../auction/IDutchAuction.sol";
-
-import "../pricer/IPricer.sol";
-
-import "../interfaces/IPremiaPool.sol";
-
-import "../libraries/Constants.sol";
-
 library QueueStorage {
     /************************************************
      *  LAYOUT

@@ -4,13 +4,13 @@ import { diamondCut } from "../../scripts/diamond";
 
 import {
   IVault,
-  Admin__factory,
-  Base__factory,
   Helpers__factory,
   IVault__factory,
   VaultDiamond__factory,
-  View__factory,
-  Write__factory,
+  VaultAdmin__factory,
+  VaultBase__factory,
+  VaultView__factory,
+  VaultWrite__factory,
   IAsset,
 } from "../../types";
 
@@ -47,14 +47,10 @@ export class VaultUtil {
   ) {
     const helpers = await new Helpers__factory(signers.deployer).deploy();
 
-    const initParams = {
+    const initProxy = {
       isCall: params.isCall,
       minimumContractSize: params.minimumContractSize,
       delta64x64: fixedFromFloat(params.delta),
-    };
-    const initProps = {
-      minimumSupply: params.minimumSupply,
-      maxTVL: params.maxTVL,
       performanceFee: params.performanceFee,
       withdrawalFee: params.withdrawalFee,
       name: params.tokenName,
@@ -62,90 +58,95 @@ export class VaultUtil {
       keeper: addresses.keeper,
       feeRecipient: addresses.feeRecipient,
       pool: addresses.pool,
+    };
+
+    const initImpl = {
+      auction: addresses.auction,
+      queue: addresses.queue,
       pricer: addresses.pricer,
     };
 
     const vaultDiamond = await new VaultDiamond__factory(
       signers.deployer
-    ).deploy();
+    ).deploy(initProxy);
 
     let registeredSelectors = [
       vaultDiamond.interface.getSighash("supportsInterface(bytes4)"),
     ];
 
-    const baseFactory = new Base__factory(signers.deployer);
-    const baseContract = await baseFactory.deploy(
+    const vaultBaseFactory = new VaultBase__factory(signers.deployer);
+    const vaultBaseContract = await vaultBaseFactory.deploy(
       params.isCall,
       addresses.pool
     );
-    await baseContract.deployed();
+    await vaultBaseContract.deployed();
 
     registeredSelectors = registeredSelectors.concat(
       await diamondCut(
         vaultDiamond,
-        baseContract.address,
-        baseFactory,
+        vaultBaseContract.address,
+        vaultBaseFactory,
         registeredSelectors
       )
     );
 
-    const adminFactory = new Admin__factory(
+    const vaultAdminFactory = new VaultAdmin__factory(
       {
         "contracts/libraries/Helpers.sol:Helpers": helpers.address,
       },
       signers.deployer
     );
 
-    const adminContract = await adminFactory.deploy(
+    const vaultAdminContract = await vaultAdminFactory.deploy(
       params.isCall,
       addresses.pool
     );
-    await adminContract.deployed();
+    await vaultAdminContract.deployed();
 
     registeredSelectors = registeredSelectors.concat(
       await diamondCut(
         vaultDiamond,
-        adminContract.address,
-        adminFactory,
+        vaultAdminContract.address,
+        vaultAdminFactory,
         registeredSelectors
       )
     );
 
-    const writeFactory = new Write__factory(signers.deployer);
-    const writeContract = await writeFactory.deploy(
+    const vaultWriteFactory = new VaultWrite__factory(signers.deployer);
+    const vaultWriteContract = await vaultWriteFactory.deploy(
       params.isCall,
       addresses.pool
     );
-    await writeContract.deployed();
+    await vaultWriteContract.deployed();
 
     registeredSelectors = registeredSelectors.concat(
       await diamondCut(
         vaultDiamond,
-        writeContract.address,
-        writeFactory,
+        vaultWriteContract.address,
+        vaultWriteFactory,
         registeredSelectors
       )
     );
 
-    const viewFactory = new View__factory(signers.deployer);
-    const viewContract = await viewFactory.deploy(
+    const vaultViewFactory = new VaultView__factory(signers.deployer);
+    const vaultViewContract = await vaultViewFactory.deploy(
       params.isCall,
       addresses.pool
     );
-    await viewContract.deployed();
+    await vaultViewContract.deployed();
 
     registeredSelectors = registeredSelectors.concat(
       await diamondCut(
         vaultDiamond,
-        viewContract.address,
-        viewFactory,
+        vaultViewContract.address,
+        vaultViewFactory,
         registeredSelectors
       )
     );
 
     addresses.vault = vaultDiamond.address;
     const vault = IVault__factory.connect(addresses.vault, signers.lp1);
-    await vault.connect(signers.deployer).init(initParams, initProps);
+    await vault.connect(signers.deployer).initialize(initImpl);
 
     return new VaultUtil({ vault, assetContract, params, signers, addresses });
   }

@@ -23,7 +23,6 @@ export type Signers = {
   keeper: SignerWithAddress;
   feeRecipient: SignerWithAddress;
   buyer?: SignerWithAddress;
-  queue?: SignerWithAddress;
 };
 
 export type Addresses = {
@@ -34,6 +33,7 @@ export type Addresses = {
   owner: string;
   keeper: string;
   feeRecipient: string;
+  auction?: string;
   buyer?: string;
   pool?: string;
   helpers?: string;

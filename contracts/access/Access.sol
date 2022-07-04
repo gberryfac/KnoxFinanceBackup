@@ -6,24 +6,6 @@ import "@solidstate/contracts/utils/ReentrancyGuard.sol";
 import "./AccessInternal.sol";
 
 contract Access is AccessInternal, ReentrancyGuard {
-    /**
-     * @dev Throws if called by any account other than the keeper.
-     */
-    modifier onlyKeeper() {
-        AccessStorage.Layout storage l = AccessStorage.layout();
-        require(msg.sender == l.keeper, "!keeper");
-        _;
-    }
-
-    /**
-     * @dev Throws if called by any account other than the vault.
-     */
-    modifier onlyVault() {
-        AccessStorage.Layout storage l = AccessStorage.layout();
-        require(msg.sender == l.vault, "!vault");
-        _;
-    }
-
     /************************************************
      *  SAFETY
      ***********************************************/

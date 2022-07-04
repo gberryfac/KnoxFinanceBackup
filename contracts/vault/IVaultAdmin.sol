@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "./Storage.sol";
+import "./VaultStorage.sol";
 
-interface IAdmin {
+interface IVaultAdmin {
     event OptionParametersSet(bool isCall, uint64 expiry, int128 strike64x64);
 
     event SaleWindowSet(
@@ -17,10 +17,7 @@ interface IAdmin {
     //  * @param
     //  * @param
     //  */
-    function init(
-        Storage.InitParams memory _initParams,
-        Storage.InitProps memory _initProps
-    ) external;
+    function initialize(VaultStorage.InitImpl memory initImpl) external;
 
     /**
      * @notice Pauses the vault during an emergency preventing deposits and borrowing.

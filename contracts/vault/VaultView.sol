@@ -1,23 +1,27 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "./internal/BaseInternal.sol";
+import "./VaultInternal.sol";
 
-contract View is BaseInternal {
-    using Storage for Storage.Layout;
+contract VaultView is VaultInternal {
+    using VaultStorage for VaultStorage.Layout;
 
-    constructor(bool isCall, address pool) BaseInternal(isCall, pool) {}
+    constructor(bool isCall, address pool) VaultInternal(isCall, pool) {}
 
     function epoch() external view returns (uint64) {
-        return Storage._epoch();
+        return VaultStorage.layout()._epoch();
     }
 
     function optionByEpoch(uint64 epoch)
         external
         view
-        returns (Storage.Option memory)
+        returns (VaultStorage.Option memory)
     {
-        return Storage._optionByEpoch(epoch);
+        return VaultStorage.layout()._optionByEpoch(epoch);
+    }
+
+    function totalCollateral() external view returns (uint256) {
+        return _totalCollateral();
     }
 
     function accountsByOption(uint256 id)

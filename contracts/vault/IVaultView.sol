@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-interface IView {
+interface IVaultView {
     function totalDeposits() external view returns (uint256);
 
     function epoch() external view returns (uint64);
