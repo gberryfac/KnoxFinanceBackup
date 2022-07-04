@@ -8,16 +8,8 @@ contract View is BaseInternal {
 
     constructor(bool isCall, address pool) BaseInternal(isCall, pool) {}
 
-    function totalDeposits() external view returns (uint256) {
-        return Storage._totalDeposits();
-    }
-
-    function epoch() external view returns (uint256) {
+    function epoch() external view returns (uint64) {
         return Storage._epoch();
-    }
-
-    function pricePerShare(uint64 epoch) external view returns (uint256) {
-        return Storage._pricePerShare(epoch);
     }
 
     function optionByEpoch(uint64 epoch)

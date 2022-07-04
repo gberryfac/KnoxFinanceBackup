@@ -6,17 +6,15 @@ import "@solidstate/contracts/token/ERC4626/base/ERC4626BaseInternal.sol";
 
 import "../IVault.sol";
 
-import "./AccessInternal.sol";
-
 import "hardhat/console.sol";
 
-contract BaseInternal is AccessInternal, ERC4626BaseInternal {
+contract BaseInternal is ERC4626BaseInternal {
     using SafeERC20 for IERC20;
     using Storage for Storage.Layout;
 
-    IERC20 immutable ERC20;
-    IPremiaPool immutable Pool;
-    IVault immutable Vault;
+    IERC20 public immutable ERC20;
+    IPremiaPool public immutable Pool;
+    IVault public immutable Vault;
 
     constructor(bool isCall, address pool) {
         Pool = IPremiaPool(pool);
@@ -38,8 +36,7 @@ contract BaseInternal is AccessInternal, ERC4626BaseInternal {
 
     function _totalCollateral() internal view returns (uint256) {
         Storage.Layout storage l = Storage.layout();
-        return
-            ERC20.balanceOf(address(this)) - l.totalPremiums - l.totalDeposits;
+        return ERC20.balanceOf(address(this)) - l.totalPremiums;
     }
 
     /************************************************
@@ -60,79 +57,77 @@ contract BaseInternal is AccessInternal, ERC4626BaseInternal {
         return _totalCollateral() + l.totalShort + l.totalPremiums;
     }
 
-    /**
-     * @notice execute a deposit of assets on behalf of given address
-     * @dev only the vault keeper may call this function
-     * @param assetAmount quantity of assets to deposit
-     * @param receiver recipient of shares resulting from deposit
-     * @return shareAmount quantity of shares to mint
-     */
-    function _deposit(uint256 assetAmount, address receiver)
-        internal
-        virtual
-        override(ERC4626BaseInternal)
-        onlyKeeper
-        returns (uint256)
-    {
-        require(
-            assetAmount <= _maxDeposit(receiver),
-            "ERC4626: maximum amount exceeded"
-        );
+    // /**
+    //  * @notice execute a deposit of assets on behalf of given address
+    //  * @dev only the vault keeper may call this function
+    //  * @param assetAmount quantity of assets to deposit
+    //  * @param receiver recipient of shares resulting from deposit
+    //  * @return shareAmount quantity of shares to mint
+    //  */
+    // function _deposit(uint256 assetAmount, address receiver)
+    //     internal
+    //     virtual
+    //     override(ERC4626BaseInternal)
+    //     returns (uint256)
+    // {
+    //     require(
+    //         assetAmount <= _maxDeposit(receiver),
+    //         "ERC4626: maximum amount exceeded"
+    //     );
 
-        uint256 shareAmount = _previewDeposit(assetAmount);
+    //     uint256 shareAmount = _previewDeposit(assetAmount);
 
-        __deposit(msg.sender, receiver, assetAmount, shareAmount);
+    //     __deposit(msg.sender, receiver, assetAmount, shareAmount);
 
-        return shareAmount;
-    }
+    //     return shareAmount;
+    // }
 
-    /**
-     * @notice execute a minting of shares on behalf of given address
-     * @dev only the vault keeper may call this function
-     * @param shareAmount quantity of shares to mint
-     * @param receiver recipient of shares resulting from deposit
-     * @return assetAmount quantity of assets to deposit
-     */
-    function _mint(uint256 shareAmount, address receiver)
-        internal
-        virtual
-        override(ERC4626BaseInternal)
-        onlyKeeper
-        returns (uint256)
-    {
-        require(
-            shareAmount <= _maxMint(receiver),
-            "ERC4626: maximum amount exceeded"
-        );
+    // /**
+    //  * @notice execute a minting of shares on behalf of given address
+    //  * @dev only the vault keeper may call this function
+    //  * @param shareAmount quantity of shares to mint
+    //  * @param receiver recipient of shares resulting from deposit
+    //  * @return assetAmount quantity of assets to deposit
+    //  */
+    // function _mint(uint256 shareAmount, address receiver)
+    //     internal
+    //     virtual
+    //     override(ERC4626BaseInternal)
+    //     returns (uint256)
+    // {
+    //     require(
+    //         shareAmount <= _maxMint(receiver),
+    //         "ERC4626: maximum amount exceeded"
+    //     );
 
-        uint256 assetAmount = _previewMint(shareAmount);
+    //     uint256 assetAmount = _previewMint(shareAmount);
 
-        __deposit(msg.sender, receiver, assetAmount, shareAmount);
+    //     __deposit(msg.sender, receiver, assetAmount, shareAmount);
 
-        return assetAmount;
-    }
+    //     return assetAmount;
+    // }
 
-    /**
-     * @notice exchange assets for shares on behalf of given address
-     * @param caller supplier of assets to be deposited
-     * @param receiver recipient of shares resulting from deposit
-     * @param assetAmount quantity of assets to deposit
-     * @param shareAmount quantity of shares to mint
-     */
-    function __deposit(
-        address caller,
-        address receiver,
-        uint256 assetAmount,
-        uint256 shareAmount
-    ) private {
-        ERC20.safeTransfer(address(this), assetAmount);
+    // /**
+    //  * @notice exchange assets for shares on behalf of given address
+    //  * @param caller supplier of assets to be deposited
+    //  * @param receiver recipient of shares resulting from deposit
+    //  * @param assetAmount quantity of assets to deposit
+    //  * @param shareAmount quantity of shares to mint
+    //  */
+    // function __deposit(
+    //     address caller,
+    //     address receiver,
+    //     uint256 assetAmount,
+    //     uint256 shareAmount
+    // ) private {
+    //     ERC20.safeTransfer(address(this), assetAmount);
 
-        _mint(receiver, shareAmount);
+    //     _mint(receiver, shareAmount);
 
-        _afterDeposit(receiver, assetAmount, shareAmount);
+    //     _afterDeposit(receiver, assetAmount, shareAmount);
 
-        emit Deposit(caller, receiver, assetAmount, shareAmount);
-    }
+    //     emit Deposit(caller, receiver, assetAmount, shareAmount);
+    // }
 
     /**
      * @notice execute a withdrawal of assets on behalf of given address
@@ -146,14 +141,9 @@ contract BaseInternal is AccessInternal, ERC4626BaseInternal {
         uint256 assetAmount,
         address receiver,
         address owner
-    )
-        internal
-        virtual
-        override(ERC4626BaseInternal)
-        auctionInactive
-        returns (uint256)
-    {
-        Vault.maxRedeemShares(owner);
+    ) internal virtual override(ERC4626BaseInternal) returns (uint256) {
+        Storage.Layout storage l = Storage.layout();
+        l.Queue.maxRedeemShares(owner);
 
         require(
             assetAmount <= _maxWithdraw(owner),
@@ -179,14 +169,9 @@ contract BaseInternal is AccessInternal, ERC4626BaseInternal {
         uint256 shareAmount,
         address receiver,
         address owner
-    )
-        internal
-        virtual
-        override(ERC4626BaseInternal)
-        auctionInactive
-        returns (uint256)
-    {
-        Vault.maxRedeemShares(owner);
+    ) internal virtual override(ERC4626BaseInternal) returns (uint256) {
+        Storage.Layout storage l = Storage.layout();
+        l.Queue.maxRedeemShares(owner);
 
         require(
             shareAmount <= _maxRedeem(owner),

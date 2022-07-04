@@ -1,6 +1,10 @@
 import { ethers } from "hardhat";
 const { BigNumber, provider } = ethers;
 
+import { fixedFromFloat, fixedToNumber } from "@premia/utils";
+import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
+import { expect } from "chai";
+
 import {
   MockVolatilityOracle,
   Pricer,
@@ -10,17 +14,12 @@ import {
   Pricer__factory,
 } from "../types";
 
-import { fixedFromFloat, fixedToNumber } from "@premia/utils";
-
 import * as assets from "./utils/assets";
 import { assert } from "./utils/assertions";
 import * as time from "./utils/time";
 import { MockPremiaPoolUtil } from "./utils/MockUtil";
 
-import { expect } from "chai";
-
 import { ADDRESS_ZERO } from "../constants";
-import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 
 import moment from "moment-timezone";
 moment.tz.setDefault("UTC");

@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 interface IView {
     function totalDeposits() external view returns (uint256);
 
-    function epoch() external view returns (uint256);
+    function epoch() external view returns (uint64);
 
     function pricePerShare(uint64 epoch) external view returns (uint256);
 

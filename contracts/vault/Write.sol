@@ -14,29 +14,15 @@ contract Write is WriteInternal, ReentrancyGuard {
     constructor(bool isCall, address pool) WriteInternal(isCall, pool) {}
 
     /************************************************
-     *  INPUT/OUTPUT
+     * PURCHASE
      ***********************************************/
-
-    // TODO:
-    function swapAndPreOrder() external auctionActive nonReentrant {}
-
-    // TODO:
-    function swapAndPurchase() external auctionActive nonReentrant {}
-
-    // function preOrder(uint256 price, uint256 size)
-    //     external
-    //     auctionActive
-    //     nonReentrant
-    //     returns (uint256)
-    // {
-    // }
 
     /**
      * @notice Initiates the option sale
      */
+    // TODO: auctionActive
     function purchase(uint256 contractSize, uint256 maxCost)
         external
-        auctionActive
         nonReentrant
     {
         _purchase(contractSize);

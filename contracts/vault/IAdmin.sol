@@ -62,12 +62,6 @@ interface IAdmin {
      */
     function setPerformanceFee(uint256 newPerformanceFee) external;
 
-    /**
-     * @notice Sets a new cap for deposits
-     * @param newCap is the new cap for deposits
-     */
-    function setCap(uint256 newCap) external;
-
     // /**
     //  * @notice
     //  * @param

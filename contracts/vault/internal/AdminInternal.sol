@@ -200,29 +200,15 @@ contract AdminInternal is BaseInternal {
 
     function _depositQueuedToVault() internal {
         Storage.Layout storage l = Storage.layout();
-
-        uint256 mintedShares = _deposit(l.totalDeposits, address(this));
-        l.totalDeposits = 0;
-
-        uint256 _pricePerShare = 10**18;
-        uint256 totalSupply = Vault.totalSupply(l.epoch);
-
-        if (mintedShares > 0 && totalSupply > 0) {
-            _pricePerShare = (_pricePerShare * mintedShares) / totalSupply;
-        }
-
-        l.pricePerShare[l.epoch] = _pricePerShare;
-
-        // emit DepositQueuedToVault(pricePerShare, mintedShares);
+        l.Queue.depositToVault();
     }
 
     function _setNextEpoch() internal {
         Storage.Layout storage l = Storage.layout();
-
-        l.claimTokenId = _formatClaimTokenId(l.epoch);
         l.totalShort = 0;
-
         l.epoch++;
+
+        l.Queue.syncEpoch(l.epoch);
 
         // Note: index epoch
         // emit SetNextEpoch(l.epoch, l.claimTokenId);
@@ -263,18 +249,21 @@ contract AdminInternal is BaseInternal {
         return uint64(Helpers.getNextFriday(block.timestamp));
     }
 
-    function _formatClaimTokenId(uint64 epoch) internal view returns (uint256) {
-        return (uint256(uint160(address(this))) << 16) + uint16(epoch);
-    }
+    // function _formatClaimTokenId(uint64 epoch) internal view returns (uint256) {
+    //     return (uint256(uint160(address(this))) << 16) + uint16(epoch);
+    // }
 
-    // TODO:
-    function _parseClaimTokenId(uint256 claimTokenId)
-        internal
-        view
-        returns (uint64)
-    {
-        // returns epoch
-    }
+    // function _parseClaimTokenId(uint256 claimTokenId)
+    //     internal
+    //     view
+    //     returns (uint64)
+    // {
+    //     assembly {
+    //         queueAddress := shr(16, claimTokenId)
+    //         epoch := claimTokenId
+    //         return(epoch)
+    //     }
+    // }
 
     function _getIntrinsicValue(uint64 epoch, uint256 size)
         internal

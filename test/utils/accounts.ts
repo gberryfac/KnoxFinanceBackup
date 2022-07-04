@@ -23,7 +23,6 @@ export async function getSigners(): Promise<types.Signers> {
   ] = await ethers.getSigners();
   const signers = {
     deployer: deployerSigner,
-    admin: adminSigner,
     lp1: lp1Signer,
     lp2: lp2Signer,
     lp3: lp3Signer,
@@ -40,7 +39,6 @@ export async function getAddresses(
 ): Promise<types.Addresses> {
   const addresses = {
     deployer: signers.deployer.address,
-    admin: signers.admin.address,
     lp1: signers.lp1.address,
     lp2: signers.lp2.address,
     lp3: signers.lp3.address,
@@ -80,7 +78,7 @@ export async function impersonateWhale(
 
     await assetContract
       .connect(signers.buyer)
-      .transfer(addresses.admin, depositAmount.mul(10));
+      .transfer(addresses.deployer, depositAmount.mul(10));
     await assetContract
       .connect(signers.buyer)
       .transfer(addresses.lp1, depositAmount.mul(10));
@@ -90,7 +88,7 @@ export async function impersonateWhale(
   } else {
     await assetContract
       .connect(signers.buyer)
-      .transfer(addresses.admin, depositAmount.mul(10));
+      .transfer(addresses.deployer, depositAmount.mul(10));
     await assetContract
       .connect(signers.buyer)
       .transfer(addresses.lp1, depositAmount.mul(10));

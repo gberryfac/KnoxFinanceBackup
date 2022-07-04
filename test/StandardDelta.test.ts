@@ -63,7 +63,7 @@ describe.skip("Standard Delta Strategy Unit Tests", () => {
     baseSpotOracle: DAI_PRICE_ORACLE[chainId],
     underlyingSpotOracle: ETH_PRICE_ORACLE[chainId],
     depositAmount: parseUnits("1000", DAI_DECIMALS),
-    cap: parseUnits("5000000", DAI_DECIMALS),
+    maxTVL: parseUnits("5000000", DAI_DECIMALS),
     minimumSupply: BigNumber.from("10").pow("3").toString(),
     minimumContractSize: BigNumber.from("10").pow("17").toString(),
     performanceFee: BigNumber.from("20000000"),
@@ -88,7 +88,7 @@ describe.skip("Standard Delta Strategy Unit Tests", () => {
     baseSpotOracle: DAI_PRICE_ORACLE[chainId],
     underlyingSpotOracle: ETH_PRICE_ORACLE[chainId],
     depositAmount: parseUnits("1", WETH_DECIMALS),
-    cap: parseUnits("1000", WETH_DECIMALS),
+    maxTVL: parseUnits("1000", WETH_DECIMALS),
     minimumSupply: BigNumber.from("10").pow("10").toString(),
     minimumContractSize: BigNumber.from("10").pow("17").toString(),
     performanceFee: BigNumber.from("20000000"),
@@ -113,7 +113,7 @@ describe.skip("Standard Delta Strategy Unit Tests", () => {
     baseSpotOracle: DAI_PRICE_ORACLE[chainId],
     underlyingSpotOracle: BTC_PRICE_ORACLE[chainId],
     depositAmount: parseUnits("0.1", WBTC_DECIMALS),
-    cap: parseUnits("100", WBTC_DECIMALS),
+    maxTVL: parseUnits("100", WBTC_DECIMALS),
     minimumSupply: BigNumber.from("10").pow("3").toString(),
     minimumContractSize: BigNumber.from("10").pow("7").toString(),
     performanceFee: BigNumber.from("20000000"),
@@ -138,7 +138,7 @@ describe.skip("Standard Delta Strategy Unit Tests", () => {
     baseSpotOracle: DAI_PRICE_ORACLE[chainId],
     underlyingSpotOracle: LINK_PRICE_ORACLE[chainId],
     depositAmount: parseUnits("100", LINK_DECIMALS),
-    cap: parseUnits("100000", LINK_DECIMALS),
+    maxTVL: parseUnits("100000", LINK_DECIMALS),
     minimumSupply: BigNumber.from("10").pow("10").toString(),
     minimumContractSize: BigNumber.from("10").pow("17").toString(),
     performanceFee: BigNumber.from("30000000"),
@@ -164,7 +164,7 @@ function behavesLikeOptionsVault(params: {
   baseSpotOracle: string;
   underlyingSpotOracle: string;
   depositAmount: BigNumber;
-  cap: BigNumber;
+  maxTVL: BigNumber;
   minimumSupply: string;
   minimumContractSize: string;
   performanceFee: BigNumber;

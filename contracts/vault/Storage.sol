@@ -5,6 +5,8 @@ import "../auction/IDutchAuction.sol";
 
 import "../pricer/IPricer.sol";
 
+import "../queue/IQueue.sol";
+
 import "../interfaces/IPremiaPool.sol";
 
 import "../libraries/Constants.sol";
@@ -21,8 +23,6 @@ library Storage {
     }
 
     struct InitProps {
-        uint64 minimumSupply;
-        uint256 cap;
         uint256 performanceFee;
         uint256 withdrawalFee;
         string name;
@@ -30,6 +30,7 @@ library Storage {
         address auction;
         address keeper;
         address feeRecipient;
+        address queue;
         address pool;
         address pricer;
     }
@@ -93,25 +94,15 @@ library Storage {
         // @notice
         uint256 totalPremiums;
         // @notice
-        uint256 totalDeposits;
-        // @notice
         uint256 totalWithdrawals;
         /************************************************
          * VAULT STATE
          ***********************************************/
         // @notice
         uint64 epoch;
-        // @notice
-        uint256 claimTokenId;
-        // @notice maps claim token id to claim token price
-        mapping(uint256 => uint256) pricePerShare;
         /************************************************
          * VAULT PROPERTIES
          ***********************************************/
-        // @notice
-        uint64 minimumSupply;
-        // @notice
-        uint256 cap;
         // @notice
         uint256 performanceFee;
         // @notice
@@ -129,11 +120,13 @@ library Storage {
         // @notice
         IDutchAuction Auction;
         // @notice
+        IQueue Queue;
+        // @notice
         IPricer Pricer;
     }
 
     bytes32 internal constant LAYOUT_SLOT =
-        keccak256("knox.contracts.vault.storage.layout");
+        keccak256("knox.contracts.storage.Vault");
 
     function layout() internal pure returns (Layout storage l) {
         bytes32 slot = LAYOUT_SLOT;
@@ -146,6 +139,7 @@ library Storage {
      *  ADMIN
      ***********************************************/
 
+    // TODO: Move Layout storage l to arguements
     function _setFeeRecipient(address newFeeRecipient) internal {
         Layout storage l = layout();
         require(newFeeRecipient != address(0), "address not provided");
@@ -153,6 +147,7 @@ library Storage {
         l.feeRecipient = newFeeRecipient;
     }
 
+    // TODO: Move Layout storage l to arguements
     function _setKeeper(address newKeeper) internal {
         Layout storage l = layout();
         require(newKeeper != address(0), "address not provided");
@@ -160,6 +155,7 @@ library Storage {
         l.keeper = newKeeper;
     }
 
+    // TODO: Move Layout storage l to arguements
     function _setPricer(address newPricer) internal {
         Layout storage l = layout();
         require(newPricer != address(0), "address not provided");
@@ -167,6 +163,7 @@ library Storage {
         l.Pricer = IPricer(newPricer);
     }
 
+    // TODO: Move Layout storage l to arguements
     function _setPerformanceFee(uint256 newPerformanceFee) internal {
         Layout storage l = layout();
 
@@ -180,6 +177,7 @@ library Storage {
         l.performanceFee = newPerformanceFee;
     }
 
+    // TODO: Move Layout storage l to arguements
     function _setWithdrawalFee(uint256 newWithdrawalFee) internal {
         Layout storage l = layout();
 
@@ -198,15 +196,7 @@ library Storage {
         l.withdrawalFee = tmpWithdrawalFee;
     }
 
-    function _setCap(uint256 newCap) internal {
-        Layout storage l = layout();
-        require(newCap > 0, "value exceeds minimum");
-
-        // emit CapSet(l.cap, newCap);
-
-        l.cap = newCap;
-    }
-
+    // TODO: Move Layout storage l to arguements
     function _setAuctionWindowOffsets(uint16 start, uint16 end) internal {
         Layout storage l = layout();
         l.startOffset = start;
@@ -217,21 +207,13 @@ library Storage {
      *  VIEW
      ***********************************************/
 
-    function _totalDeposits() internal view returns (uint256) {
-        Layout storage l = layout();
-        return l.totalDeposits;
-    }
-
-    function _epoch() internal view returns (uint256) {
+    // TODO: Move Layout storage l to arguements
+    function _epoch() internal view returns (uint64) {
         Layout storage l = layout();
         return l.epoch;
     }
 
-    function _pricePerShare(uint64 epoch) internal view returns (uint256) {
-        Layout storage l = layout();
-        return l.pricePerShare[epoch];
-    }
-
+    // TODO: Move Layout storage l to arguements
     function _optionByEpoch(uint64 epoch)
         internal
         view

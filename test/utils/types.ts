@@ -16,7 +16,6 @@ export type Asset = {
 
 export type Signers = {
   deployer: SignerWithAddress;
-  admin: SignerWithAddress;
   lp1: SignerWithAddress;
   lp2: SignerWithAddress;
   lp3: SignerWithAddress;
@@ -24,12 +23,11 @@ export type Signers = {
   keeper: SignerWithAddress;
   feeRecipient: SignerWithAddress;
   buyer?: SignerWithAddress;
-  strategy?: SignerWithAddress;
+  queue?: SignerWithAddress;
 };
 
 export type Addresses = {
   deployer: string;
-  admin: string;
   lp1: string;
   lp2: string;
   lp3: string;
@@ -40,7 +38,7 @@ export type Addresses = {
   pool?: string;
   helpers?: string;
   pricer?: string;
-  strategy?: string;
+  queue?: string;
   vault?: string;
   spotOracle?: string;
   volatilityOracle?: string;
@@ -55,7 +53,7 @@ export type Params = {
   delta: number;
   pool: Pool;
   depositAmount: BigNumber;
-  cap: BigNumber;
+  maxTVL: BigNumber;
   minimumSupply: string;
   minimumContractSize: string;
   performanceFee: BigNumber;

@@ -23,10 +23,11 @@ contract Admin is AdminInternal {
      * @notice
      */
     // TODO: Rename initialize()
+    // TODO: onlyOwner
     function init(
         Storage.InitParams memory _initParams,
         Storage.InitProps memory _initProps
-    ) external onlyOwner {
+    ) external {
         // // TODO: Validation
         // require(_initProps.pricer != address(0), "address not provided");
 
@@ -54,10 +55,8 @@ contract Admin is AdminInternal {
                 .decimals();
 
             l.minimumContractSize = _initParams.minimumContractSize;
-            l.minimumSupply = _initProps.minimumSupply;
 
             l.delta64x64 = _initParams.delta64x64;
-            l.cap = _initProps.cap;
 
             l.performanceFee = _initProps.performanceFee;
             l.withdrawalFee =
@@ -68,6 +67,7 @@ contract Admin is AdminInternal {
             l.feeRecipient = _initProps.feeRecipient;
 
             l.Auction = IDutchAuction(_initProps.auction);
+            l.Queue = IQueue(_initProps.queue);
             l.Pricer = IPricer(_initProps.pricer);
 
             l.startOffset = 2 hours;
@@ -92,19 +92,21 @@ contract Admin is AdminInternal {
      *  SAFETY
      ***********************************************/
 
-    /**
-     * @notice Pauses the vault during an emergency preventing deposits and borrowing.
-     */
-    function pause() external onlyOwner {
-        _pause();
-    }
+    // /**
+    //  * @notice Pauses the vault during an emergency preventing deposits and borrowing.
+    //  */
+    // // TODO: onlyOwner
+    // function pause() external {
+    //     _pause();
+    // }
 
-    /**
-     * @notice Unpauses the vault during following an emergency allowing deposits and borrowing.
-     */
-    function unpause() external onlyOwner {
-        _unpause();
-    }
+    // /**
+    //  * @notice Unpauses the vault during following an emergency allowing deposits and borrowing.
+    //  */
+    // // TODO: onlyOwner
+    // function unpause() external {
+    //     _unpause();
+    // }
 
     /************************************************
      *  ADMIN
@@ -114,7 +116,8 @@ contract Admin is AdminInternal {
      * @notice Sets the new fee recipient
      * @param newFeeRecipient is the address of the new fee recipient
      */
-    function setFeeRecipient(address newFeeRecipient) external onlyOwner {
+    // TODO: onlyOwner
+    function setFeeRecipient(address newFeeRecipient) external {
         Storage._setFeeRecipient(newFeeRecipient);
     }
 
@@ -122,18 +125,22 @@ contract Admin is AdminInternal {
      * @notice Sets the new keeper
      * @param newKeeper is the address of the new keeper
      */
-    function setKeeper(address newKeeper) external onlyOwner {
+    // TODO: onlyOwner
+    function setKeeper(address newKeeper) external {
         Storage._setKeeper(newKeeper);
     }
 
-    // TODO:
-    function setPricer(address newPricer) external onlyOwner {}
+    // TODO: onlyOwner
+    function setPricer(address newPricer) external {
+        Storage._setPricer(newPricer);
+    }
 
     /**
      * @notice Sets the performance fee for the vault
      * @param newPerformanceFee is the performance fee (6 decimals). ex: 20 * 10 ** 6 = 20%
      */
-    function setPerformanceFee(uint256 newPerformanceFee) external onlyOwner {
+    // TODO: onlyOwner
+    function setPerformanceFee(uint256 newPerformanceFee) external {
         Storage._setPerformanceFee(newPerformanceFee);
     }
 
@@ -141,16 +148,9 @@ contract Admin is AdminInternal {
      * @notice Sets the withdrawal fee for the vault
      * @param newWithdrawalFee is the withdrawal fee (6 decimals). ex: 2 * 10 ** 6 = 2%
      */
-    function setWithdrawalFee(uint256 newWithdrawalFee) external onlyOwner {
+    // TODO: onlyOwner
+    function setWithdrawalFee(uint256 newWithdrawalFee) external {
         Storage._setWithdrawalFee(newWithdrawalFee);
-    }
-
-    /**
-     * @notice Sets a new cap for deposits
-     * @param newCap is the new cap for deposits
-     */
-    function setCap(uint256 newCap) external onlyOwner {
-        Storage._setCap(newCap);
     }
 
     // /**
@@ -158,10 +158,8 @@ contract Admin is AdminInternal {
     //  * @param
     //  * @param
     //  */
-    function setAuctionWindowOffsets(uint16 start, uint16 end)
-        external
-        onlyOwner
-    {
+    // TODO: onlyOwner
+    function setAuctionWindowOffsets(uint16 start, uint16 end) external {
         Storage._setAuctionWindowOffsets(start, end);
     }
 
@@ -179,28 +177,32 @@ contract Admin is AdminInternal {
     /**
      * @notice Sets the parameters for the next option to be sold
      */
-    function setOptionParameters() external onlyKeeper {
+    // TODO: onlyKeeper
+    function setOptionParameters() external {
         _setOptionParameters();
     }
 
     /**
      * @notice
      */
-    function setAuctionPrices() external onlyKeeper {
+    // TODO: onlyKeeper
+    function setAuctionPrices() external {
         _setAuctionPrices();
     }
 
     /**
      * @notice Sets the start and end time of the auction.
      */
-    function setAuctionWindow() external onlyKeeper {
+    // TODO: onlyKeeper
+    function setAuctionWindow() external {
         _setAuctionWindow();
     }
 
     /**
      * @notice
      */
-    function initializeAuction() external onlyKeeper {
+    // TODO: onlyKeeper
+    function initializeAuction() external {
         _initializeAuction();
     }
 
@@ -218,35 +220,40 @@ contract Admin is AdminInternal {
     /**
      * @notice Processes expired options
      */
-    function processExpired() external onlyKeeper {
+    // TODO: onlyKeeper
+    function processExpired() external {
         _processExpired();
     }
 
     /**
      * @notice Transfers reserved liquidity from Premia pool to Vault.
      */
-    function withdrawReservedLiquidity() external onlyKeeper {
+    // TODO: onlyKeeper
+    function withdrawReservedLiquidity() external {
         _withdrawReservedLiquidity();
     }
 
     /**
      * @notice
      */
-    function collectVaultFees() external onlyKeeper {
+    // TODO: onlyKeeper
+    function collectVaultFees() external {
         _collectVaultFees();
     }
 
     /**
      * @notice
      */
-    function depositQueuedToVault() external onlyKeeper {
+    // TODO: onlyKeeper
+    function depositQueuedToVault() external {
         _depositQueuedToVault();
     }
 
     /**
      * @notice
      */
-    function setNextEpoch() external onlyKeeper {
+    // TODO: onlyKeeper
+    function setNextEpoch() external {
         _setNextEpoch();
     }
 
@@ -265,18 +272,17 @@ contract Admin is AdminInternal {
      * HELPERS
      ***********************************************/
 
-    function formatClaimTokenId(uint64 epoch) external view returns (uint256) {
-        return _formatClaimTokenId(epoch);
-    }
+    // function formatClaimTokenId(uint64 epoch) external view returns (uint256) {
+    //     return _formatClaimTokenId(epoch);
+    // }
 
-    // TODO:
-    function parseClaimTokenId(uint256 claimTokenId)
-        external
-        view
-        returns (uint64)
-    {
-        return _parseClaimTokenId(claimTokenId);
-    }
+    // function parseClaimTokenId(uint256 claimTokenId)
+    //     external
+    //     view
+    //     returns (uint64)
+    // {
+    //     return _parseClaimTokenId(claimTokenId);
+    // }
 
     function getIntrinsicValue(uint64 epoch, uint256 size)
         external

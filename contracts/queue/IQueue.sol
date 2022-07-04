@@ -5,6 +5,12 @@ import "@solidstate/contracts/token/ERC1155/IERC1155.sol";
 import "@solidstate/contracts/token/ERC1155/enumerable/IERC1155Enumerable.sol";
 
 interface IQueue is IERC1155, IERC1155Enumerable {
+    /**
+     * @notice Sets a new max TVL for deposits
+     * @param maxTVL is the new TVL limit for deposits
+     */
+    function setMaxTVL(uint256 maxTVL) external;
+
     function depositToQueue(uint256 amount) external;
 
     function depositToQueue(uint256 amount, address receiver) external;
@@ -12,6 +18,10 @@ interface IQueue is IERC1155, IERC1155Enumerable {
     function withdrawFromQueue(uint256 amount) external;
 
     function maxRedeemShares(address receiver) external;
+
+    function syncEpoch(uint64 epoch) external;
+
+    function depositToVault() external;
 
     function previewUnredeemedSharesFromEpoch(uint64 epoch, uint256 balance)
         external

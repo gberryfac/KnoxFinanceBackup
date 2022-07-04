@@ -5,13 +5,12 @@ import { diamondCut } from "../../scripts/diamond";
 import {
   IVault,
   Admin__factory,
-  Auction__factory,
   Base__factory,
   Helpers__factory,
   IVault__factory,
-  Queue__factory,
   VaultDiamond__factory,
   View__factory,
+  Write__factory,
   IAsset,
 } from "../../types";
 
@@ -46,7 +45,7 @@ export class VaultUtil {
     signers: types.Signers,
     addresses: types.Addresses
   ) {
-    const helpers = await new Helpers__factory(signers.admin).deploy();
+    const helpers = await new Helpers__factory(signers.deployer).deploy();
 
     const initParams = {
       isCall: params.isCall,
@@ -55,7 +54,7 @@ export class VaultUtil {
     };
     const initProps = {
       minimumSupply: params.minimumSupply,
-      cap: params.cap,
+      maxTVL: params.maxTVL,
       performanceFee: params.performanceFee,
       withdrawalFee: params.withdrawalFee,
       name: params.tokenName,
@@ -67,14 +66,14 @@ export class VaultUtil {
     };
 
     const vaultDiamond = await new VaultDiamond__factory(
-      signers.admin
+      signers.deployer
     ).deploy();
 
     let registeredSelectors = [
       vaultDiamond.interface.getSighash("supportsInterface(bytes4)"),
     ];
 
-    const baseFactory = new Base__factory(signers.admin);
+    const baseFactory = new Base__factory(signers.deployer);
     const baseContract = await baseFactory.deploy(
       params.isCall,
       addresses.pool
@@ -90,27 +89,11 @@ export class VaultUtil {
       )
     );
 
-    const queueFactory = new Queue__factory(signers.admin);
-    const queueContract = await queueFactory.deploy(
-      params.isCall,
-      addresses.pool
-    );
-    await queueContract.deployed();
-
-    registeredSelectors = registeredSelectors.concat(
-      await diamondCut(
-        vaultDiamond,
-        queueContract.address,
-        queueFactory,
-        registeredSelectors
-      )
-    );
-
     const adminFactory = new Admin__factory(
       {
         "contracts/libraries/Helpers.sol:Helpers": helpers.address,
       },
-      signers.admin
+      signers.deployer
     );
 
     const adminContract = await adminFactory.deploy(
@@ -128,23 +111,23 @@ export class VaultUtil {
       )
     );
 
-    const auctionFactory = new Auction__factory(signers.admin);
-    const auctionContract = await auctionFactory.deploy(
+    const writeFactory = new Write__factory(signers.deployer);
+    const writeContract = await writeFactory.deploy(
       params.isCall,
       addresses.pool
     );
-    await auctionContract.deployed();
+    await writeContract.deployed();
 
     registeredSelectors = registeredSelectors.concat(
       await diamondCut(
         vaultDiamond,
-        auctionContract.address,
-        auctionFactory,
+        writeContract.address,
+        writeFactory,
         registeredSelectors
       )
     );
 
-    const viewFactory = new View__factory(signers.admin);
+    const viewFactory = new View__factory(signers.deployer);
     const viewContract = await viewFactory.deploy(
       params.isCall,
       addresses.pool
@@ -162,7 +145,7 @@ export class VaultUtil {
 
     addresses.vault = vaultDiamond.address;
     const vault = IVault__factory.connect(addresses.vault, signers.lp1);
-    await vault.connect(signers.admin).init(initParams, initProps);
+    await vault.connect(signers.deployer).init(initParams, initProps);
 
     return new VaultUtil({ vault, assetContract, params, signers, addresses });
   }

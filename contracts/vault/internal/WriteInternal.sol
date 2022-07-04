@@ -14,27 +14,8 @@ abstract contract WriteInternal is BaseInternal {
     constructor(bool isCall, address pool) BaseInternal(isCall, pool) {}
 
     /************************************************
-     *  INPUT/OUTPUT
+     * PURCHASE
      ***********************************************/
 
     function _purchase(uint256 contractSize) internal {}
-
-    /************************************************
-     * HELPERS
-     ***********************************************/
-
-    // // /**
-    // //  * @notice adjusts precision of value to base decimals
-    // //  * @param value is the amount denominated in the underlying asset decimals
-    // //  * @param assetProperties is a struct containing the underlying and asset decimals
-    // //  */
-    // function _fromUnderlyingtoBaseDecimals(uint256 value)
-    //     internal
-    //     view
-    //     returns (uint256)
-    // {
-    //     Storage.Layout storage l = Storage.layout();
-    //     int128 value64x64 = value.divu(10**l.underlyingDecimals);
-    //     return value64x64.mulu(10**l.baseDecimals);
-    // }
 }
