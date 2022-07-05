@@ -1,55 +1,76 @@
-import * as types from "./types";
+import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
+import { deployMockContract, MockContract } from "ethereum-waffle";
 
 import {
+  MockERC20,
   MockPremiaPool,
-  MockSpotPriceOracle,
+  MockERC20__factory,
   MockPremiaPool__factory,
-  MockSpotPriceOracle__factory,
 } from "../../types";
-
-import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 
 interface MockPremiaPoolUtilArgs {
   pool: MockPremiaPool;
-  baseSpotPriceOracle: MockSpotPriceOracle;
-  underlyingSpotPriceOracle: MockSpotPriceOracle;
+  underlyingSpotPriceOracle: MockContract;
+  baseSpotPriceOracle: MockContract;
+  underlyingAsset: MockERC20;
+  baseAsset: MockERC20;
 }
 
 export class MockPremiaPoolUtil {
   pool: MockPremiaPool;
-  baseSpotPriceOracle: MockSpotPriceOracle;
-  underlyingSpotPriceOracle: MockSpotPriceOracle;
+  underlyingSpotPriceOracle: MockContract;
+  baseSpotPriceOracle: MockContract;
+  underlyingAsset: MockERC20;
+  baseAsset: MockERC20;
 
   constructor(props: MockPremiaPoolUtilArgs) {
     this.pool = props.pool;
     this.baseSpotPriceOracle = props.baseSpotPriceOracle;
     this.underlyingSpotPriceOracle = props.underlyingSpotPriceOracle;
+    this.underlyingAsset = props.underlyingAsset;
+    this.baseAsset = props.baseAsset;
   }
 
   static async deploy(
     underlying: {
-      oracleDecimals: number;
-      oraclePrice: number;
-      asset: types.Asset;
+      decimals: number;
+      price: number;
     },
     base: {
-      oracleDecimals: number;
-      oraclePrice: number;
-      asset: types.Asset;
+      decimals: number;
+      price: number;
     },
     deployer: SignerWithAddress
   ) {
-    const underlyingSpotPriceOracle = await new MockSpotPriceOracle__factory(
-      deployer
-    ).deploy(underlying.oracleDecimals, underlying.oraclePrice);
+    const underlyingSpotPriceOracle = await deployMockContract(
+      deployer as any,
+      [
+        "function latestAnswer() external view returns (int256)",
+        "function decimals() external view returns (uint8)",
+      ]
+    );
 
-    const baseSpotPriceOracle = await new MockSpotPriceOracle__factory(
-      deployer
-    ).deploy(base.oracleDecimals, base.oraclePrice);
+    await underlyingSpotPriceOracle.mock.latestAnswer.returns(underlying.price);
+    await underlyingSpotPriceOracle.mock.decimals.returns(underlying.decimals);
+
+    const baseSpotPriceOracle = await deployMockContract(deployer as any, [
+      "function latestAnswer() external view returns (int256)",
+      "function decimals() external view returns (uint8)",
+    ]);
+
+    await baseSpotPriceOracle.mock.latestAnswer.returns(base.price);
+    await baseSpotPriceOracle.mock.decimals.returns(base.decimals);
+
+    const underlyingAsset = await new MockERC20__factory(deployer).deploy(
+      "",
+      18
+    );
+
+    const baseAsset = await new MockERC20__factory(deployer).deploy("", 18);
 
     const pool = await new MockPremiaPool__factory(deployer).deploy(
-      underlying.asset.address,
-      base.asset.address,
+      underlyingAsset.address,
+      baseAsset.address,
       underlyingSpotPriceOracle.address,
       baseSpotPriceOracle.address
     );
@@ -58,6 +79,8 @@ export class MockPremiaPoolUtil {
       pool,
       underlyingSpotPriceOracle,
       baseSpotPriceOracle,
+      underlyingAsset,
+      baseAsset,
     });
   }
 }
