@@ -1,11 +1,13 @@
 import { BigNumber } from "ethers";
 
+/* eslint-disable no-unused-vars */
 export enum CHAINID {
   ETH_MAINNET = 1,
   ETH_RINKEBY = 4,
   ARB_MAINNET = 42161,
   ARB_RINKEBY = 421611,
 }
+/* eslint-enable */
 
 export const TEST_URI = {
   [CHAINID.ETH_MAINNET]: process.env.TEST_URI,

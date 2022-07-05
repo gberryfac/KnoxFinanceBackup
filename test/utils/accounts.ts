@@ -13,7 +13,6 @@ const chainId = network.config.chainId;
 export async function getSigners(): Promise<types.Signers> {
   const [
     deployerSigner,
-    adminSigner,
     lp1Signer,
     lp2Signer,
     lp3Signer,

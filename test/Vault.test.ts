@@ -93,9 +93,6 @@ describe("Vault Unit Tests", () => {
 });
 
 function behavesLikeVault(params: types.Params) {
-  let signers: types.Signers;
-  let addresses: types.Addresses;
-
   describe.only(params.name, () => {
     let snapshotId: number;
 

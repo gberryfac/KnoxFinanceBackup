@@ -1,5 +1,4 @@
 import { ethers } from "hardhat";
-const { getContractFactory } = ethers;
 
 import { TestOrderBook, TestOrderBook__factory } from "../../types";
 
@@ -22,10 +21,6 @@ describe.only("OrderBook", () => {
   before(async () => {
     bNZero = BigNumber.from("0");
     [signer1, signer2, signer3] = await ethers.getSigners();
-
-    const library = await getContractFactory("OrderBook").then((contract) =>
-      contract.deploy()
-    );
 
     instance = await new TestOrderBook__factory(signer1).deploy();
   });

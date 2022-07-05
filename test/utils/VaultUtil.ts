@@ -135,7 +135,7 @@ export class VaultUtil {
     );
     await vaultViewContract.deployed();
 
-    registeredSelectors = registeredSelectors.concat(
+    registeredSelectors.concat(
       await diamondCut(
         vaultDiamond,
         vaultViewContract.address,
