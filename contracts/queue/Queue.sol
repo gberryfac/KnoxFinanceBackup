@@ -135,7 +135,7 @@ contract Queue is Access, ERC1155Base, ERC1155Enumerable, QueueInternal {
     function parseClaimTokenId(uint256 claimTokenId)
         external
         pure
-        returns (uint64)
+        returns (address, uint64)
     {
         return _parseClaimTokenId(claimTokenId);
     }

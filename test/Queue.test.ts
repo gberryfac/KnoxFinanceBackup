@@ -1,5 +1,5 @@
 import { ethers } from "hardhat";
-const { parseUnits } = ethers.utils;
+const { parseUnits, hexConcat, hexZeroPad } = ethers.utils;
 
 import { deployMockContract, MockContract } from "ethereum-waffle";
 import { expect } from "chai";
@@ -22,9 +22,9 @@ import { assert } from "./utils/assertions";
 import { MockPremiaPoolUtil } from "./utils/MockUtil";
 
 import moment from "moment-timezone";
+import { BigNumber } from "ethers";
 moment.tz.setDefault("UTC");
 
-// TODO: test multiple cases, see StandardDelta
 const params = {
   isCall: true,
   base: assets.DAI,
@@ -97,7 +97,7 @@ describe.only("Queue Unit Tests", () => {
     addresses.queue = instance.address;
   });
 
-  describe("#constructor", () => {
+  describe("#constructor()", () => {
     time.revertToSnapshotAfterEach(async () => {});
 
     it("should initialize Queue with correct state", async () => {
@@ -110,16 +110,50 @@ describe.only("Queue Unit Tests", () => {
     });
   });
 
-  // TODO:
-  describe.skip("#setMaxTVL(uint256, address)", () => {
+  describe("#setMaxTVL(uint256,address)", () => {
     time.revertToSnapshotAfterEach(async () => {});
+
+    it("should revert if caller is !owner", async () => {
+      await expect(instance.setMaxTVL(1000)).to.be.revertedWith(
+        "Ownable: sender must be owner"
+      );
+    });
+
+    it("should revert if newMaxTVL <= 0", async () => {
+      await expect(
+        instance.connect(signers.deployer).setMaxTVL(0)
+      ).to.be.revertedWith("value exceeds minimum");
+    });
+
+    it("should set newMaxTVL", async () => {
+      await instance.connect(signers.deployer).setMaxTVL(1000);
+      await assert.bnEqual(await instance.maxTVL(), BigNumber.from("1000"));
+    });
   });
 
   describe("#depositToQueue(uint256)", () => {
     time.revertToSnapshotAfterEach(async () => {});
 
-    it.skip("should revert if Queue is paused", async () => {});
-    it.skip("should revert if maxTVL is exceeded", async () => {});
+    it("should revert if Queue is paused", async () => {
+      await instance.connect(signers.deployer).pause();
+      await expect(
+        instance["depositToQueue(uint256)"](params.depositAmount)
+      ).to.be.revertedWith("Pausable: paused");
+    });
+
+    it("should revert if maxTVL is exceeded", async () => {
+      const depositAmount = params.maxTVL.add(BigNumber.from("1"));
+
+      await assetContract
+        .connect(signers.buyer)
+        .approve(addresses.queue, depositAmount);
+
+      await expect(
+        instance
+          .connect(signers.buyer)
+          ["depositToQueue(uint256)"](depositAmount)
+      ).to.be.revertedWith("maxTVL exceeded");
+    });
 
     it("should revert if value is <= 0", async () => {
       await expect(
@@ -186,9 +220,108 @@ describe.only("Queue Unit Tests", () => {
     it.skip("should redeem vault shares if LP deposited in past epoch", async () => {});
   });
 
-  // TODO:
-  describe.skip("#depositToQueue(uint256, address)", () => {
+  describe("#depositToQueue(uint256,address)", () => {
     time.revertToSnapshotAfterEach(async () => {});
+
+    it("should revert if Queue is paused", async () => {
+      await instance.connect(signers.deployer).pause();
+      await expect(
+        instance["depositToQueue(uint256,address)"](
+          params.depositAmount,
+          addresses.lp2
+        )
+      ).to.be.revertedWith("Pausable: paused");
+    });
+
+    it("should revert if maxTVL is exceeded", async () => {
+      const depositAmount = params.maxTVL.add(BigNumber.from("1"));
+
+      await assetContract
+        .connect(signers.buyer)
+        .approve(addresses.queue, depositAmount);
+
+      await expect(
+        instance
+          .connect(signers.buyer)
+          ["depositToQueue(uint256,address)"](depositAmount, addresses.lp2)
+      ).to.be.revertedWith("maxTVL exceeded");
+    });
+
+    it("should revert if value is <= 0", async () => {
+      await expect(
+        instance["depositToQueue(uint256,address)"](
+          ethers.constants.Zero,
+          addresses.lp2
+        )
+      ).to.be.revertedWith("value exceeds minimum");
+    });
+
+    it("should mint claim token 1:1 for collateral deposited", async () => {
+      await assetContract
+        .connect(signers.lp1)
+        .approve(addresses.queue, params.depositAmount);
+
+      await instance["depositToQueue(uint256,address)"](
+        params.depositAmount,
+        addresses.lp2
+      );
+
+      const epoch = await instance.epoch();
+      const claimTokenBalance = await instance["balanceOf(address,uint256)"](
+        addresses.lp2,
+        await instance.formatClaimTokenId(epoch)
+      );
+
+      const queueBalance = await assetContract.balanceOf(addresses.queue);
+
+      assert.bnEqual(queueBalance, params.depositAmount);
+      assert.bnEqual(claimTokenBalance, params.depositAmount);
+    });
+
+    it("should mint claim tokens if LP deposits multiple times within same epoch", async () => {
+      const firstDeposit = params.depositAmount;
+
+      await assetContract
+        .connect(signers.lp1)
+        .approve(addresses.queue, firstDeposit);
+
+      await instance["depositToQueue(uint256,address)"](
+        firstDeposit,
+        addresses.lp2
+      );
+
+      let epoch = await instance["epoch()"]();
+      let claimTokenBalance = await instance["balanceOf(address,uint256)"](
+        addresses.lp2,
+        await instance.formatClaimTokenId(epoch)
+      );
+
+      const secondDeposit = params.depositAmount.div(2);
+
+      await assetContract
+        .connect(signers.lp1)
+        .approve(addresses.queue, secondDeposit);
+
+      await instance["depositToQueue(uint256,address)"](
+        secondDeposit,
+        addresses.lp2
+      );
+
+      epoch = await instance["epoch()"]();
+      claimTokenBalance = await instance["balanceOf(address,uint256)"](
+        addresses.lp2,
+        await instance.formatClaimTokenId(epoch)
+      );
+
+      const totalDeposits = firstDeposit.add(secondDeposit);
+      const queueBalance = await assetContract.balanceOf(addresses.queue);
+
+      assert.bnEqual(queueBalance, totalDeposits);
+      assert.bnEqual(claimTokenBalance, totalDeposits);
+    });
+
+    // TODO: Move to integration tests
+    it.skip("should redeem vault shares if LP deposited in past epoch", async () => {});
   });
 
   describe("#withdrawFromQueue(uint256)", () => {
@@ -221,7 +354,7 @@ describe.only("Queue Unit Tests", () => {
 
   // TODO:
   // TODO: Move to integration tests
-  describe.skip("#redeemSharesFromEpoch(uint64, address)", () => {
+  describe.skip("#redeemSharesFromEpoch(uint64,address)", () => {
     time.revertToSnapshotAfterEach(async () => {});
 
     it("should revert if sender != receiver and sender != approved", async () => {
@@ -234,6 +367,7 @@ describe.only("Queue Unit Tests", () => {
     });
   });
 
+  // TODO:
   // TODO: Move to integration tests
   describe.skip("#maxRedeemShares(address)", () => {
     time.revertToSnapshotAfterEach(async () => {
@@ -285,4 +419,84 @@ describe.only("Queue Unit Tests", () => {
       assert.bnEqual(lpVaultSharesAfter, params.depositAmount);
     });
   });
+
+  // TODO:
+  // TODO: Move to integration tests
+  describe.skip("#syncEpoch(uint64)", () => {
+    time.revertToSnapshotAfterEach(async () => {});
+  });
+
+  // TODO:
+  // TODO: Move to integration tests
+  describe.skip("#depositToVault()", () => {
+    time.revertToSnapshotAfterEach(async () => {});
+  });
+
+  // TODO:
+  // TODO: Move to integration tests
+  describe.skip("#previewUnredeemedShares(address)", () => {
+    time.revertToSnapshotAfterEach(async () => {});
+  });
+
+  // TODO:
+  // TODO: Move to integration tests
+  describe.skip("#previewUnredeemedSharesFromEpoch(uint64,uint256)", () => {
+    time.revertToSnapshotAfterEach(async () => {});
+  });
+
+  // TODO:
+  // TODO: Move to integration tests
+  describe.skip("#pricePerShare(uint64)", () => {
+    time.revertToSnapshotAfterEach(async () => {});
+  });
+
+  describe("#formatClaimTokenId(uint64)", () => {
+    time.revertToSnapshotAfterEach(async () => {});
+
+    it("should format claim token id correctly", async () => {
+      for (let i = 0; i < 10000; i++) {
+        let claimTokenId = formatClaimTokenId({
+          address: addresses.queue,
+          epoch: BigNumber.from(i),
+        });
+
+        assert.bnEqual(
+          await instance.formatClaimTokenId(i),
+          BigNumber.from(claimTokenId)
+        );
+      }
+    });
+  });
+
+  describe("#parseClaimTokenId(uint256)", () => {
+    time.revertToSnapshotAfterEach(async () => {});
+
+    it("should parse claim token id correctly", async () => {
+      for (let i = 0; i < 10000; i++) {
+        const bn = BigNumber.from(i);
+
+        let claimTokenId = formatClaimTokenId({
+          address: addresses.queue,
+          epoch: bn,
+        });
+
+        let [address, epoch] = await instance.parseClaimTokenId(claimTokenId);
+
+        assert.equal(address, addresses.queue);
+        assert.bnEqual(epoch, bn);
+      }
+    });
+  });
 });
+
+export interface ClaimTokenId {
+  address: string;
+  epoch: BigNumber;
+}
+
+function formatClaimTokenId({ address, epoch }: ClaimTokenId) {
+  return hexConcat([
+    hexZeroPad(BigNumber.from(address).toHexString(), 20),
+    hexZeroPad(epoch.toHexString(), 8),
+  ]);
+}

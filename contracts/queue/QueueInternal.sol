@@ -10,8 +10,6 @@ import "../vault/IVault.sol";
 
 import "./QueueStorage.sol";
 
-import "hardhat/console.sol";
-
 contract QueueInternal is ERC1155BaseInternal, ERC1155EnumerableInternal {
     using QueueStorage for QueueStorage.Layout;
     using SafeERC20 for IERC20;
@@ -51,7 +49,7 @@ contract QueueInternal is ERC1155BaseInternal, ERC1155EnumerableInternal {
         uint256 totalWithDepositedAmount =
             Vault.totalAssets() + ERC20.balanceOf(address(this)) + amount;
 
-        require(totalWithDepositedAmount <= l.maxTVL, "vault maxTVL exceeded");
+        require(totalWithDepositedAmount <= l.maxTVL, "maxTVL exceeded");
         require(amount > 0, "value exceeds minimum");
 
         // redeems shares from previous epochs
@@ -206,23 +204,23 @@ contract QueueInternal is ERC1155BaseInternal, ERC1155EnumerableInternal {
      ***********************************************/
 
     function _formatClaimTokenId(uint64 epoch) internal view returns (uint256) {
-        return (uint256(uint160(address(this))) << 16) + uint16(epoch);
+        return (uint256(uint160(address(this))) << 64) + uint256(epoch);
     }
 
     function _parseClaimTokenId(uint256 claimTokenId)
         internal
         pure
-        returns (uint64)
+        returns (address, uint64)
     {
         address queue;
         uint64 epoch;
 
         assembly {
-            queue := shr(16, claimTokenId)
+            queue := shr(64, claimTokenId)
             epoch := claimTokenId
         }
 
-        return epoch;
+        return (queue, epoch);
     }
 
     /************************************************
