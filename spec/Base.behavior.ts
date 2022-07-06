@@ -7,12 +7,12 @@ import { assert } from "../test/utils/assertions";
 
 import { VaultUtil } from "../test/utils/VaultUtil";
 
-import { IAsset, IVault, MockERC20 } from "../types";
+import { IAsset, IVault } from "../types";
 
 interface BaseBehaviorArgs {
   deploy: () => Promise<IVault>;
   getVaultUtil: () => Promise<VaultUtil>;
-  getAsset: () => Promise<MockERC20>;
+  getAsset: () => Promise<IAsset>;
   mintERC20: (
     address: string,
     amount: BigNumber
@@ -43,7 +43,7 @@ export function describeBehaviorOfBase(
   describe("::Base", () => {
     let instance: IVault;
     let v: VaultUtil;
-    let assetContract: IAsset;
+    let asset: IAsset;
     let params: types.Params;
     let signers: types.Signers;
     let addresses: types.Addresses;
@@ -54,7 +54,7 @@ export function describeBehaviorOfBase(
       instance = await deploy();
       v = await getVaultUtil();
 
-      assetContract = v.assetContract;
+      asset = v.asset;
       params = v.params;
 
       signers = v.signers;

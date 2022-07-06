@@ -61,7 +61,7 @@ export async function impersonateWhale(
   const whaleSigner = await _impersonateWhale(addresses.buyer, "1500");
   signers.buyer = whaleSigner;
 
-  const assetContract = await getContractAt("IAsset", depositAsset);
+  const asset = await getContractAt("IAsset", depositAsset);
 
   await _setERC20Balance(
     depositAsset,
@@ -71,32 +71,30 @@ export async function impersonateWhale(
   );
 
   if (depositAsset === WETH_ADDRESS[chainId]) {
-    await assetContract
-      .connect(signers.buyer)
-      .deposit({ value: parseEther("700") });
+    await asset.connect(signers.buyer).deposit({ value: parseEther("700") });
 
-    await assetContract
+    await asset
       .connect(signers.buyer)
       .transfer(addresses.deployer, depositAmount.mul(10));
-    await assetContract
+    await asset
       .connect(signers.buyer)
       .transfer(addresses.lp1, depositAmount.mul(10));
-    await assetContract
+    await asset
       .connect(signers.buyer)
       .transfer(addresses.lp2, depositAmount.mul(10));
   } else {
-    await assetContract
+    await asset
       .connect(signers.buyer)
       .transfer(addresses.deployer, depositAmount.mul(10));
-    await assetContract
+    await asset
       .connect(signers.buyer)
       .transfer(addresses.lp1, depositAmount.mul(10));
-    await assetContract
+    await asset
       .connect(signers.buyer)
       .transfer(addresses.lp2, depositAmount.mul(10));
   }
 
-  return [signers, addresses, assetContract];
+  return [signers, addresses, asset];
 }
 
 async function _impersonateWhale(account: string, ethBalance: string) {

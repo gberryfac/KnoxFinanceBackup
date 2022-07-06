@@ -18,7 +18,7 @@ import { fixedFromFloat } from "@premia/utils";
 
 interface VaultUtilArgs {
   vault: IVault;
-  assetContract: IAsset;
+  asset: IAsset;
   params: types.Params;
   signers: types.Signers;
   addresses: types.Addresses;
@@ -26,21 +26,21 @@ interface VaultUtilArgs {
 
 export class VaultUtil {
   vault: IVault;
-  assetContract: IAsset;
+  asset: IAsset;
   params: types.Params;
   signers: types.Signers;
   addresses: types.Addresses;
 
   constructor(props: VaultUtilArgs) {
     this.vault = props.vault;
-    this.assetContract = props.assetContract;
+    this.asset = props.asset;
     this.params = props.params;
     this.signers = props.signers;
     this.addresses = props.addresses;
   }
 
   static async deploy(
-    assetContract: IAsset,
+    asset: IAsset,
     params: types.Params,
     signers: types.Signers,
     addresses: types.Addresses
@@ -58,12 +58,6 @@ export class VaultUtil {
       keeper: addresses.keeper,
       feeRecipient: addresses.feeRecipient,
       pool: addresses.pool,
-    };
-
-    const initImpl = {
-      auction: addresses.auction,
-      queue: addresses.queue,
-      pricer: addresses.pricer,
     };
 
     const vaultDiamond = await new VaultDiamond__factory(
@@ -146,8 +140,7 @@ export class VaultUtil {
 
     addresses.vault = vaultDiamond.address;
     const vault = IVault__factory.connect(addresses.vault, signers.lp1);
-    await vault.connect(signers.deployer).initialize(initImpl);
 
-    return new VaultUtil({ vault, assetContract, params, signers, addresses });
+    return new VaultUtil({ vault, asset, params, signers, addresses });
   }
 }

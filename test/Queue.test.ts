@@ -53,7 +53,7 @@ type Params = {
 function behavesLikeQueue(params: Params) {
   describe.only(params.name, () => {
     let addresses: types.Addresses;
-    let assetContract: MockERC20;
+    let asset: MockERC20;
     let instance: Queue;
     let mockPremiaPool: MockPremiaPoolUtil;
     let mockVault: MockContract;
@@ -102,20 +102,20 @@ function behavesLikeQueue(params: Params) {
       instance = Queue__factory.connect(proxy.address, signers.lp1);
       addresses.queue = instance.address;
 
-      assetContract = params.isCall
+      asset = params.isCall
         ? mockPremiaPool.underlyingAsset
         : mockPremiaPool.baseAsset;
 
-      assetContract.connect(signers.lp1).mint(addresses.lp1, params.mintAmount);
-      assetContract.connect(signers.lp2).mint(addresses.lp2, params.mintAmount);
-      assetContract.connect(signers.lp3).mint(addresses.lp3, params.mintAmount);
+      asset.connect(signers.lp1).mint(addresses.lp1, params.mintAmount);
+      asset.connect(signers.lp2).mint(addresses.lp2, params.mintAmount);
+      asset.connect(signers.lp3).mint(addresses.lp3, params.mintAmount);
     });
 
     describe("#constructor()", () => {
       time.revertToSnapshotAfterEach(async () => {});
 
       it("should initialize Queue with correct state", async () => {
-        await assert.equal(await instance.ERC20(), assetContract.address);
+        await assert.equal(await instance.ERC20(), asset.address);
         await assert.equal(await instance.Vault(), addresses.vault);
         await assert.bnEqual(await instance.epoch(), ethers.constants.One);
         await assert.bnEqual(await instance.maxTVL(), params.maxTVL);
@@ -156,7 +156,7 @@ function behavesLikeQueue(params: Params) {
       it("should revert if maxTVL is exceeded", async () => {
         const depositAmount = params.maxTVL.add(BigNumber.from("1"));
 
-        await assetContract
+        await asset
           .connect(signers.lp3)
           .approve(addresses.queue, depositAmount);
 
@@ -174,7 +174,7 @@ function behavesLikeQueue(params: Params) {
       });
 
       it("should mint claim token 1:1 for collateral deposited", async () => {
-        await assetContract
+        await asset
           .connect(signers.lp1)
           .approve(addresses.queue, params.depositAmount);
 
@@ -186,7 +186,7 @@ function behavesLikeQueue(params: Params) {
           await instance.formatClaimTokenId(epoch)
         );
 
-        const queueBalance = await assetContract.balanceOf(addresses.queue);
+        const queueBalance = await asset.balanceOf(addresses.queue);
 
         assert.bnEqual(queueBalance, params.depositAmount);
         assert.bnEqual(claimTokenBalance, params.depositAmount);
@@ -195,9 +195,7 @@ function behavesLikeQueue(params: Params) {
       it("should mint claim tokens if LP deposits multiple times within same epoch", async () => {
         const firstDeposit = params.depositAmount;
 
-        await assetContract
-          .connect(signers.lp1)
-          .approve(addresses.queue, firstDeposit);
+        await asset.connect(signers.lp1).approve(addresses.queue, firstDeposit);
 
         await instance["depositToQueue(uint256)"](firstDeposit);
 
@@ -209,7 +207,7 @@ function behavesLikeQueue(params: Params) {
 
         const secondDeposit = params.depositAmount.div(2);
 
-        await assetContract
+        await asset
           .connect(signers.lp1)
           .approve(addresses.queue, secondDeposit);
 
@@ -222,7 +220,7 @@ function behavesLikeQueue(params: Params) {
         );
 
         const totalDeposits = firstDeposit.add(secondDeposit);
-        const queueBalance = await assetContract.balanceOf(addresses.queue);
+        const queueBalance = await asset.balanceOf(addresses.queue);
 
         assert.bnEqual(queueBalance, totalDeposits);
         assert.bnEqual(claimTokenBalance, totalDeposits);
@@ -248,7 +246,7 @@ function behavesLikeQueue(params: Params) {
       it("should revert if maxTVL is exceeded", async () => {
         const depositAmount = params.maxTVL.add(BigNumber.from("1"));
 
-        await assetContract
+        await asset
           .connect(signers.lp3)
           .approve(addresses.queue, depositAmount);
 
@@ -269,7 +267,7 @@ function behavesLikeQueue(params: Params) {
       });
 
       it("should mint claim token 1:1 for collateral deposited", async () => {
-        await assetContract
+        await asset
           .connect(signers.lp1)
           .approve(addresses.queue, params.depositAmount);
 
@@ -284,7 +282,7 @@ function behavesLikeQueue(params: Params) {
           await instance.formatClaimTokenId(epoch)
         );
 
-        const queueBalance = await assetContract.balanceOf(addresses.queue);
+        const queueBalance = await asset.balanceOf(addresses.queue);
 
         assert.bnEqual(queueBalance, params.depositAmount);
         assert.bnEqual(claimTokenBalance, params.depositAmount);
@@ -293,9 +291,7 @@ function behavesLikeQueue(params: Params) {
       it("should mint claim tokens if LP deposits multiple times within same epoch", async () => {
         const firstDeposit = params.depositAmount;
 
-        await assetContract
-          .connect(signers.lp1)
-          .approve(addresses.queue, firstDeposit);
+        await asset.connect(signers.lp1).approve(addresses.queue, firstDeposit);
 
         await instance["depositToQueue(uint256,address)"](
           firstDeposit,
@@ -310,7 +306,7 @@ function behavesLikeQueue(params: Params) {
 
         const secondDeposit = params.depositAmount.div(2);
 
-        await assetContract
+        await asset
           .connect(signers.lp1)
           .approve(addresses.queue, secondDeposit);
 
@@ -326,7 +322,7 @@ function behavesLikeQueue(params: Params) {
         );
 
         const totalDeposits = firstDeposit.add(secondDeposit);
-        const queueBalance = await assetContract.balanceOf(addresses.queue);
+        const queueBalance = await asset.balanceOf(addresses.queue);
 
         assert.bnEqual(queueBalance, totalDeposits);
         assert.bnEqual(claimTokenBalance, totalDeposits);
@@ -338,7 +334,7 @@ function behavesLikeQueue(params: Params) {
 
     describe("#withdrawFromQueue(uint256)", () => {
       time.revertToSnapshotAfterEach(async () => {
-        await assetContract
+        await asset
           .connect(signers.lp1)
           .approve(addresses.queue, params.depositAmount);
 
@@ -346,11 +342,11 @@ function behavesLikeQueue(params: Params) {
       });
 
       it("should withdraw exact amount deposited", async () => {
-        const lpBalanceBefore = await assetContract.balanceOf(addresses.lp1);
+        const lpBalanceBefore = await asset.balanceOf(addresses.lp1);
 
         await instance.withdrawFromQueue(params.depositAmount);
 
-        const lpBalanceAfter = await assetContract.balanceOf(addresses.lp1);
+        const lpBalanceAfter = await asset.balanceOf(addresses.lp1);
         assert.bnEqual(
           lpBalanceBefore,
           lpBalanceAfter.sub(params.depositAmount)
@@ -386,7 +382,7 @@ function behavesLikeQueue(params: Params) {
     // TODO: Move to integration tests
     describe.skip("#maxRedeemShares(address)", () => {
       time.revertToSnapshotAfterEach(async () => {
-        await assetContract
+        await asset
           .connect(signers.lp1)
           .approve(addresses.vault, params.depositAmount);
 
