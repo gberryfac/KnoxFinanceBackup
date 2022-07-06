@@ -24,7 +24,7 @@ contract VaultAdmin is Access, VaultInternal {
     {
         // // TODO: Validation
         VaultStorage.Layout storage l = VaultStorage.layout();
-        l.Auction = IDutchAuction(initImpl.auction);
+        l.Auction = IAuction(initImpl.auction);
         l.Queue = IQueue(initImpl.queue);
         l.Pricer = IPricer(initImpl.pricer);
 

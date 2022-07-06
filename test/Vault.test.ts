@@ -5,6 +5,8 @@ const { parseUnits } = ethers.utils;
 import {
   IAsset,
   IVault,
+  Auction__factory,
+  AuctionProxy__factory,
   Queue__factory,
   QueueProxy__factory,
   Pricer__factory,
@@ -19,7 +21,7 @@ import { describeBehaviorOfBase } from "../spec/Base.behavior";
 
 import { VaultUtil } from "./utils/VaultUtil";
 
-import { ADDRESS_ONE, PREMIA_VOLATILITY_SURFACE_ORACLE } from "../constants";
+import { PREMIA_VOLATILITY_SURFACE_ORACLE } from "../constants";
 
 describe("Vault Unit Tests", () => {
   behavesLikeVault({
@@ -109,14 +111,6 @@ function behavesLikeVault(params: types.Params) {
       signers = await accounts.getSigners();
       addresses = await accounts.getAddresses(signers);
 
-      [signers, addresses, asset] = await accounts.impersonateWhale(
-        params.asset.buyer,
-        params.asset.address,
-        params.depositAmount,
-        signers,
-        addresses
-      );
-
       addresses.pool = params.pool.address;
 
       v = await VaultUtil.deploy(asset, params, signers, addresses);
@@ -129,11 +123,23 @@ function behavesLikeVault(params: types.Params) {
 
       let queueProxy = await new QueueProxy__factory(signers.deployer).deploy(
         params.maxTVL,
-        instance.address,
+        queue.address,
         addresses.vault
       );
 
       queue = Queue__factory.connect(queueProxy.address, signers.lp1);
+
+      let auction = await new Auction__factory(signers.deployer).deploy(
+        params.isCall,
+        addresses.pool,
+        addresses.vault
+      );
+
+      let auctionProxy = await new AuctionProxy__factory(
+        signers.deployer
+      ).deploy(auction.address, addresses.vault);
+
+      auction = Auction__factory.connect(auctionProxy.address, signers.lp1);
 
       let pricer = await new Pricer__factory(signers.deployer).deploy(
         addresses.pool,
@@ -141,7 +147,7 @@ function behavesLikeVault(params: types.Params) {
       );
 
       addresses.queue = queue.address;
-      addresses.auction = ADDRESS_ONE;
+      addresses.auction = auction.address;
       addresses.pricer = pricer.address;
 
       const initImpl = {
@@ -152,6 +158,14 @@ function behavesLikeVault(params: types.Params) {
 
       await v.vault.connect(signers.deployer).initialize(initImpl);
       instance = v.vault;
+
+      [signers, addresses, asset] = await accounts.impersonateWhale(
+        params.asset.buyer,
+        params.asset.address,
+        params.depositAmount,
+        signers,
+        addresses
+      );
     });
 
     beforeEach(async () => {
@@ -167,14 +181,17 @@ function behavesLikeVault(params: types.Params) {
       getVaultUtil: async () => v,
     });
 
-    describeBehaviorOfBase({
-      deploy: async () => instance,
-      getVaultUtil: async () => v,
-      getAsset: async () => asset,
-      mintERC20: undefined as any,
-      burnERC20: undefined as any,
-      mintAsset: undefined as any,
-      supply: ethers.constants.Zero,
-    });
+    describeBehaviorOfBase(
+      {
+        deploy: async () => instance,
+        getVaultUtil: async () => v,
+        getAsset: async () => asset,
+        mintERC20: undefined as any,
+        burnERC20: undefined as any,
+        mintAsset: undefined as any,
+        supply: ethers.constants.Zero,
+      },
+      ["::ERC4626Base"]
+    );
   });
 }

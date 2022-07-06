@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {IPremiaPool, PoolStorage} from "../interfaces/IPremiaPool.sol";
+import "../interfaces/IPremiaPool.sol";
 
 import "../libraries/ABDKMath64x64Token.sol";
 
@@ -26,7 +26,7 @@ contract PricerInternal {
 
         IVolOracle = IVolatilitySurfaceOracle(volatilityOracle);
 
-        PoolStorage.PoolSettings memory settings =
+        IPremiaPool.PoolSettings memory settings =
             IPremiaPool(pool).getPoolSettings();
 
         base = settings.base;

@@ -6,6 +6,8 @@ import "@solidstate/contracts/token/ERC4626/base/ERC4626BaseInternal.sol";
 
 import "../access/AccessInternal.sol";
 
+import "../interfaces/IPremiaPool.sol";
+
 import "../libraries/ABDKMath64x64Token.sol";
 import "../libraries/Helpers.sol";
 
@@ -26,8 +28,7 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal {
 
     constructor(bool isCall, address pool) {
         Pool = IPremiaPool(pool);
-
-        PoolStorage.PoolSettings memory settings = Pool.getPoolSettings();
+        IPremiaPool.PoolSettings memory settings = Pool.getPoolSettings();
         address asset = isCall ? settings.underlying : settings.base;
 
         ERC20 = IERC20(asset);
@@ -146,8 +147,8 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal {
     function _initializeAuction() internal {
         VaultStorage.Layout storage l = VaultStorage.layout();
 
-        l.Auction.initializeAuction(
-            DutchAuctionStorage.InitAuction(
+        l.Auction.initialize(
+            AuctionStorage.InitAuction(
                 l.epoch++,
                 l.startTime,
                 l.endTime,

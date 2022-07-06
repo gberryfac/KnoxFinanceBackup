@@ -24,7 +24,7 @@ export function describeBehaviorOfAdmin(
   describe("::Admin", () => {
     let instance: IVault;
     let v: VaultUtil;
-    let assetContract: IAsset;
+    let asset: IAsset;
     let params: types.Params;
     let signers: types.Signers;
     let addresses: types.Addresses;
@@ -35,7 +35,7 @@ export function describeBehaviorOfAdmin(
       instance = await deploy();
       v = await getVaultUtil();
 
-      assetContract = v.assetContract;
+      asset = v.asset;
       params = v.params;
 
       signers = v.signers;
@@ -44,7 +44,7 @@ export function describeBehaviorOfAdmin(
 
     describe.skip("#processEpoch", () => {
       time.revertToSnapshotAfterEach(async () => {
-        await assetContract
+        await asset
           .connect(signers.lp1)
           .approve(addresses.vault, params.depositAmount);
 

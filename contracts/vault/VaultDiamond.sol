@@ -8,6 +8,8 @@ import "@solidstate/contracts/token/ERC4626/base/ERC4626BaseStorage.sol";
 
 import "../access/AccessStorage.sol";
 
+import "../interfaces/IPremiaPool.sol";
+
 import "./VaultStorage.sol";
 
 contract VaultDiamond is SolidStateDiamond {
@@ -34,7 +36,7 @@ contract VaultDiamond is SolidStateDiamond {
 
         {
             VaultStorage.Layout storage l = VaultStorage.layout();
-            PoolStorage.PoolSettings memory settings =
+            IPremiaPool.PoolSettings memory settings =
                 IPremiaPool(initProxy.pool).getPoolSettings();
 
             l.isCall = initProxy.isCall;

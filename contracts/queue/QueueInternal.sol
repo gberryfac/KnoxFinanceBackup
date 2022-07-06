@@ -6,6 +6,8 @@ import "@solidstate/contracts/token/ERC1155/base/ERC1155BaseInternal.sol";
 import "@solidstate/contracts/token/ERC1155/enumerable/ERC1155EnumerableInternal.sol";
 import "@solidstate/contracts/utils/SafeERC20.sol";
 
+import "../interfaces/IPremiaPool.sol";
+
 import "../vault/IVault.sol";
 
 import "./QueueStorage.sol";
@@ -22,9 +24,8 @@ contract QueueInternal is ERC1155BaseInternal, ERC1155EnumerableInternal {
         address pool,
         address vault
     ) {
-        IPremiaPool Pool = IPremiaPool(pool);
-
-        PoolStorage.PoolSettings memory settings = Pool.getPoolSettings();
+        IPremiaPool.PoolSettings memory settings =
+            IPremiaPool(pool).getPoolSettings();
         address asset = isCall ? settings.underlying : settings.base;
 
         ERC20 = IERC20(asset);

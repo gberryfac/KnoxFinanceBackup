@@ -1,13 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "../auction/IDutchAuction.sol";
+import "../auction/IAuction.sol";
 
 import "../pricer/IPricer.sol";
 
 import "../queue/IQueue.sol";
-
-import "../interfaces/IPremiaPool.sol";
 
 import "../libraries/Constants.sol";
 
@@ -110,7 +108,7 @@ library VaultStorage {
          * EXTERNAL CONTRACTS
          ***********************************************/
         // @notice
-        IDutchAuction Auction;
+        IAuction Auction;
         // @notice
         IQueue Queue;
         // @notice

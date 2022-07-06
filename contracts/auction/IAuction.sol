@@ -1,12 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "./DutchAuctionStorage.sol";
+import "./AuctionStorage.sol";
 
-interface IDutchAuction {
-    function initializeAuction(
-        DutchAuctionStorage.InitAuction memory initAuction
-    ) external;
+interface IAuction {
+    function initialize(AuctionStorage.InitAuction memory initAuction) external;
 
     function lastPrice(uint64 epoch) external view returns (uint256);
 

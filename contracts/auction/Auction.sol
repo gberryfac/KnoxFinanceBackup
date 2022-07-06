@@ -1,31 +1,24 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "@solidstate/contracts/utils/ReentrancyGuard.sol";
+import "../access/Access.sol";
 
-import "./DutchAuctionInternal.sol";
-import "./IDutchAuction.sol";
+import "./AuctionInternal.sol";
+import "./IAuction.sol";
 
 // TODO: Switch to stage modifiers
-contract DutchAuction is DutchAuctionInternal, IDutchAuction, ReentrancyGuard {
+contract Auction is Access, AuctionInternal, IAuction {
     constructor(
-        address asset,
+        bool isCall,
         address pool,
         address vault
-    ) DutchAuctionInternal(asset, pool, vault) {}
+    ) AuctionInternal(isCall, pool, vault) {}
 
-    /**
-     * @dev Throws if called by any account other than the keeper.
-     */
-    modifier onlyVault() {
-        require(msg.sender == address(Vault), "!vault");
-        _;
-    }
-
-    function initializeAuction(
-        DutchAuctionStorage.InitAuction memory initAuction
-    ) external onlyVault {
-        _initializeAuction(initAuction);
+    function initialize(AuctionStorage.InitAuction memory initAuction)
+        external
+        onlyVault
+    {
+        _initialize(initAuction);
     }
 
     /************************************************

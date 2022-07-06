@@ -5,7 +5,7 @@ import "@solidstate/contracts/utils/EnumerableSet.sol";
 
 import "./OrderBook.sol";
 
-library DutchAuctionStorage {
+library AuctionStorage {
     struct InitAuction {
         uint64 epoch;
         uint256 startTime;
@@ -39,7 +39,7 @@ library DutchAuctionStorage {
     }
 
     bytes32 internal constant STORAGE_SLOT =
-        keccak256("knox.contracts.storage.DutchAuction");
+        keccak256("knox.contracts.storage.Auction");
 
     function layout() internal pure returns (Layout storage l) {
         bytes32 slot = STORAGE_SLOT;
