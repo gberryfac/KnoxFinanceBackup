@@ -52,12 +52,12 @@ type Params = {
 
 function behavesLikeQueue(params: Params) {
   describe.only(params.name, () => {
-    let addresses: types.Addresses;
     let asset: MockERC20;
     let instance: Queue;
     let mockPremiaPool: MockPremiaPoolUtil;
     let mockVault: MockContract;
     let proxy: QueueProxy;
+    let addresses: types.Addresses;
     let signers: types.Signers;
 
     before(async () => {
