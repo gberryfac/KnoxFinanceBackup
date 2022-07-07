@@ -21,12 +21,12 @@ contract TestOrderBook {
         view
         returns (
             uint256,
-            uint256,
+            int128,
             uint256,
             address
         )
     {
-        return index._getOrder(id);
+        return index._getOrderById(id);
     }
 
     function getPreviousOrder(uint256 id) external view returns (uint256) {
@@ -38,11 +38,11 @@ contract TestOrderBook {
     }
 
     function insert(
-        uint256 price,
+        int128 price64x64,
         uint256 amount,
         address buyer
     ) external returns (uint256) {
-        return index._insert(price, amount, buyer);
+        return index._insert(price64x64, amount, buyer);
     }
 
     function remove(uint256 id) external returns (bool) {

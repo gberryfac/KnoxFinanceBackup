@@ -13,14 +13,16 @@ import "../vault/IVault.sol";
 
 import "./AuctionStorage.sol";
 
+import "hardhat/console.sol";
+
 // TODO: Switch to stage modifiers
 contract AuctionInternal {
     using ABDKMath64x64 for int128;
     using ABDKMath64x64 for uint256;
+    using AuctionStorage for AuctionStorage.Layout;
     using EnumerableSet for EnumerableSet.UintSet;
     using OrderBook for OrderBook.Index;
     using SafeERC20 for IERC20;
-    using AuctionStorage for AuctionStorage.Layout;
 
     IERC20 public immutable ERC20;
     IPremiaPool public immutable Pool;
@@ -50,7 +52,7 @@ contract AuctionInternal {
             "auction already initialized"
         );
 
-        require(initAuction.minPrice > 0, "minPrice <= 0");
+        require(initAuction.minPrice64x64 > 0, "minPrice64x64 <= 0");
 
         require(
             initAuction.endTime > initAuction.startTime,
@@ -58,7 +60,7 @@ contract AuctionInternal {
         );
 
         require(
-            block.timestamp > initAuction.startTime,
+            initAuction.startTime >= block.timestamp,
             "start time too early"
         );
 
@@ -66,16 +68,15 @@ contract AuctionInternal {
             true,
             false,
             false,
+            initAuction.maxPrice64x64,
+            initAuction.minPrice64x64,
+            0,
             initAuction.startTime,
             initAuction.endTime,
-            initAuction.maxPrice,
-            initAuction.minPrice,
-            initAuction.minSize,
             0,
             0,
             0,
             initAuction.endTime - initAuction.startTime,
-            0,
             0
         );
 
@@ -87,28 +88,31 @@ contract AuctionInternal {
      ***********************************************/
 
     // @notice
-    function _lastPrice(uint64 epoch) internal view returns (uint256) {
+    function _lastPrice(uint64 epoch) internal view returns (int128) {
         AuctionStorage.Layout storage l = AuctionStorage.layout();
-        return l.auctions[epoch].lastPrice;
+        return l.auctions[epoch].lastPrice64x64;
     }
 
     // @notice Returns price during the auction
-    function _priceCurve(uint64 epoch) internal view returns (uint256) {
+    function _priceCurve(uint64 epoch) internal view returns (int128) {
         AuctionStorage.Layout storage l = AuctionStorage.layout();
         uint256 startTime = l.auctions[epoch].startTime;
         uint256 totalTime = l.auctions[epoch].totalTime;
 
-        uint256 maxPrice = l.auctions[epoch].maxPrice;
-        uint256 minPrice = l.auctions[epoch].minPrice;
+        int128 maxPrice64x64 = l.auctions[epoch].maxPrice64x64;
+        int128 minPrice64x64 = l.auctions[epoch].minPrice64x64;
 
         uint256 elapsed = block.timestamp - startTime;
-        int128 timeRemaining = elapsed.divu(totalTime);
+        int128 timeRemaining64x64 = elapsed.divu(totalTime);
 
-        return maxPrice - timeRemaining.mulu(maxPrice - minPrice);
+        return
+            maxPrice64x64.sub(
+                timeRemaining64x64.mul(maxPrice64x64.sub(minPrice64x64))
+            );
     }
 
     // @notice The current clearing price of the Dutch auction
-    function _clearingPrice(uint64 epoch) internal view returns (uint256) {
+    function _clearingPrice(uint64 epoch) internal view returns (int128) {
         AuctionStorage.Layout storage l = AuctionStorage.layout();
         return
             l.auctions[epoch].finalized
@@ -127,56 +131,55 @@ contract AuctionInternal {
         bool isLimitOrder
     );
 
-    // TODO: add _addLimitOrderFor()
-    // TODO: add _cancelLimitOrderFor()
-    // TODO: add _addOrderFor()
-    // TODO: add _withdrawOrderFor()
-
     function _addLimitOrder(
         uint64 epoch,
-        uint256 price,
+        int128 price64x64,
         uint256 size
     ) internal returns (uint256) {
         // modifier: reject if auction not initialized
         // modifier: reject if auction is finalized
         AuctionStorage.Layout storage l = AuctionStorage.layout();
-        require(size > l.auctions[epoch].minSize, "size < minimum");
+
+        require(price64x64 > 0, "price <= 0");
+        require(size > l.minSize, "size < minimum");
 
         if (block.timestamp >= l.auctions[epoch].startTime) {
             if (_finalizeAuction(epoch)) return 0;
         }
 
-        uint256 cost = price * size;
+        uint256 cost = price64x64.mulu(size);
         ERC20.safeTransferFrom(msg.sender, address(this), cost);
         l.claimsByBuyer[msg.sender].add(epoch);
 
-        emit OrderAdded(msg.sender, price, size, true);
-        return l.orderbooks[epoch]._insert(price, size, msg.sender);
+        // emit OrderAdded(msg.sender, price64x64, size, true);
+        return l.orderbooks[epoch]._insert(price64x64, size, msg.sender);
     }
 
-    function _cancelLimitOrder(uint64 epoch, uint256 id)
-        internal
-        returns (bool)
-    {
+    function _cancelLimitOrder(uint64 epoch, uint256 id) internal {
         // modifier: reject if auction not initialized
         // modifier: reject if auction is finalized
         AuctionStorage.Layout storage l = AuctionStorage.layout();
+
+        require(id > 0, "invalid order id");
+
         if (block.timestamp >= l.auctions[epoch].startTime) {
-            if (_finalizeAuction(epoch)) return false;
+            if (_finalizeAuction(epoch)) return;
         }
 
         OrderBook.Index storage orderbook = l.orderbooks[epoch];
-        (, uint256 price, uint256 size, address buyer) =
-            orderbook._getOrder(id);
+        (, int128 price64x64, uint256 size, address buyer) =
+            orderbook._getOrderById(id);
 
-        if (buyer != msg.sender) return false;
+        require(buyer != address(0), "order does not exist");
+        require(buyer == msg.sender, "buyer != msg.sender");
 
-        uint256 cost = price * size;
-        ERC20.safeTransfer(msg.sender, cost);
+        orderbook._remove(id);
         l.claimsByBuyer[buyer].remove(epoch);
 
-        // emit LimitOrderCanceled(msg.sender, id, price, size);
-        return orderbook._remove(id);
+        uint256 cost = price64x64.mulu(size);
+        ERC20.safeTransfer(msg.sender, cost);
+
+        // emit LimitOrderCanceled(msg.sender, id, price64x64, size);
     }
 
     function _addOrder(uint64 epoch, uint256 size) internal returns (uint256) {
@@ -184,7 +187,7 @@ contract AuctionInternal {
         // modifier: reject if auction is finalized
         AuctionStorage.Layout storage l = AuctionStorage.layout();
 
-        require(size >= l.auctions[epoch].minSize, "size < minimum");
+        require(size >= l.minSize, "size < minimum");
         if (_finalizeAuction(epoch)) return 0;
 
         uint256 totalCollateral = l.auctions[epoch].totalCollateral;
@@ -193,15 +196,15 @@ contract AuctionInternal {
             l.auctions[epoch].totalCollateral = Vault.totalCollateral();
         }
 
-        uint256 price = _priceCurve(epoch);
-        uint256 cost = price * size;
+        int128 price64x64 = _priceCurve(epoch);
+        uint256 cost = price64x64.mulu(size);
         ERC20.safeTransferFrom(msg.sender, address(this), cost);
-        l.auctions[epoch].lastPrice = price;
+        l.auctions[epoch].lastPrice64x64 = price64x64;
 
         l.claimsByBuyer[msg.sender].add(epoch);
 
-        emit OrderAdded(msg.sender, price, size, false);
-        return l.orderbooks[epoch]._insert(price, size, msg.sender);
+        // emit OrderAdded(msg.sender, price64x64, size, false);
+        return l.orderbooks[epoch]._insert(price64x64, size, msg.sender);
     }
 
     /************************************************
@@ -222,17 +225,17 @@ contract AuctionInternal {
         uint256 totalCollateralUsed;
         uint256 totalCollateral = l.auctions[epoch].totalCollateral;
 
-        uint256 price;
+        int128 price64x64;
         uint256 size;
 
         for (uint256 i = 1; i <= length; i++) {
-            (, price, size, ) = orderbook._getOrder(next);
+            (, price64x64, size, ) = orderbook._getOrderById(next);
 
             // Reached the last "active" order
-            if (price < _clearingPrice(epoch)) break;
+            if (price64x64 < _clearingPrice(epoch)) break;
 
             if (totalCollateralUsed + size >= totalCollateral) {
-                l.auctions[epoch].lastPrice = price;
+                l.auctions[epoch].lastPrice64x64 = price64x64;
                 l.auctions[epoch].totalCollateralUsed = totalCollateral;
                 return true;
             }
@@ -241,7 +244,7 @@ contract AuctionInternal {
             next = orderbook._getNextOrder(next);
         }
 
-        l.auctions[epoch].lastPrice = price;
+        l.auctions[epoch].lastPrice64x64 = price64x64;
         l.auctions[epoch].totalCollateralUsed = totalCollateralUsed;
         return false;
     }
@@ -266,12 +269,12 @@ contract AuctionInternal {
         // modifier: reject if auction is processed
         AuctionStorage.Layout storage l = AuctionStorage.layout();
 
-        uint256 lastPrice = _lastPrice(epoch);
+        int128 lastPrice64x64 = _lastPrice(epoch);
         uint256 totalCollateralUsed = l.auctions[epoch].totalCollateralUsed;
 
         require(l.auctions[epoch].totalPremiums <= 0, "premiums transferred");
 
-        uint256 totalPremiums = lastPrice * totalCollateralUsed;
+        uint256 totalPremiums = lastPrice64x64.mulu(totalCollateralUsed);
         l.auctions[epoch].totalPremiums = totalPremiums;
 
         ERC20.safeTransfer(address(Vault), totalPremiums);
@@ -362,31 +365,31 @@ contract AuctionInternal {
         uint256 fill;
 
         uint256 next = orderbook._head();
-        uint256 lastPrice = _lastPrice(epoch);
+        int128 lastPrice64x64 = _lastPrice(epoch);
 
         uint256 totalCollateralUsed;
         uint256 totalCollateral = l.auctions[epoch].totalCollateral;
 
         uint256 id;
-        uint256 price;
+        int128 price64x64;
         uint256 size;
         address buyer;
 
         for (uint256 i = 1; i <= orderbook._length(); i++) {
-            (id, price, size, buyer) = orderbook._getOrder(next);
+            (id, price64x64, size, buyer) = orderbook._getOrderById(next);
 
             if (buyer == msg.sender) {
-                if (price >= lastPrice) {
+                if (price64x64 >= lastPrice64x64) {
                     if (totalCollateralUsed + size >= totalCollateral) {
                         uint256 remainder =
                             totalCollateral - totalCollateralUsed;
 
                         fill += remainder;
-                        uint256 paid = price * size;
-                        uint256 cost = lastPrice * remainder;
+                        uint256 paid = price64x64.mulu(size);
+                        uint256 cost = lastPrice64x64.mulu(remainder);
                         refund += paid - cost;
                     } else fill += size;
-                } else refund += price * size;
+                } else refund += price64x64.mulu(size);
             }
 
             totalCollateralUsed += size;
@@ -433,5 +436,28 @@ contract AuctionInternal {
         }
 
         return claims;
+    }
+
+    function _getAuction(uint64 epoch)
+        internal
+        view
+        returns (AuctionStorage.Auction memory)
+    {
+        return AuctionStorage.layout()._getAuction(epoch);
+    }
+
+    function _getOrderById(uint64 epoch, uint256 id)
+        internal
+        view
+        returns (
+            uint256,
+            int128,
+            uint256,
+            address
+        )
+    {
+        AuctionStorage.Layout storage l = AuctionStorage.layout();
+        OrderBook.Index storage orderbook = l.orderbooks[epoch];
+        return orderbook._getOrderById(id);
     }
 }

@@ -105,7 +105,7 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal {
         int128 timeToMaturity64x64 =
             l.Pricer.getTimeToMaturity64x64(nextOption.expiry);
 
-        int128 minPrice =
+        int128 minPrice64x64 =
             l.Pricer.getBlackScholesPrice64x64(
                 spot64x64,
                 nextOption.strike64x64,
@@ -113,7 +113,7 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal {
                 l.isCall
             );
 
-        int128 maxPrice =
+        int128 maxPrice64x64 =
             l.Pricer.getBlackScholesPrice64x64(
                 spot64x64,
                 offsetStrike64x64,
@@ -122,12 +122,12 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal {
             );
 
         // TODO: Skip auction, if true
-        require(maxPrice > minPrice, "maxPrice <= minPrice");
+        require(maxPrice64x64 > minPrice64x64, "maxPrice <= minPrice");
 
         uint8 decimals = l.isCall ? l.underlyingDecimals : l.baseDecimals;
 
-        l.maxPrice = maxPrice.toDecimals(decimals);
-        l.minPrice = minPrice.toDecimals(decimals);
+        l.maxPrice64x64 = maxPrice64x64;
+        l.minPrice64x64 = minPrice64x64;
 
         // emit PriceRangeSet(l.maxPrice, l.minPrice);
     }
@@ -150,11 +150,10 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal {
         l.Auction.initialize(
             AuctionStorage.InitAuction(
                 l.epoch++,
+                l.maxPrice64x64,
+                l.minPrice64x64,
                 l.startTime,
-                l.endTime,
-                l.maxPrice,
-                l.minPrice,
-                l.minimumContractSize
+                l.endTime
             )
         );
     }

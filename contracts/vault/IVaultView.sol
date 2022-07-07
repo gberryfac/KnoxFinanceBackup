@@ -6,6 +6,8 @@ interface IVaultView {
 
     function epoch() external view returns (uint64);
 
+    function collateralAsset() external view returns (address);
+
     function pricePerShare(uint64 epoch) external view returns (uint256);
 
     function option()

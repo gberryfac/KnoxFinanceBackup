@@ -14,8 +14,8 @@ library OrderBook {
 
     struct Order {
         address buyer;
+        int128 price64x64;
         uint256 id;
-        uint256 price;
         uint256 size;
         uint256 parent;
         uint256 left;
@@ -38,18 +38,18 @@ library OrderBook {
     /// @dev Retrieve the id, price, size, and buyer for the order.
     /// @param index The index that the order is part of.
     /// @param id The id for the order to be looked up.
-    function _getOrder(Index storage index, uint256 id)
+    function _getOrderById(Index storage index, uint256 id)
         internal
         view
         returns (
             uint256,
-            uint256,
+            int128,
             uint256,
             address
         )
     {
         Order memory order = index.orders[id];
-        return (order.id, order.price, order.size, order.buyer);
+        return (order.id, order.price64x64, order.size, order.buyer);
     }
 
     /// @dev Returns the previous bid in descending order.
@@ -158,20 +158,20 @@ library OrderBook {
     /// @dev Updates or Inserts the id into the index at its appropriate location based on the price provided.
     /// @param index The index that the order is part of.
     // / @param id The unique identifier of the data element the index order will represent.
-    /// @param price The unit price specified by the buyer.
+    /// @param price64x64 The unit price specified by the buyer.
     /// @param size The size specified by the buyer.
     /// @param buyer The buyers wallet address.
     function _insert(
         Index storage index,
-        uint256 price,
+        int128 price64x64,
         uint256 size,
         address buyer
     ) internal returns (uint256) {
         index.length = index.length > 0 ? index.length + 1 : 1;
         uint256 id = index.length;
 
-        (, uint256 highestBidPrice, , ) = _getOrder(index, index.head);
-        if (index.head == 0 || price > highestBidPrice) {
+        (, int128 highestPricePaid, , ) = _getOrderById(index, index.head);
+        if (index.head == 0 || price64x64 > highestPricePaid) {
             index.head = id;
         }
 
@@ -179,7 +179,7 @@ library OrderBook {
             // A order with this id already exists.  If the price is
             // the same, then just return early, otherwise, remove it
             // and reinsert it.
-            if (index.orders[id].price == price) {
+            if (index.orders[id].price64x64 == price64x64) {
                 return id;
             }
             _remove(index, id);
@@ -198,7 +198,7 @@ library OrderBook {
                 // This is a new unpopulated order.
                 currentOrder.id = id;
                 currentOrder.parent = previousOrderId;
-                currentOrder.price = price;
+                currentOrder.price64x64 = price64x64;
                 currentOrder.size = size;
                 currentOrder.buyer = buyer;
                 break;
@@ -208,7 +208,7 @@ library OrderBook {
             previousOrderId = currentOrder.id;
 
             // The new order belongs in the right subtree
-            if (price <= currentOrder.price) {
+            if (price64x64 <= currentOrder.price64x64) {
                 if (currentOrder.right == 0) {
                     currentOrder.right = id;
                 }
@@ -342,7 +342,7 @@ library OrderBook {
 
         // Now we zero out all of the fields on the orderToDelete.
         orderToDelete.id = 0;
-        orderToDelete.price = 0;
+        orderToDelete.price64x64 = 0;
         orderToDelete.size = 0;
         orderToDelete.buyer = 0x0000000000000000000000000000000000000000;
         orderToDelete.parent = 0;

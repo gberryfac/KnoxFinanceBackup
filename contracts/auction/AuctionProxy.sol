@@ -7,13 +7,21 @@ import "@solidstate/contracts/proxy/upgradeable/UpgradeableProxyStorage.sol";
 
 import "../access/AccessStorage.sol";
 
+import "./AuctionStorage.sol";
+
 contract AuctionProxy is UpgradeableProxyOwnable {
     using AccessStorage for AccessStorage.Layout;
+    using AuctionStorage for AuctionStorage.Layout;
     using OwnableStorage for OwnableStorage.Layout;
     using UpgradeableProxyStorage for UpgradeableProxyStorage.Layout;
 
-    constructor(address implementation, address vault) {
+    constructor(
+        uint256 minSize,
+        address implementation,
+        address vault
+    ) {
         AccessStorage.layout().vault = vault;
+        AuctionStorage.layout().minSize = minSize;
         OwnableStorage.layout().setOwner(msg.sender);
         UpgradeableProxyStorage.layout().setImplementation(implementation);
     }

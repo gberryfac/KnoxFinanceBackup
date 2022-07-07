@@ -22,7 +22,7 @@ contract VaultAdmin is Access, VaultInternal {
         external
         onlyOwner
     {
-        // // TODO: Validation
+        // TODO: Validation
         VaultStorage.Layout storage l = VaultStorage.layout();
         l.Auction = IAuction(initImpl.auction);
         l.Queue = IQueue(initImpl.queue);

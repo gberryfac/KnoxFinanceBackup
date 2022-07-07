@@ -20,6 +20,10 @@ contract VaultView is VaultInternal {
         return VaultStorage.layout()._optionByEpoch(epoch);
     }
 
+    function collateralAsset() external view returns (address) {
+        return address(ERC20);
+    }
+
     function totalCollateral() external view returns (uint256) {
         return _totalCollateral();
     }

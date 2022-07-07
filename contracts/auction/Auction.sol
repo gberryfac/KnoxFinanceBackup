@@ -26,17 +26,17 @@ contract Auction is Access, AuctionInternal, IAuction {
      ***********************************************/
 
     // @notice
-    function lastPrice(uint64 epoch) external view returns (uint256) {
+    function lastPrice(uint64 epoch) external view returns (int128) {
         return _lastPrice(epoch);
     }
 
     // @notice
-    function priceCurve(uint64 epoch) external view returns (uint256) {
+    function priceCurve(uint64 epoch) external view returns (int128) {
         return _priceCurve(epoch);
     }
 
     // @notice
-    function clearingPrice(uint64 epoch) external view returns (uint256) {
+    function clearingPrice(uint64 epoch) external view returns (int128) {
         return _clearingPrice(epoch);
     }
 
@@ -44,27 +44,18 @@ contract Auction is Access, AuctionInternal, IAuction {
      *  AUCTION ORDER
      ***********************************************/
 
-    // TODO: add addLimitOrderFor()
-    // TODO: add cancelLimitOrderFor()
-    // TODO: add addOrderFor()
-    // TODO: add withdrawOrderFor()
-
     // @notice
     function addLimitOrder(
         uint64 epoch,
-        uint256 price,
+        int128 price64x64,
         uint256 size
     ) external nonReentrant returns (uint256) {
-        return _addLimitOrder(epoch, price, size);
+        return _addLimitOrder(epoch, price64x64, size);
     }
 
     // @notice
-    function cancelLimitOrder(uint64 epoch, uint256 id)
-        external
-        nonReentrant
-        returns (bool)
-    {
-        return _cancelLimitOrder(epoch, id);
+    function cancelLimitOrder(uint64 epoch, uint256 id) external nonReentrant {
+        _cancelLimitOrder(epoch, id);
     }
 
     // @notice
@@ -130,6 +121,27 @@ contract Auction is Access, AuctionInternal, IAuction {
         returns (uint64[] memory)
     {
         return _claimsByBuyer(buyer);
+    }
+
+    function getAuction(uint64 epoch)
+        external
+        view
+        returns (AuctionStorage.Auction memory)
+    {
+        return _getAuction(epoch);
+    }
+
+    function getOrderById(uint64 epoch, uint256 id)
+        external
+        view
+        returns (
+            uint256,
+            int128,
+            uint256,
+            address
+        )
+    {
+        return _getOrderById(epoch, id);
     }
 
     /************************************************

@@ -6,19 +6,19 @@ import "./AuctionStorage.sol";
 interface IAuction {
     function initialize(AuctionStorage.InitAuction memory initAuction) external;
 
-    function lastPrice(uint64 epoch) external view returns (uint256);
+    function lastPrice(uint64 epoch) external view returns (int128);
 
-    function priceCurve(uint64 epoch) external view returns (uint256);
+    function priceCurve(uint64 epoch) external view returns (int128);
 
-    function clearingPrice(uint64 epoch) external view returns (uint256);
+    function clearingPrice(uint64 epoch) external view returns (int128);
 
     function addLimitOrder(
         uint64 epoch,
-        uint256 price,
+        int128 price64x64,
         uint256 size
     ) external returns (uint256);
 
-    function cancelLimitOrder(uint64 epoch, uint256 id) external returns (bool);
+    function cancelLimitOrder(uint64 epoch, uint256 id) external;
 
     function addOrder(uint64 epoch, uint256 size) external returns (uint256);
 
@@ -42,4 +42,9 @@ interface IAuction {
         external
         view
         returns (uint64[] memory);
+
+    function getAuction(uint64 epoch)
+        external
+        view
+        returns (AuctionStorage.Auction memory);
 }

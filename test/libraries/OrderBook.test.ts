@@ -1,4 +1,5 @@
 import { ethers } from "hardhat";
+import { BigNumber } from "ethers";
 
 import { TestOrderBook, TestOrderBook__factory } from "../../types";
 
@@ -6,10 +7,6 @@ import { assert } from "../utils/assertions";
 import * as time from "../utils/time";
 
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
-
-import moment from "moment-timezone";
-import { BigNumber } from "ethers";
-moment.tz.setDefault("UTC");
 
 describe.only("OrderBook", () => {
   let instance: TestOrderBook;

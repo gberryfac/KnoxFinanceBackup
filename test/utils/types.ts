@@ -19,10 +19,11 @@ export type Signers = {
   lp1: SignerWithAddress;
   lp2: SignerWithAddress;
   lp3: SignerWithAddress;
-  owner: SignerWithAddress;
   keeper: SignerWithAddress;
   feeRecipient: SignerWithAddress;
-  buyer?: SignerWithAddress;
+  buyer1: SignerWithAddress;
+  buyer2: SignerWithAddress;
+  buyer3: SignerWithAddress;
 };
 
 export type Addresses = {
@@ -30,9 +31,11 @@ export type Addresses = {
   lp1: string;
   lp2: string;
   lp3: string;
-  owner: string;
   keeper: string;
   feeRecipient: string;
+  buyer1: string;
+  buyer2: string;
+  buyer3: string;
   auction?: string;
   buyer?: string;
   pool?: string;
@@ -44,18 +47,18 @@ export type Addresses = {
   volatilityOracle?: string;
 };
 
-export type Params = {
+export type VaultParams = {
   name: string;
   tokenName: string;
   tokenSymbol: string;
   tokenDecimals: number;
   asset: Asset;
   delta: number;
+  deltaOffset: number;
   pool: Pool;
-  depositAmount: BigNumber;
+  deposit: BigNumber;
   maxTVL: BigNumber;
-  minimumSupply: string;
-  minimumContractSize: string;
+  minSize: BigNumber;
   performanceFee: BigNumber;
   withdrawalFee: BigNumber;
   isCall: boolean;

@@ -1,4 +1,5 @@
 import { ethers } from "hardhat";
+import { BigNumber } from "ethers";
 const { parseUnits, hexConcat, hexZeroPad } = ethers.utils;
 
 import { deployMockContract, MockContract } from "ethereum-waffle";
@@ -20,24 +21,20 @@ import { assert } from "./utils/assertions";
 
 import { MockPremiaPoolUtil } from "./utils/MockUtil";
 
-import moment from "moment-timezone";
-import { BigNumber } from "ethers";
-moment.tz.setDefault("UTC");
-
 describe("Queue Unit Tests", () => {
   behavesLikeQueue({
     name: "Queue (Put Options)",
     isCall: false,
-    mintAmount: parseUnits("1000", 18),
-    depositAmount: parseUnits("10", 18),
+    mint: parseUnits("1000", 18),
+    deposit: parseUnits("10", 18),
     maxTVL: parseUnits("100", 18),
   });
 
   behavesLikeQueue({
     name: "Queue (Call Options)",
     isCall: true,
-    mintAmount: parseUnits("1000", 18),
-    depositAmount: parseUnits("10", 18),
+    mint: parseUnits("1000", 18),
+    deposit: parseUnits("10", 18),
     maxTVL: parseUnits("100", 18),
   });
 });
@@ -45,8 +42,8 @@ describe("Queue Unit Tests", () => {
 type Params = {
   name: string;
   isCall: boolean;
-  mintAmount: BigNumber;
-  depositAmount: BigNumber;
+  mint: BigNumber;
+  deposit: BigNumber;
   maxTVL: BigNumber;
 };
 
@@ -106,9 +103,9 @@ function behavesLikeQueue(params: Params) {
         ? mockPremiaPool.underlyingAsset
         : mockPremiaPool.baseAsset;
 
-      asset.connect(signers.lp1).mint(addresses.lp1, params.mintAmount);
-      asset.connect(signers.lp2).mint(addresses.lp2, params.mintAmount);
-      asset.connect(signers.lp3).mint(addresses.lp3, params.mintAmount);
+      asset.connect(signers.lp1).mint(addresses.lp1, params.mint);
+      asset.connect(signers.lp2).mint(addresses.lp2, params.mint);
+      asset.connect(signers.lp3).mint(addresses.lp3, params.mint);
     });
 
     describe("#constructor()", () => {
@@ -149,21 +146,17 @@ function behavesLikeQueue(params: Params) {
       it("should revert if Queue is paused", async () => {
         await instance.connect(signers.deployer).pause();
         await expect(
-          instance["depositToQueue(uint256)"](params.depositAmount)
+          instance["depositToQueue(uint256)"](params.deposit)
         ).to.be.revertedWith("Pausable: paused");
       });
 
       it("should revert if maxTVL is exceeded", async () => {
-        const depositAmount = params.maxTVL.add(BigNumber.from("1"));
+        const deposit = params.maxTVL.add(BigNumber.from("1"));
 
-        await asset
-          .connect(signers.lp3)
-          .approve(addresses.queue, depositAmount);
+        await asset.connect(signers.lp3).approve(addresses.queue, deposit);
 
         await expect(
-          instance
-            .connect(signers.lp3)
-            ["depositToQueue(uint256)"](depositAmount)
+          instance.connect(signers.lp3)["depositToQueue(uint256)"](deposit)
         ).to.be.revertedWith("maxTVL exceeded");
       });
 
@@ -176,9 +169,9 @@ function behavesLikeQueue(params: Params) {
       it("should mint claim token 1:1 for collateral deposited", async () => {
         await asset
           .connect(signers.lp1)
-          .approve(addresses.queue, params.depositAmount);
+          .approve(addresses.queue, params.deposit);
 
-        await instance["depositToQueue(uint256)"](params.depositAmount);
+        await instance["depositToQueue(uint256)"](params.deposit);
 
         const epoch = await instance.epoch();
         const claimTokenBalance = await instance["balanceOf(address,uint256)"](
@@ -188,12 +181,12 @@ function behavesLikeQueue(params: Params) {
 
         const queueBalance = await asset.balanceOf(addresses.queue);
 
-        assert.bnEqual(queueBalance, params.depositAmount);
-        assert.bnEqual(claimTokenBalance, params.depositAmount);
+        assert.bnEqual(queueBalance, params.deposit);
+        assert.bnEqual(claimTokenBalance, params.deposit);
       });
 
       it("should mint claim tokens if LP deposits multiple times within same epoch", async () => {
-        const firstDeposit = params.depositAmount;
+        const firstDeposit = params.deposit;
 
         await asset.connect(signers.lp1).approve(addresses.queue, firstDeposit);
 
@@ -205,7 +198,7 @@ function behavesLikeQueue(params: Params) {
           await instance.formatClaimTokenId(epoch)
         );
 
-        const secondDeposit = params.depositAmount.div(2);
+        const secondDeposit = params.deposit.div(2);
 
         await asset
           .connect(signers.lp1)
@@ -237,23 +230,21 @@ function behavesLikeQueue(params: Params) {
         await instance.connect(signers.deployer).pause();
         await expect(
           instance["depositToQueue(uint256,address)"](
-            params.depositAmount,
+            params.deposit,
             addresses.lp2
           )
         ).to.be.revertedWith("Pausable: paused");
       });
 
       it("should revert if maxTVL is exceeded", async () => {
-        const depositAmount = params.maxTVL.add(BigNumber.from("1"));
+        const deposit = params.maxTVL.add(BigNumber.from("1"));
 
-        await asset
-          .connect(signers.lp3)
-          .approve(addresses.queue, depositAmount);
+        await asset.connect(signers.lp3).approve(addresses.queue, deposit);
 
         await expect(
           instance
             .connect(signers.lp3)
-            ["depositToQueue(uint256,address)"](depositAmount, addresses.lp2)
+            ["depositToQueue(uint256,address)"](deposit, addresses.lp2)
         ).to.be.revertedWith("maxTVL exceeded");
       });
 
@@ -269,10 +260,10 @@ function behavesLikeQueue(params: Params) {
       it("should mint claim token 1:1 for collateral deposited", async () => {
         await asset
           .connect(signers.lp1)
-          .approve(addresses.queue, params.depositAmount);
+          .approve(addresses.queue, params.deposit);
 
         await instance["depositToQueue(uint256,address)"](
-          params.depositAmount,
+          params.deposit,
           addresses.lp2
         );
 
@@ -284,12 +275,12 @@ function behavesLikeQueue(params: Params) {
 
         const queueBalance = await asset.balanceOf(addresses.queue);
 
-        assert.bnEqual(queueBalance, params.depositAmount);
-        assert.bnEqual(claimTokenBalance, params.depositAmount);
+        assert.bnEqual(queueBalance, params.deposit);
+        assert.bnEqual(claimTokenBalance, params.deposit);
       });
 
       it("should mint claim tokens if LP deposits multiple times within same epoch", async () => {
-        const firstDeposit = params.depositAmount;
+        const firstDeposit = params.deposit;
 
         await asset.connect(signers.lp1).approve(addresses.queue, firstDeposit);
 
@@ -304,7 +295,7 @@ function behavesLikeQueue(params: Params) {
           await instance.formatClaimTokenId(epoch)
         );
 
-        const secondDeposit = params.depositAmount.div(2);
+        const secondDeposit = params.deposit.div(2);
 
         await asset
           .connect(signers.lp1)
@@ -336,21 +327,18 @@ function behavesLikeQueue(params: Params) {
       time.revertToSnapshotAfterEach(async () => {
         await asset
           .connect(signers.lp1)
-          .approve(addresses.queue, params.depositAmount);
+          .approve(addresses.queue, params.deposit);
 
-        await instance["depositToQueue(uint256)"](params.depositAmount);
+        await instance["depositToQueue(uint256)"](params.deposit);
       });
 
       it("should withdraw exact amount deposited", async () => {
         const lpBalanceBefore = await asset.balanceOf(addresses.lp1);
 
-        await instance.withdrawFromQueue(params.depositAmount);
+        await instance.withdrawFromQueue(params.deposit);
 
         const lpBalanceAfter = await asset.balanceOf(addresses.lp1);
-        assert.bnEqual(
-          lpBalanceBefore,
-          lpBalanceAfter.sub(params.depositAmount)
-        );
+        assert.bnEqual(lpBalanceBefore, lpBalanceAfter.sub(params.deposit));
 
         const epoch = await instance.epoch();
         const claimTokenBalance = await instance["balanceOf(address,uint256)"](
@@ -384,9 +372,9 @@ function behavesLikeQueue(params: Params) {
       time.revertToSnapshotAfterEach(async () => {
         await asset
           .connect(signers.lp1)
-          .approve(addresses.vault, params.depositAmount);
+          .approve(addresses.vault, params.deposit);
 
-        await instance["depositToQueue(uint256)"](params.depositAmount);
+        await instance["depositToQueue(uint256)"](params.deposit);
         await instance.connect(signers.keeper)["processEpoch(bool)"](false);
       });
 
@@ -405,7 +393,7 @@ function behavesLikeQueue(params: Params) {
           "balanceOf(address,uint256)"
         ](addresses.lp1, previousEpoch);
 
-        assert.bnEqual(lpQueueSharesBefore, params.depositAmount);
+        assert.bnEqual(lpQueueSharesBefore, params.deposit);
 
         const lpVaultSharesBefore = await instance["balanceOf(address)"](
           addresses.lp1
@@ -426,7 +414,7 @@ function behavesLikeQueue(params: Params) {
           addresses.lp1
         );
 
-        assert.bnEqual(lpVaultSharesAfter, params.depositAmount);
+        assert.bnEqual(lpVaultSharesAfter, params.deposit);
       });
     });
 

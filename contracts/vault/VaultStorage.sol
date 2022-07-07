@@ -16,8 +16,8 @@ library VaultStorage {
 
     struct InitProxy {
         bool isCall;
-        uint64 minimumContractSize;
         int128 delta64x64;
+        int128 deltaOffset64x64;
         uint256 performanceFee;
         uint256 withdrawalFee;
         string name;
@@ -59,8 +59,6 @@ library VaultStorage {
          ***********************************************/
         // @notice Option type the vault is strategy
         bool isCall;
-        // @notice Minimum amount of the underlying a strategy will sell
-        uint64 minimumContractSize;
         // @notice Delta used to calculate strike price
         int128 delta64x64;
         // @notice Offset used to calculate offset strike price
@@ -75,13 +73,13 @@ library VaultStorage {
         // @notice
         uint64 endOffset;
         // @notice
+        int128 maxPrice64x64;
+        // @notice
+        int128 minPrice64x64;
+        // @notice
         uint256 startTime;
         // @notice
         uint256 endTime;
-        // @notice
-        uint256 maxPrice;
-        // @notice
-        uint256 minPrice;
         /************************************************
          * VAULT STATE
          ***********************************************/

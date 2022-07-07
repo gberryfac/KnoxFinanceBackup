@@ -46,9 +46,8 @@ contract VaultDiamond is SolidStateDiamond {
             l.underlyingDecimals = IERC20Metadata(settings.underlying)
                 .decimals();
 
-            l.minimumContractSize = initProxy.minimumContractSize;
-
             l.delta64x64 = initProxy.delta64x64;
+            l.deltaOffset64x64 = initProxy.deltaOffset64x64;
 
             l.performanceFee = initProxy.performanceFee;
             l.withdrawalFee =

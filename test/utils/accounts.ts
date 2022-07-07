@@ -1,14 +1,11 @@
 import { ethers, network } from "hardhat";
 import { BigNumber } from "ethers";
 const { getContractAt } = ethers;
-const { parseEther } = ethers.utils;
 
 import * as types from "./types";
 
-import { WETH_ADDRESS, SLOTS } from "../../constants";
-import { IAsset } from "../../types";
-
-const chainId = network.config.chainId;
+import { SLOTS } from "../../constants";
+import { MockERC20 } from "../../types";
 
 export async function getSigners(): Promise<types.Signers> {
   const [
@@ -16,18 +13,22 @@ export async function getSigners(): Promise<types.Signers> {
     lp1Signer,
     lp2Signer,
     lp3Signer,
-    ownerSigner,
     keeperSigner,
     feeRecipientSigner,
+    buyer1Signer,
+    buyer2Signer,
+    buyer3Signer,
   ] = await ethers.getSigners();
   const signers = {
     deployer: deployerSigner,
     lp1: lp1Signer,
     lp2: lp2Signer,
     lp3: lp3Signer,
-    owner: ownerSigner,
     keeper: keeperSigner,
     feeRecipient: feeRecipientSigner,
+    buyer1: buyer1Signer,
+    buyer2: buyer2Signer,
+    buyer3: buyer3Signer,
   };
 
   return signers as types.Signers;
@@ -41,9 +42,11 @@ export async function getAddresses(
     lp1: signers.lp1.address,
     lp2: signers.lp2.address,
     lp3: signers.lp3.address,
-    owner: signers.owner.address,
     keeper: signers.keeper.address,
     feeRecipient: signers.feeRecipient.address,
+    buyer1: signers.buyer1.address,
+    buyer2: signers.buyer2.address,
+    buyer3: signers.buyer3.address,
   };
 
   return addresses;
@@ -51,64 +54,33 @@ export async function getAddresses(
 
 export async function impersonateWhale(
   buyer: string,
-  depositAsset: string,
-  depositAmount: BigNumber,
+  asset: string,
+  deposit: BigNumber,
   signers: types.Signers,
   addresses: types.Addresses
-): Promise<[types.Signers, types.Addresses, IAsset]> {
-  addresses.buyer = buyer;
+): Promise<[types.Signers, types.Addresses, MockERC20]> {
+  addresses.buyer1 = buyer;
 
-  const whaleSigner = await _impersonateWhale(addresses.buyer, "1500");
-  signers.buyer = whaleSigner;
-
-  const asset = await getContractAt("IAsset", depositAsset);
-
-  await _setERC20Balance(
-    depositAsset,
-    addresses.buyer,
-    depositAmount.mul(100).toHexString(),
-    SLOTS[depositAsset]
-  );
-
-  if (depositAsset === WETH_ADDRESS[chainId]) {
-    await asset.connect(signers.buyer).deposit({ value: parseEther("700") });
-
-    await asset
-      .connect(signers.buyer)
-      .transfer(addresses.deployer, depositAmount.mul(10));
-    await asset
-      .connect(signers.buyer)
-      .transfer(addresses.lp1, depositAmount.mul(10));
-    await asset
-      .connect(signers.buyer)
-      .transfer(addresses.lp2, depositAmount.mul(10));
-  } else {
-    await asset
-      .connect(signers.buyer)
-      .transfer(addresses.deployer, depositAmount.mul(10));
-    await asset
-      .connect(signers.buyer)
-      .transfer(addresses.lp1, depositAmount.mul(10));
-    await asset
-      .connect(signers.buyer)
-      .transfer(addresses.lp2, depositAmount.mul(10));
-  }
-
-  return [signers, addresses, asset];
-}
-
-async function _impersonateWhale(account: string, ethBalance: string) {
   await network.provider.request({
     method: "hardhat_impersonateAccount",
-    params: [account],
+    params: [addresses.buyer1],
   });
 
-  await network.provider.send("hardhat_setBalance", [
-    account,
-    parseEther(ethBalance)._hex,
-  ]);
+  signers.buyer1 = await ethers.getSigner(addresses.buyer1);
 
-  return await ethers.getSigner(account);
+  for (let s in signers) {
+    let address = signers[s].address;
+
+    await _setERC20Balance(
+      asset,
+      address,
+      deposit.mul(10).toHexString(),
+      SLOTS[asset]
+    );
+  }
+
+  const erc20 = await getContractAt("MockERC20", asset);
+  return [signers, addresses, erc20];
 }
 
 async function _setERC20Balance(

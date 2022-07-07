@@ -3,8 +3,8 @@ import { BigNumber } from "ethers";
 const { parseUnits } = ethers.utils;
 
 import {
-  IAsset,
   IVault,
+  MockERC20,
   Auction__factory,
   AuctionProxy__factory,
   Queue__factory,
@@ -31,11 +31,11 @@ describe("Vault Unit Tests", () => {
     tokenDecimals: 18,
     asset: assets.DAI,
     delta: 0.4,
+    deltaOffset: 0.05,
     pool: assets.PREMIA.WETH_DAI,
-    depositAmount: parseUnits("100000", assets.DAI.decimals),
+    deposit: parseUnits("100000", assets.DAI.decimals),
     maxTVL: parseUnits("5000000", assets.DAI.decimals),
-    minimumSupply: BigNumber.from("10").pow("3").toString(),
-    minimumContractSize: BigNumber.from("10").pow("17").toString(),
+    minSize: BigNumber.from("10").pow(assets.DAI.decimals - 1),
     performanceFee: BigNumber.from("20000000"),
     withdrawalFee: BigNumber.from("2000000"),
     isCall: false,
@@ -48,11 +48,11 @@ describe("Vault Unit Tests", () => {
     tokenDecimals: 18,
     asset: assets.ETH,
     delta: 0.4,
+    deltaOffset: 0.05,
     pool: assets.PREMIA.WETH_DAI,
-    depositAmount: parseUnits("10", assets.ETH.decimals),
+    deposit: parseUnits("10", assets.ETH.decimals),
     maxTVL: parseUnits("1000", assets.ETH.decimals),
-    minimumSupply: BigNumber.from("10").pow("10").toString(),
-    minimumContractSize: BigNumber.from("10").pow("17").toString(),
+    minSize: BigNumber.from("10").pow(assets.ETH.decimals - 1),
     performanceFee: BigNumber.from("20000000"),
     withdrawalFee: BigNumber.from("2000000"),
     isCall: true,
@@ -65,11 +65,11 @@ describe("Vault Unit Tests", () => {
     tokenDecimals: 18,
     asset: assets.BTC,
     delta: 0.4,
+    deltaOffset: 0.05,
     pool: assets.PREMIA.WBTC_DAI,
-    depositAmount: parseUnits("1", assets.BTC.decimals),
+    deposit: parseUnits("1", assets.BTC.decimals),
     maxTVL: parseUnits("100", assets.BTC.decimals),
-    minimumSupply: BigNumber.from("10").pow("3").toString(),
-    minimumContractSize: BigNumber.from("10").pow("7").toString(),
+    minSize: BigNumber.from("10").pow(assets.BTC.decimals - 1),
     performanceFee: BigNumber.from("20000000"),
     withdrawalFee: BigNumber.from("2000000"),
     isCall: true,
@@ -82,11 +82,11 @@ describe("Vault Unit Tests", () => {
     tokenDecimals: 18,
     asset: assets.LINK,
     delta: 0.4,
+    deltaOffset: 0.05,
     pool: assets.PREMIA.LINK_DAI,
-    depositAmount: parseUnits("100", assets.LINK.decimals),
+    deposit: parseUnits("100", assets.LINK.decimals),
     maxTVL: parseUnits("100000", assets.LINK.decimals),
-    minimumSupply: BigNumber.from("10").pow("10").toString(),
-    minimumContractSize: BigNumber.from("10").pow("17").toString(),
+    minSize: BigNumber.from("10").pow(assets.LINK.decimals - 1),
     performanceFee: BigNumber.from("30000000"),
     withdrawalFee: BigNumber.from("1000000"),
     isCall: true,
@@ -95,14 +95,14 @@ describe("Vault Unit Tests", () => {
 
 const chainId = network.config.chainId;
 
-function behavesLikeVault(params: types.Params) {
+function behavesLikeVault(params: types.VaultParams) {
   describe.only(params.name, () => {
     let snapshotId: number;
 
     let signers: types.Signers;
     let addresses: types.Addresses;
 
-    let asset: IAsset;
+    let asset: MockERC20;
 
     let instance: IVault;
     let v: VaultUtil;
@@ -113,7 +113,7 @@ function behavesLikeVault(params: types.Params) {
 
       addresses.pool = params.pool.address;
 
-      v = await VaultUtil.deploy(asset, params, signers, addresses);
+      v = await VaultUtil.deploy(params, signers, addresses);
 
       let queue = await new Queue__factory(signers.deployer).deploy(
         params.isCall,
@@ -137,7 +137,7 @@ function behavesLikeVault(params: types.Params) {
 
       let auctionProxy = await new AuctionProxy__factory(
         signers.deployer
-      ).deploy(auction.address, addresses.vault);
+      ).deploy(params.minSize, auction.address, addresses.vault);
 
       auction = Auction__factory.connect(auctionProxy.address, signers.lp1);
 
@@ -161,11 +161,14 @@ function behavesLikeVault(params: types.Params) {
 
       [signers, addresses, asset] = await accounts.impersonateWhale(
         params.asset.buyer,
-        params.asset.address,
-        params.depositAmount,
+        v.asset.address,
+        params.deposit,
         signers,
         addresses
       );
+
+      // if true, the test is configured with the incorrect asset.
+      if (asset.address !== params.asset.address) throw Error;
     });
 
     beforeEach(async () => {

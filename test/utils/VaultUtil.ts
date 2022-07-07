@@ -1,3 +1,6 @@
+import { ethers } from "hardhat";
+const { getContractAt } = ethers;
+
 import * as types from "./types";
 
 import { diamondCut } from "../../scripts/diamond";
@@ -11,23 +14,23 @@ import {
   VaultBase__factory,
   VaultView__factory,
   VaultWrite__factory,
-  IAsset,
+  MockERC20,
 } from "../../types";
 
 import { fixedFromFloat } from "@premia/utils";
 
 interface VaultUtilArgs {
   vault: IVault;
-  asset: IAsset;
-  params: types.Params;
+  asset: MockERC20;
+  params: types.VaultParams;
   signers: types.Signers;
   addresses: types.Addresses;
 }
 
 export class VaultUtil {
   vault: IVault;
-  asset: IAsset;
-  params: types.Params;
+  asset: MockERC20;
+  params: types.VaultParams;
   signers: types.Signers;
   addresses: types.Addresses;
 
@@ -40,8 +43,7 @@ export class VaultUtil {
   }
 
   static async deploy(
-    asset: IAsset,
-    params: types.Params,
+    params: types.VaultParams,
     signers: types.Signers,
     addresses: types.Addresses
   ) {
@@ -49,8 +51,9 @@ export class VaultUtil {
 
     const initProxy = {
       isCall: params.isCall,
-      minimumContractSize: params.minimumContractSize,
+      minSize: params.minSize,
       delta64x64: fixedFromFloat(params.delta),
+      deltaOffset64x64: fixedFromFloat(params.deltaOffset),
       performanceFee: params.performanceFee,
       withdrawalFee: params.withdrawalFee,
       name: params.tokenName,
@@ -140,6 +143,9 @@ export class VaultUtil {
 
     addresses.vault = vaultDiamond.address;
     const vault = IVault__factory.connect(addresses.vault, signers.lp1);
+    const collateralAsset = await vault.collateralAsset();
+
+    const asset = await getContractAt("MockERC20", collateralAsset);
 
     return new VaultUtil({ vault, asset, params, signers, addresses });
   }
