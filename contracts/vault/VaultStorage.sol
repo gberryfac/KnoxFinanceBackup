@@ -73,10 +73,6 @@ library VaultStorage {
         // @notice
         uint64 endOffset;
         // @notice
-        int128 maxPrice64x64;
-        // @notice
-        int128 minPrice64x64;
-        // @notice
         uint256 startTime;
         // @notice
         uint256 endTime;

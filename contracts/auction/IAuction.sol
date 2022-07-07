@@ -6,6 +6,12 @@ import "./AuctionStorage.sol";
 interface IAuction {
     function initialize(AuctionStorage.InitAuction memory initAuction) external;
 
+    function setAuctionPrices(
+        uint64 epoch,
+        int128 maxPrice64x64,
+        int128 minPrice64x64
+    ) external;
+
     function lastPrice(uint64 epoch) external view returns (int128);
 
     function priceCurve(uint64 epoch) external view returns (int128);
@@ -35,6 +41,8 @@ interface IAuction {
     function withdraw(uint64 epoch) external;
 
     function isFinalized(uint64 epoch) external view returns (bool);
+
+    function status(uint64 epoch) external view returns (AuctionStorage.Status);
 
     function totalCollateralUsed(uint64 epoch) external view returns (uint256);
 

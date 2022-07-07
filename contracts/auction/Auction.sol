@@ -21,6 +21,14 @@ contract Auction is Access, AuctionInternal, IAuction {
         _initialize(initAuction);
     }
 
+    function setAuctionPrices(
+        uint64 epoch,
+        int128 maxPrice64x64,
+        int128 minPrice64x64
+    ) external onlyVault {
+        _setAuctionPrices(epoch, maxPrice64x64, minPrice64x64);
+    }
+
     /************************************************
      *  PRICING
      ***********************************************/
@@ -109,6 +117,14 @@ contract Auction is Access, AuctionInternal, IAuction {
 
     function isFinalized(uint64 epoch) external view returns (bool) {
         return _isFinalized(epoch);
+    }
+
+    function status(uint64 epoch)
+        external
+        view
+        returns (AuctionStorage.Status)
+    {
+        return _status(epoch);
     }
 
     function totalCollateralUsed(uint64 epoch) external view returns (uint256) {

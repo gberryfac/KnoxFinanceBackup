@@ -179,34 +179,28 @@ function behavesLikeAuction(params: Params) {
     });
 
     describe("#initialize(AuctionStorage.InitAuction)", () => {
+      const epoch = 0;
       time.revertToSnapshotAfterEach(async () => {});
 
       it("should revert if caller is !vault", async () => {
         await expect(
           instance.initialize({
-            epoch: 0,
-            maxPrice64x64: fixedFromFloat("0.1"),
-            minPrice64x64: fixedFromFloat("0.01"),
+            epoch: epoch,
             startTime: BigNumber.from(block.timestamp + 7200),
             endTime: BigNumber.from(block.timestamp + 86400),
           })
         ).to.be.revertedWith("!vault");
       });
 
-      // TODO:
       it.skip("should revert if auction initialized", async () => {});
-      // TODO:
-      it.skip("should revert if minPrice64x64 <= 0", async () => {});
-      // TODO:
+
       it.skip("should revert if endTime < startTime", async () => {});
-      // TODO:
+
       it.skip("should revert if block.timestamp < startTime", async () => {});
 
       it("should initialize new auction with correct state", async () => {
         const initAuction = {
-          epoch: 0,
-          maxPrice64x64: fixedFromFloat("0.1"),
-          minPrice64x64: fixedFromFloat("0.01"),
+          epoch: epoch,
           startTime: BigNumber.from(block.timestamp + 7200),
           endTime: BigNumber.from(block.timestamp + 86400),
         };
@@ -215,15 +209,11 @@ function behavesLikeAuction(params: Params) {
 
         const auction = await instance.getAuction(0);
 
-        await assert.isTrue(auction.initialized);
-        await assert.isFalse(auction.finalized);
-        await assert.isFalse(auction.processed);
+        assert.equal(await instance.status(epoch), 0);
 
         await assert.bnEqual(auction.startTime, initAuction.startTime);
         await assert.bnEqual(auction.endTime, initAuction.endTime);
-        await assert.bnEqual(auction.maxPrice64x64, initAuction.maxPrice64x64);
 
-        await assert.bnEqual(auction.minPrice64x64, initAuction.minPrice64x64);
         await assert.bnEqual(auction.totalCollateral, ethers.constants.Zero);
         await assert.bnEqual(
           auction.totalCollateralUsed,
@@ -241,20 +231,81 @@ function behavesLikeAuction(params: Params) {
       });
     });
 
+    describe("#setAuctionPrices(uint64,int128,int128)", () => {
+      describe("if uninitialized", () => {
+        it.skip("should revert", async () => {});
+      });
+
+      describe("else", () => {
+        const epoch = 0;
+        const maxPrice64x64 = fixedFromFloat("0.1");
+        const minPrice64x64 = fixedFromFloat("0.01");
+
+        time.revertToSnapshotAfterEach(async () => {
+          await instance.connect(signers.deployer).initialize({
+            epoch: epoch,
+            startTime: BigNumber.from(block.timestamp + 7200),
+            endTime: BigNumber.from(block.timestamp + 86400),
+          });
+        });
+
+        it("should revert if caller is !vault", async () => {
+          await expect(
+            instance.setAuctionPrices(epoch, maxPrice64x64, minPrice64x64)
+          ).to.be.revertedWith("!vault");
+        });
+
+        it.skip("should revert if auction initialized", async () => {});
+
+        it("should cancel auction if maxPrice64x64 >= minPrice64x64", async () => {
+          await instance
+            .connect(signers.deployer)
+            .setAuctionPrices(epoch, minPrice64x64, maxPrice64x64);
+
+          assert.equal(await instance.status(epoch), 3);
+        });
+
+        it("should cancel auction if maxPrice64x64 <= 0", async () => {
+          await instance
+            .connect(signers.deployer)
+            .setAuctionPrices(epoch, 0, minPrice64x64);
+
+          assert.equal(await instance.status(epoch), 3);
+        });
+
+        it("should cancel auction if minPrice64x64 <= 0", async () => {
+          await instance
+            .connect(signers.deployer)
+            .setAuctionPrices(epoch, maxPrice64x64, 0);
+
+          assert.equal(await instance.status(epoch), 3);
+        });
+
+        it("should set correct auction prices", async () => {
+          await instance
+            .connect(signers.deployer)
+            .setAuctionPrices(epoch, maxPrice64x64, minPrice64x64);
+
+          const auction = await instance.getAuction(0);
+
+          await assert.bnEqual(auction.maxPrice64x64, maxPrice64x64);
+          await assert.bnEqual(auction.minPrice64x64, minPrice64x64);
+        });
+      });
+    });
+
     describe("#addLimitOrder(uint64,uint256,uint256)", () => {
       describe("if uninitialized", () => {
         it.skip("should revert", async () => {});
       });
 
       describe("else", () => {
-        let epoch = 0;
+        const epoch = 0;
         const cost = params.deposit.div(10);
 
         time.revertToSnapshotAfterEach(async () => {
           await instance.connect(signers.deployer).initialize({
             epoch: epoch,
-            maxPrice64x64: fixedFromFloat("0.1"),
-            minPrice64x64: fixedFromFloat("0.01"),
             startTime: BigNumber.from(block.timestamp + 7200),
             endTime: BigNumber.from(block.timestamp + 86400),
           });
@@ -320,14 +371,12 @@ function behavesLikeAuction(params: Params) {
       });
 
       describe("else", () => {
-        let epoch = 0;
+        const epoch = 0;
         const cost = params.deposit.div(10);
 
         time.revertToSnapshotAfterEach(async () => {
           await instance.connect(signers.deployer).initialize({
             epoch: 0,
-            maxPrice64x64: fixedFromFloat("0.1"),
-            minPrice64x64: fixedFromFloat("0.01"),
             startTime: BigNumber.from(block.timestamp + 7200),
             endTime: BigNumber.from(block.timestamp + 86400),
           });
@@ -392,19 +441,23 @@ function behavesLikeAuction(params: Params) {
 
       describe("else", () => {
         let startTime;
-        let epoch = 0;
+        const epoch = 0;
         const cost = params.deposit.div(10);
+        const maxPrice64x64 = fixedFromFloat("0.1");
+        const minPrice64x64 = fixedFromFloat("0.01");
 
         time.revertToSnapshotAfterEach(async () => {
           startTime = BigNumber.from(block.timestamp + 60);
 
           await instance.connect(signers.deployer).initialize({
             epoch: epoch,
-            maxPrice64x64: fixedFromFloat("0.1"),
-            minPrice64x64: fixedFromFloat("0.01"),
             startTime: startTime,
             endTime: BigNumber.from(block.timestamp + 86400),
           });
+
+          await instance
+            .connect(signers.deployer)
+            .setAuctionPrices(epoch, maxPrice64x64, minPrice64x64);
         });
 
         it.skip("should revert if auction is finalized", async () => {});

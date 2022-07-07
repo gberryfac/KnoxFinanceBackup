@@ -60,7 +60,6 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal {
 
     function _setAndInitializeAuction() internal {
         _setOptionParameters();
-        _setAuctionPrices();
         _setAuctionWindow();
         _initializeAuction();
     }
@@ -86,52 +85,6 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal {
         // emit OptionParametersSet(l.isCall, option.expiry, option.strike64x64);
     }
 
-    function _setAuctionPrices() internal {
-        VaultStorage.Layout storage l = VaultStorage.layout();
-        VaultStorage.Option storage nextOption = l.options[l.epoch++];
-
-        require(nextOption.strike64x64 > 0, "delta strike unset");
-
-        int128 offsetStrike64x64 =
-            l.Pricer.getDeltaStrikePrice64x64(
-                l.isCall,
-                nextOption.expiry,
-                l.delta64x64 - l.deltaOffset64x64
-            );
-
-        offsetStrike64x64 = l.Pricer.snapToGrid(l.isCall, offsetStrike64x64);
-
-        int128 spot64x64 = l.Pricer.latestAnswer64x64();
-        int128 timeToMaturity64x64 =
-            l.Pricer.getTimeToMaturity64x64(nextOption.expiry);
-
-        int128 minPrice64x64 =
-            l.Pricer.getBlackScholesPrice64x64(
-                spot64x64,
-                nextOption.strike64x64,
-                timeToMaturity64x64,
-                l.isCall
-            );
-
-        int128 maxPrice64x64 =
-            l.Pricer.getBlackScholesPrice64x64(
-                spot64x64,
-                offsetStrike64x64,
-                timeToMaturity64x64,
-                l.isCall
-            );
-
-        // TODO: Skip auction, if true
-        require(maxPrice64x64 > minPrice64x64, "maxPrice <= minPrice");
-
-        uint8 decimals = l.isCall ? l.underlyingDecimals : l.baseDecimals;
-
-        l.maxPrice64x64 = maxPrice64x64;
-        l.minPrice64x64 = minPrice64x64;
-
-        // emit PriceRangeSet(l.maxPrice, l.minPrice);
-    }
-
     function _setAuctionWindow() internal {
         VaultStorage.Layout storage l = VaultStorage.layout();
         VaultStorage.Option memory option = l.options[l.epoch];
@@ -148,13 +101,7 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal {
         VaultStorage.Layout storage l = VaultStorage.layout();
 
         l.Auction.initialize(
-            AuctionStorage.InitAuction(
-                l.epoch++,
-                l.maxPrice64x64,
-                l.minPrice64x64,
-                l.startTime,
-                l.endTime
-            )
+            AuctionStorage.InitAuction(l.epoch++, l.startTime, l.endTime)
         );
     }
 
@@ -169,6 +116,7 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal {
 
         _depositQueuedToVault();
         _setNextEpoch();
+        _setAuctionPrices();
     }
 
     function _processExpired() internal {
@@ -249,6 +197,46 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal {
 
         // Note: index epoch
         // emit SetNextEpoch(l.epoch, l.claimTokenId);
+    }
+
+    function _setAuctionPrices() internal {
+        VaultStorage.Layout storage l = VaultStorage.layout();
+        VaultStorage.Option storage option = l.options[l.epoch];
+
+        require(option.strike64x64 > 0, "delta strike unset");
+
+        int128 offsetStrike64x64 =
+            l.Pricer.getDeltaStrikePrice64x64(
+                l.isCall,
+                option.expiry,
+                l.delta64x64 - l.deltaOffset64x64
+            );
+
+        offsetStrike64x64 = l.Pricer.snapToGrid(l.isCall, offsetStrike64x64);
+
+        int128 spot64x64 = l.Pricer.latestAnswer64x64();
+        int128 timeToMaturity64x64 =
+            l.Pricer.getTimeToMaturity64x64(option.expiry);
+
+        int128 maxPrice64x64 =
+            l.Pricer.getBlackScholesPrice64x64(
+                spot64x64,
+                offsetStrike64x64,
+                timeToMaturity64x64,
+                l.isCall
+            );
+
+        int128 minPrice64x64 =
+            l.Pricer.getBlackScholesPrice64x64(
+                spot64x64,
+                option.strike64x64,
+                timeToMaturity64x64,
+                l.isCall
+            );
+
+        l.Auction.setAuctionPrices(l.epoch, maxPrice64x64, minPrice64x64);
+
+        // emit PriceRangeSet(l.maxPrice, l.minPrice);
     }
 
     /************************************************

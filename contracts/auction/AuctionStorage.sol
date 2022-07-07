@@ -8,16 +8,14 @@ import "./OrderBook.sol";
 library AuctionStorage {
     struct InitAuction {
         uint64 epoch;
-        int128 maxPrice64x64;
-        int128 minPrice64x64;
         uint256 startTime;
         uint256 endTime;
     }
 
+    enum Status {INITIALIZED, FINALIZED, PROCESSED, CANCELLED}
+
     struct Auction {
-        bool initialized;
-        bool finalized;
-        bool processed;
+        Status status;
         int128 maxPrice64x64;
         int128 minPrice64x64;
         int128 lastPrice64x64;

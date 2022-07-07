@@ -44,15 +44,10 @@ contract AuctionInternal {
     function _initialize(AuctionStorage.InitAuction memory initAuction)
         internal
     {
+        // modifier: reject if auction initialized
+
         // TODO: Input validation
         AuctionStorage.Layout storage l = AuctionStorage.layout();
-
-        require(
-            !l.auctions[initAuction.epoch].initialized,
-            "auction already initialized"
-        );
-
-        require(initAuction.minPrice64x64 > 0, "minPrice64x64 <= 0");
 
         require(
             initAuction.endTime > initAuction.startTime,
@@ -65,11 +60,9 @@ contract AuctionInternal {
         );
 
         l.auctions[initAuction.epoch] = AuctionStorage.Auction(
-            true,
-            false,
-            false,
-            initAuction.maxPrice64x64,
-            initAuction.minPrice64x64,
+            AuctionStorage.Status.INITIALIZED,
+            0,
+            0,
             0,
             initAuction.startTime,
             initAuction.endTime,
@@ -80,7 +73,32 @@ contract AuctionInternal {
             0
         );
 
-        // emit AuctionInitialized();
+        // TODO: Add enums for status
+        // emit AuctionStatus(AuctionStorage.Status.INITIALIZED)
+    }
+
+    function _setAuctionPrices(
+        uint64 epoch,
+        int128 maxPrice64x64,
+        int128 minPrice64x64
+    ) internal {
+        // modifier: reject if auction not initialized
+        // modifier: reject if auction is finalized
+        AuctionStorage.Layout storage l = AuctionStorage.layout();
+
+        if (
+            maxPrice64x64 <= 0 ||
+            minPrice64x64 <= 0 ||
+            maxPrice64x64 <= minPrice64x64
+        ) {
+            l.auctions[epoch].status = AuctionStorage.Status.CANCELLED;
+
+            // TODO: Add enums for status
+            // emit AuctionStatus(AuctionStorage.Status.CANCELLED)
+        }
+
+        l.auctions[epoch].maxPrice64x64 = maxPrice64x64;
+        l.auctions[epoch].minPrice64x64 = minPrice64x64;
     }
 
     /************************************************
@@ -115,7 +133,7 @@ contract AuctionInternal {
     function _clearingPrice(uint64 epoch) internal view returns (int128) {
         AuctionStorage.Layout storage l = AuctionStorage.layout();
         return
-            l.auctions[epoch].finalized
+            l.auctions[epoch].status == AuctionStorage.Status.FINALIZED
                 ? _lastPrice(epoch)
                 : _priceCurve(epoch);
     }
@@ -138,6 +156,7 @@ contract AuctionInternal {
     ) internal returns (uint256) {
         // modifier: reject if auction not initialized
         // modifier: reject if auction is finalized
+        // modifier: reject if auction is cancelled
         AuctionStorage.Layout storage l = AuctionStorage.layout();
 
         require(price64x64 > 0, "price <= 0");
@@ -185,9 +204,11 @@ contract AuctionInternal {
     function _addOrder(uint64 epoch, uint256 size) internal returns (uint256) {
         // modifier: reject if auction not initialized
         // modifier: reject if auction is finalized
+        // modifier: reject if auction is cancelled
         AuctionStorage.Layout storage l = AuctionStorage.layout();
 
         require(size >= l.minSize, "size < minimum");
+
         if (_finalizeAuction(epoch)) return 0;
 
         uint256 totalCollateral = l.auctions[epoch].totalCollateral;
@@ -216,6 +237,7 @@ contract AuctionInternal {
         // modifier: reject if auction not initialized
         // modifier: reject if auction has not started
         // modifier: reject if auction is finalized
+        // modifier: reject if auction is cancelled
         AuctionStorage.Layout storage l = AuctionStorage.layout();
         OrderBook.Index storage orderbook = l.orderbooks[epoch];
 
@@ -253,20 +275,37 @@ contract AuctionInternal {
         // modifier: reject if auction not initialized
         // modifier: reject if auction has not started
         // modifier: reject if auction is finalized
+        // modifier: reject if auction is cancelled
         AuctionStorage.Layout storage l = AuctionStorage.layout();
+
+        if (
+            l.auctions[epoch].maxPrice64x64 <= 0 ||
+            l.auctions[epoch].minPrice64x64 <= 0
+        ) {
+            l.auctions[epoch].status = AuctionStorage.Status.CANCELLED;
+
+            // TODO: Add enums for status
+            // emit AuctionStatus(AuctionStorage.Status.CANCELLED)
+        }
 
         if (
             _processOrders(epoch) || block.timestamp > l.auctions[epoch].endTime
         ) {
-            l.auctions[epoch].finalized = true;
+            l.auctions[epoch].status = AuctionStorage.Status.FINALIZED;
+
+            // TODO: Add enums for status
+            // emit AuctionStatus(AuctionStorage.Status.FINALIZED)
+
             return true;
         }
+
         return false;
     }
 
     function _transferPremium(uint64 epoch) internal {
         // modifier: reject if auction is not finalized
         // modifier: reject if auction is processed
+        // modifier: reject if auction is cancelled
         AuctionStorage.Layout storage l = AuctionStorage.layout();
 
         int128 lastPrice64x64 = _lastPrice(epoch);
@@ -283,6 +322,7 @@ contract AuctionInternal {
     function _setLongTokenId(uint64 epoch, uint256 longTokenId) internal {
         // modifier: reject if auction is not finalized
         // modifier: reject if auction is processed
+        // modifier: reject if auction is cancelled
         AuctionStorage.Layout storage l = AuctionStorage.layout();
         require(l.auctions[epoch].longTokenId != 0);
         l.auctions[epoch].longTokenId = longTokenId;
@@ -291,6 +331,7 @@ contract AuctionInternal {
     function _processAuction(uint64 epoch) internal {
         // modifier: reject if auction is not finalized
         // modifier: reject if auction is processed
+        // modifier: reject if auction is cancelled
         AuctionStorage.Layout storage l = AuctionStorage.layout();
 
         uint256 totalCollateralUsed = l.auctions[epoch].totalCollateralUsed;
@@ -313,7 +354,10 @@ contract AuctionInternal {
             );
         }
 
-        l.auctions[epoch].processed = true;
+        l.auctions[epoch].status = AuctionStorage.Status.PROCESSED;
+
+        // TODO: Add enums for status
+        // emit AuctionStatus(AuctionStorage.Status.PROCESSED)
     }
 
     /************************************************
@@ -365,7 +409,12 @@ contract AuctionInternal {
         uint256 fill;
 
         uint256 next = orderbook._head();
-        int128 lastPrice64x64 = _lastPrice(epoch);
+
+        // If auction is cancelled, buyers are refunded.
+        int128 lastPrice64x64 =
+            l.auctions[epoch].status == AuctionStorage.Status.CANCELLED
+                ? type(int128).max
+                : _lastPrice(epoch);
 
         uint256 totalCollateralUsed;
         uint256 totalCollateral = l.auctions[epoch].totalCollateral;
@@ -388,8 +437,12 @@ contract AuctionInternal {
                         uint256 paid = price64x64.mulu(size);
                         uint256 cost = lastPrice64x64.mulu(remainder);
                         refund += paid - cost;
-                    } else fill += size;
-                } else refund += price64x64.mulu(size);
+                    } else {
+                        fill += size;
+                    }
+                } else {
+                    refund += price64x64.mulu(size);
+                }
             }
 
             totalCollateralUsed += size;
@@ -407,7 +460,16 @@ contract AuctionInternal {
 
     function _isFinalized(uint64 epoch) internal view returns (bool) {
         AuctionStorage.Layout storage l = AuctionStorage.layout();
-        return l.auctions[epoch].finalized;
+        return l.auctions[epoch].status == AuctionStorage.Status.FINALIZED;
+    }
+
+    function _status(uint64 epoch)
+        internal
+        view
+        returns (AuctionStorage.Status)
+    {
+        AuctionStorage.Layout storage l = AuctionStorage.layout();
+        return l.auctions[epoch].status;
     }
 
     function _totalCollateralUsed(uint64 epoch)
