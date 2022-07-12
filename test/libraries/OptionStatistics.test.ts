@@ -74,7 +74,7 @@ describe.only("OptionStatistics", () => {
     instance = await new TestOptionStatistics__factory(signer).deploy();
   });
 
-  describe("#invCDF", () => {
+  describe("#invCDF64x64", () => {
     for (let x in icdfs) {
       const expected = +icdfs[x];
       const tolerance =
@@ -83,7 +83,7 @@ describe.only("OptionStatistics", () => {
           : maxError.centralInverseCDF;
 
       it(`value of ${x} equals ${expected}`, async function () {
-        const value = await instance.invCDF(parseEther(x), POSITIVE);
+        const value = await instance.invCDF64x64(parseEther(x), POSITIVE);
         const actual = new FixedPointX64(value).parsed;
         expect(expected).to.be.closeTo(actual, tolerance);
       });
@@ -91,25 +91,25 @@ describe.only("OptionStatistics", () => {
 
     it("should revert values less than or equal to 0", async () => {
       await expect(
-        instance.invCDF(parseEther("100"), NEGATIVE)
+        instance.invCDF64x64(parseEther("100"), NEGATIVE)
       ).to.be.revertedWith("InverseOutOfBounds");
       await expect(
-        instance.invCDF(parseEther("0.001"), NEGATIVE)
+        instance.invCDF64x64(parseEther("0.001"), NEGATIVE)
       ).to.be.revertedWith("InverseOutOfBounds");
       await expect(
-        instance.invCDF(parseEther("0.0"), POSITIVE)
+        instance.invCDF64x64(parseEther("0.0"), POSITIVE)
       ).to.be.revertedWith("InverseOutOfBounds");
     });
 
     it("should revert values greater than or equal to 1", async function () {
       await expect(
-        instance.invCDF(parseEther("1"), POSITIVE)
+        instance.invCDF64x64(parseEther("1"), POSITIVE)
       ).to.be.revertedWith("InverseOutOfBounds");
       await expect(
-        instance.invCDF(parseEther("1.001"), POSITIVE)
+        instance.invCDF64x64(parseEther("1.001"), POSITIVE)
       ).to.be.revertedWith("InverseOutOfBounds");
       await expect(
-        instance.invCDF(parseEther("100"), POSITIVE)
+        instance.invCDF64x64(parseEther("100"), POSITIVE)
       ).to.be.revertedWith("InverseOutOfBounds");
     });
   });

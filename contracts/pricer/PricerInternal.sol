@@ -26,8 +26,8 @@ contract PricerInternal {
 
         IVolOracle = IVolatilitySurfaceOracle(volatilityOracle);
 
-        IPremiaPool.PoolSettings memory settings =
-            IPremiaPool(pool).getPoolSettings();
+        IPremiaPool.PoolSettings memory settings = IPremiaPool(pool)
+            .getPoolSettings();
 
         base = settings.base;
         underlying = settings.underlying;
@@ -45,8 +45,8 @@ contract PricerInternal {
 
     function _latestAnswer64x64() internal view returns (int128) {
         (, int256 basePrice, , , ) = BaseSpotOracle.latestRoundData();
-        (, int256 underlyingPrice, , , ) =
-            UnderlyingSpotOracle.latestRoundData();
+        (, int256 underlyingPrice, , , ) = UnderlyingSpotOracle
+            .latestRoundData();
 
         // int256 basePrice = BaseSpotOracle.latestAnswer();
         // int256 underlyingPrice = UnderlyingSpotOracle.latestAnswer();
@@ -104,19 +104,18 @@ contract PricerInternal {
         int128 timeToMaturity64x64 = _getTimeToMaturity64x64(expiry);
         require(timeToMaturity64x64 > 0, "tau <= 0");
 
-        int128 iv_atm =
-            _getAnnualizedVolatility64x64(
-                spot64x64,
-                spot64x64,
-                timeToMaturity64x64
-            );
+        int128 iv_atm = _getAnnualizedVolatility64x64(
+            spot64x64,
+            spot64x64,
+            timeToMaturity64x64
+        );
         require(iv_atm > 0, "iv_atm <= 0");
 
         int128 v = iv_atm.mul(timeToMaturity64x64.sqrt());
         int128 w = timeToMaturity64x64.mul(iv_atm.pow(2)) >> 1;
 
         if (!isCall) delta64x64 = int128(0x010000000000000000).sub(delta64x64);
-        int128 beta = delta64x64.invCDF();
+        int128 beta = delta64x64.invCDF64x64();
 
         int128 z = w.sub(beta.mul(v));
         return spot64x64.mul(z.exp());

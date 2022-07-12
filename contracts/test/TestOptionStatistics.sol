@@ -30,12 +30,12 @@ contract TestOptionStatistics {
         }
     }
 
-    function invCDF(uint256 x, bool isNegative)
+    function invCDF64x64(uint256 x, bool isNegative)
         external
         pure
         returns (int128 y)
     {
         int128 p = toSigned(x, isNegative);
-        y = p.invCDF();
+        y = p.invCDF64x64();
     }
 }
