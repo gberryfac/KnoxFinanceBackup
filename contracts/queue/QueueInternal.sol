@@ -54,7 +54,7 @@ contract QueueInternal is ERC1155BaseInternal, ERC1155EnumerableInternal {
         require(amount > 0, "value exceeds minimum");
 
         // redeems shares from previous epochs
-        _maxRedeemShares(receiver);
+        _redeemMaxShares(receiver);
 
         uint256 currentClaimTokenId = _formatClaimTokenId(l.epoch);
         _mint(receiver, currentClaimTokenId, amount, "");
@@ -79,7 +79,11 @@ contract QueueInternal is ERC1155BaseInternal, ERC1155EnumerableInternal {
         ERC20.safeTransfer(msg.sender, amount);
     }
 
-    function _maxRedeemShares(address receiver) internal {
+    /************************************************
+     *  REDEEM
+     ***********************************************/
+
+    function _redeemMaxShares(address receiver) internal {
         uint256[] memory claimTokenIds = _tokensByAccount(receiver);
 
         uint256 unredeemedShares;

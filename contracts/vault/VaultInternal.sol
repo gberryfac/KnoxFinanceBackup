@@ -352,7 +352,7 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal {
         address owner
     ) internal virtual override(ERC4626BaseInternal) returns (uint256) {
         VaultStorage.Layout storage l = VaultStorage.layout();
-        l.Queue.maxRedeemShares(owner);
+        l.Queue.redeemMaxShares(owner);
 
         require(
             assetAmount <= _maxWithdraw(owner),
@@ -380,7 +380,7 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal {
         address owner
     ) internal virtual override(ERC4626BaseInternal) returns (uint256) {
         VaultStorage.Layout storage l = VaultStorage.layout();
-        l.Queue.maxRedeemShares(owner);
+        l.Queue.redeemMaxShares(owner);
 
         require(
             shareAmount <= _maxRedeem(owner),

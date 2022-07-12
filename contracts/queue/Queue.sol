@@ -60,6 +60,15 @@ contract Queue is Access, ERC1155Base, ERC1155Enumerable, QueueInternal {
      *  REDEEM
      ***********************************************/
 
+    function redeemMaxShares(address receiver) external nonReentrant {
+        require(
+            receiver == msg.sender || isApprovedForAll(receiver, msg.sender),
+            "ERC1155: caller is not owner nor approved"
+        );
+
+        _redeemMaxShares(receiver);
+    }
+
     function redeemSharesFromEpoch(uint64 epoch, address receiver)
         external
         nonReentrant
@@ -69,15 +78,6 @@ contract Queue is Access, ERC1155Base, ERC1155Enumerable, QueueInternal {
             "ERC1155: caller is not owner nor approved"
         );
         _redeemSharesFromEpoch(epoch, receiver);
-    }
-
-    function maxRedeemShares(address receiver) external nonReentrant {
-        require(
-            receiver == msg.sender || isApprovedForAll(receiver, msg.sender),
-            "ERC1155: caller is not owner nor approved"
-        );
-
-        _maxRedeemShares(receiver);
     }
 
     /************************************************
