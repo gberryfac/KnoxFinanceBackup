@@ -84,7 +84,7 @@ contract QueueInternal is ERC1155BaseInternal, ERC1155EnumerableInternal {
      ***********************************************/
 
     function _redeemMaxShares(address receiver) internal {
-        uint256[] memory claimTokenIds = _tokensByAccount(receiver);
+        uint256[] memory claimTokenIds = _tokensByAccount(msg.sender);
 
         uint256 unredeemedShares;
 
@@ -111,15 +111,20 @@ contract QueueInternal is ERC1155BaseInternal, ERC1155EnumerableInternal {
 
         uint256 currentClaimTokenId = _formatClaimTokenId(l.epoch);
 
-        if (claimTokenId < currentClaimTokenId) {
+        if (claimTokenId != currentClaimTokenId) {
             uint256 claimTokenBalance = _balanceOf(receiver, claimTokenId);
-            _burn(receiver, claimTokenId, claimTokenBalance);
+            _burn(msg.sender, claimTokenId, claimTokenBalance);
 
-            return
+            uint256 unredeemedShares =
                 _previewUnredeemedSharesFromEpoch(
                     uint256(claimTokenId),
                     claimTokenBalance
                 );
+
+            require(Vault.transfer(receiver, unredeemedShares));
+
+            // Note: Index receiver
+            // emit RedeemedShares(receiver, unredeemedShares, claimTokenId);
         }
 
         return 0;
@@ -187,7 +192,7 @@ contract QueueInternal is ERC1155BaseInternal, ERC1155EnumerableInternal {
         QueueStorage.Layout storage l = QueueStorage.layout();
         uint256 currentClaimTokenId = _formatClaimTokenId(l.epoch);
 
-        if (claimTokenId < currentClaimTokenId) {
+        if (claimTokenId != currentClaimTokenId) {
             return (claimTokenBalance * l.pricePerShare[claimTokenId]) / 10**18;
         }
 
