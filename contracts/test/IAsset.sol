@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "./../interfaces/IWETH.sol";
+import "../interfaces/IWETH.sol";
 
 interface IAsset is IWETH {
     /**

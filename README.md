@@ -1,8 +1,8 @@
-[![Twitter Follow](https://img.shields.io/twitter/follow/knox_finance?style=flat-square)](https://twitter.com/knox_finance)
-[![Discord](https://img.shields.io/discord/936681223831580734.svg?label=&logo=discord&logoColor=ffffff&color=7389D8&labelColor=6A7EC2)](https://discord.gg/azPNJXQ4kR)
+[![Twitter Follow](https://img.shields.io/badge/Twitter-black?logo=twitter&logoColor=white)](https://twitter.com/knox_finance)
+[![Discord](https://img.shields.io/badge/Discord-black?logo=discord&logoColor=white)](https://discord.gg/azPNJXQ4kR)
 [![tests](https://github.com/KnoxFinance/knox-contracts/actions/workflows/test.yaml/badge.svg)](https://codecov.io/gh/KnoxFinance/knox-contracts)
-[![codecov](https://codecov.io/gh/KnoxFinance/knox-contracts/branch/master/graph/badge.svg?token=ZI3OV5TSAV)](https://codecov.io/gh/KnoxFinance/knox-contracts)
 [![Lint](https://github.com/KnoxFinance/knox-contracts/workflows/Lint/badge.svg)](https://github.com/KnoxFinance/knox-contracts/actions/workflows/lint.yaml)
+[![codecov](https://codecov.io/gh/KnoxFinance/knox-contracts/branch/master/graph/badge.svg?token=ZI3OV5TSAV)](https://codecov.io/gh/KnoxFinance/knox-contracts)
 
 # Knox Finance
 
@@ -30,7 +30,7 @@ npm install
 Setup Husky to format code on commit:
 
 ```bash
-npm prepare
+npm run prepare
 ```
 
 ## Testing

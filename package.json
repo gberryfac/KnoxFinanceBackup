@@ -2,8 +2,8 @@
   "scripts": {
     "prepare": "npx husky install",
     "test": "npm run test:arb",
-    "test:eth": "CHAINID=1 npx hardhat test test/*.ts",
-    "test:arb": "CHAINID=42161 npx hardhat test test/*.ts",
+    "test:eth": "CHAINID=1 npx hardhat test",
+    "test:arb": "CHAINID=42161 npx hardhat test",
     "lint-staged": "npx lint-staged",
     "lint:ts": "npx eslint '**/*.ts'",
     "lint:sol": "npx solhint -f table contracts/**/*.sol",
@@ -19,11 +19,10 @@
   "devDependencies": {
     "@nomiclabs/hardhat-ethers": "^2.0.6",
     "@nomiclabs/hardhat-waffle": "^2.0.2",
-    "@openzeppelin/contracts": "^4.5.0",
-    "@openzeppelin/contracts-upgradeable": "^4.5.1",
     "@premia/utils": "^0.0.4",
     "@primitivefi/hardhat-dodoc": "^0.2.3",
-    "@solidstate/contracts": "^0.0.31",
+    "@solidstate/contracts": "^0.0.35",
+    "@solidstate/spec": "^0.0.35",
     "@typechain/ethers-v5": "^9.0.0",
     "@typechain/hardhat": "^4.0.0",
     "@types/chai": "^4.2.18",
@@ -40,6 +39,7 @@
     "ethereum-waffle": "^3.4.0",
     "ethers": "^5.6.0",
     "hardhat": "^2.8.4",
+    "hardhat-abi-exporter": "^2.9.0",
     "hardhat-contract-sizer": "^2.5.0",
     "hardhat-gas-reporter": "^1.0.8",
     "hardhat-tracer": "^1.0.0-alpha.6",
@@ -58,7 +58,13 @@
     "web3-units": "^1.4.0"
   },
   "lint-staged": {
-    "*.ts": "npm run lint:ts",
-    "*.sol": "npm run lint:sol"
+    "*.ts": [
+      "npm run prettier:ts",
+      "npm run lint:ts"
+    ],
+    "*.sol": [
+      "npm run prettier:sol",
+      "npm run lint:sol"
+    ]
   }
 }

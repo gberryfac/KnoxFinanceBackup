@@ -9,11 +9,10 @@ import { fixedFromFloat } from "@premia/utils";
 import { expect } from "chai";
 import moment from "moment-timezone";
 
-import * as time from "./helpers/time";
-import * as fixtures from "./helpers/fixtures";
-import * as types from "./helpers/types";
-
-import { assert } from "./helpers/assertions";
+import * as accounts from "./utils/accounts";
+import { assert } from "./utils/assertions";
+import * as time from "./utils/time";
+import * as types from "./utils/types";
 
 import {
   ADDRESS_ZERO,
@@ -46,9 +45,9 @@ const chainId = network.config.chainId;
 moment.tz.setDefault("UTC");
 
 let block;
-describe("Standard Delta Strategy Unit Tests", () => {
+describe.skip("Standard Delta Strategy Unit Tests", () => {
   behavesLikeOptionsVault({
-    whale: DAI_WHALE_ADDRESS[chainId],
+    buyer: DAI_WHALE_ADDRESS[chainId],
     name: `Knox ETH Delta Vault (Put)`,
     tokenName: `Knox ETH Delta Vault`,
     tokenSymbol: `kETH-DELTA-P`,
@@ -67,13 +66,13 @@ describe("Standard Delta Strategy Unit Tests", () => {
     cap: parseUnits("5000000", DAI_DECIMALS),
     minimumSupply: BigNumber.from("10").pow("3").toString(),
     minimumContractSize: BigNumber.from("10").pow("17").toString(),
-    managementFee: BigNumber.from("2000000"),
     performanceFee: BigNumber.from("20000000"),
+    withdrawalFee: BigNumber.from("2000000"),
     isCall: false,
   });
 
   behavesLikeOptionsVault({
-    whale: DAI_WHALE_ADDRESS[chainId],
+    buyer: DAI_WHALE_ADDRESS[chainId],
     name: `Knox ETH Delta Vault (Call)`,
     tokenName: `Knox ETH Delta Vault`,
     tokenSymbol: `kETH-DELTA-C`,
@@ -92,13 +91,13 @@ describe("Standard Delta Strategy Unit Tests", () => {
     cap: parseUnits("1000", WETH_DECIMALS),
     minimumSupply: BigNumber.from("10").pow("10").toString(),
     minimumContractSize: BigNumber.from("10").pow("17").toString(),
-    managementFee: BigNumber.from("2000000"),
     performanceFee: BigNumber.from("20000000"),
+    withdrawalFee: BigNumber.from("2000000"),
     isCall: true,
   });
 
   behavesLikeOptionsVault({
-    whale: WBTC_WHALE_ADDRESS[chainId],
+    buyer: WBTC_WHALE_ADDRESS[chainId],
     name: `Knox BTC Delta Vault (Call)`,
     tokenName: `Knox BTC Delta Vault`,
     tokenSymbol: `kBTC-DELTA-C`,
@@ -117,13 +116,13 @@ describe("Standard Delta Strategy Unit Tests", () => {
     cap: parseUnits("100", WBTC_DECIMALS),
     minimumSupply: BigNumber.from("10").pow("3").toString(),
     minimumContractSize: BigNumber.from("10").pow("7").toString(),
-    managementFee: BigNumber.from("2000000"),
     performanceFee: BigNumber.from("20000000"),
+    withdrawalFee: BigNumber.from("2000000"),
     isCall: true,
   });
 
   behavesLikeOptionsVault({
-    whale: LINK_WHALE_ADDRESS[chainId],
+    buyer: LINK_WHALE_ADDRESS[chainId],
     name: `Knox LINK Delta Vault (Call)`,
     tokenName: `Knox LINK Delta Vault`,
     tokenSymbol: `kLINK-DELTA-C`,
@@ -142,14 +141,14 @@ describe("Standard Delta Strategy Unit Tests", () => {
     cap: parseUnits("100000", LINK_DECIMALS),
     minimumSupply: BigNumber.from("10").pow("10").toString(),
     minimumContractSize: BigNumber.from("10").pow("17").toString(),
-    managementFee: BigNumber.from("1000000"),
     performanceFee: BigNumber.from("30000000"),
+    withdrawalFee: BigNumber.from("1000000"),
     isCall: true,
   });
 });
 
 function behavesLikeOptionsVault(params: {
-  whale: string;
+  buyer: string;
   name: string;
   tokenName: string;
   tokenSymbol: string;
@@ -168,8 +167,8 @@ function behavesLikeOptionsVault(params: {
   cap: BigNumber;
   minimumSupply: string;
   minimumContractSize: string;
-  managementFee: BigNumber;
   performanceFee: BigNumber;
+  withdrawalFee: BigNumber;
   isCall: boolean;
 }) {
   let signers: types.Signers;
@@ -202,11 +201,11 @@ function behavesLikeOptionsVault(params: {
       initSnapshotId = await time.takeSnapshot();
       block = await provider.getBlock(await provider.getBlockNumber());
 
-      signers = await fixtures.getSigners();
-      addresses = await fixtures.getAddresses(signers);
+      signers = await accounts.getSigners();
+      addresses = await accounts.getAddresses(signers);
 
-      [signers, addresses] = await fixtures.impersonateWhale(
-        params.whale,
+      [signers, addresses] = await accounts.impersonateWhale(
+        params.buyer,
         params.asset,
         params.depositAmount,
         signers,
@@ -234,15 +233,11 @@ function behavesLikeOptionsVault(params: {
         contract.deploy(params.asset)
       );
 
-      addresses.common = helpersLibrary.address;
+      addresses.helpers = helpersLibrary.address;
       addresses.vault = vaultContract.address;
 
-      pricerContract = await getContractFactory("StandardDeltaPricer").then(
-        (contract) =>
-          contract.deploy(
-            params.pool,
-            PREMIA_VOLATILITY_SURFACE_ORACLE[chainId]
-          )
+      pricerContract = await getContractFactory("Pricer").then((contract) =>
+        contract.deploy(params.pool, PREMIA_VOLATILITY_SURFACE_ORACLE[chainId])
       );
 
       addresses.pricer = pricerContract.address;
@@ -250,7 +245,7 @@ function behavesLikeOptionsVault(params: {
       strategyContract = await getContractFactory("StandardDelta", {
         signer: signers.owner,
         libraries: {
-          Helpers: addresses.common,
+          Helpers: addresses.helpers,
         },
       }).then((contract) => contract.deploy());
 
@@ -268,7 +263,7 @@ function behavesLikeOptionsVault(params: {
         addresses.vault
       );
 
-      strategyContract = await strategyContract.connect(signers.whale);
+      strategyContract = await strategyContract.connect(signers.buyer);
     });
 
     after(async () => {
@@ -281,7 +276,7 @@ function behavesLikeOptionsVault(params: {
         testStrategy = await getContractFactory("StandardDelta", {
           signer: signers.owner,
           libraries: {
-            Helpers: addresses.common,
+            Helpers: addresses.helpers,
           },
         }).then((contract) => contract.deploy());
       });
@@ -337,7 +332,7 @@ function behavesLikeOptionsVault(params: {
       it("should revert when not owner", async () => {
         await expect(
           testStrategy
-            .connect(signers.user)
+            .connect(signers.lp1)
             .initialize(
               params.isCall,
               params.baseDecimals,
@@ -453,7 +448,7 @@ function behavesLikeOptionsVault(params: {
       time.revertToSnapshotAfterEach();
       it("should revert when caller is not keeper", async () => {
         await expect(
-          strategyContract.connect(signers.user).sync()
+          strategyContract.connect(signers.lp1).sync()
         ).to.be.revertedWith("1");
       });
 

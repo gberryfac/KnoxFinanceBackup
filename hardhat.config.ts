@@ -3,6 +3,7 @@ import "@nomiclabs/hardhat-ethers";
 import "@nomiclabs/hardhat-waffle";
 import "@primitivefi/hardhat-dodoc";
 import "@typechain/hardhat";
+import "hardhat-abi-exporter";
 import "hardhat-contract-sizer";
 import "hardhat-gas-reporter";
 import "hardhat-tracer";
@@ -12,8 +13,13 @@ require("dotenv").config();
 
 import { TEST_URI, BLOCK_NUMBER } from "./constants";
 
-let { MAINNET_URI, DODOC_ON_COMPILE, REPORT_GAS, SIZER_ON_COMPILE } =
-  process.env;
+let {
+  MAINNET_URI,
+  ARBITRUM_URI,
+  DODOC_ON_COMPILE,
+  REPORT_GAS,
+  SIZER_ON_COMPILE,
+} = process.env;
 
 // Defaults to CHAINID=42161 so things will run with mainnet fork if not specified
 const CHAINID = process.env.CHAINID ? Number(process.env.CHAINID) : 42161;
@@ -22,7 +28,7 @@ const config: HardhatUserConfig = {
   solidity: {
     compilers: [
       {
-        version: "0.8.10",
+        version: "0.8.12",
         settings: {
           optimizer: {
             runs: 200,
@@ -64,6 +70,10 @@ const config: HardhatUserConfig = {
       url: MAINNET_URI,
       chainId: CHAINID,
     },
+    arbitrum: {
+      url: ARBITRUM_URI,
+      chainId: CHAINID,
+    },
   },
   mocha: {
     timeout: 60000,
@@ -76,9 +86,10 @@ const config: HardhatUserConfig = {
   dodoc: {
     runOnCompile: DODOC_ON_COMPILE === "true",
     include: [
-      "contracts/interfaces/IVault.sol",
+      "contracts/interfaces/IKnox.sol",
       "contracts/interfaces/IStandardDelta.sol",
       "contracts/interfaces/IStandardDeltaPricer.sol",
+      "contracts/vaults/Queue.sol",
       "contracts/strategies/StandardDelta.sol",
       "contracts/strategies/StandardDeltaPricer.sol",
       "contracts/vaults/Vault.sol",
