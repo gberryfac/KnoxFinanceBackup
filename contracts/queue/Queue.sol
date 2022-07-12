@@ -65,11 +65,6 @@ contract Queue is Access, ERC1155Base, ERC1155Enumerable, QueueInternal {
     }
 
     function redeemMaxShares(address receiver) external nonReentrant {
-        require(
-            receiver == msg.sender || isApprovedForAll(receiver, msg.sender),
-            "ERC1155: caller is not owner nor approved"
-        );
-
         _redeemMaxShares(receiver);
     }
 
@@ -88,8 +83,8 @@ contract Queue is Access, ERC1155Base, ERC1155Enumerable, QueueInternal {
      *  PROCESS EPOCH
      ***********************************************/
 
-    function syncEpoch(uint64 epoch) external onlyVault {
-        _syncEpoch(epoch);
+    function syncEpoch(uint64 _epoch) external onlyVault {
+        _syncEpoch(_epoch);
     }
 
     function depositToVault() external onlyVault {
@@ -108,12 +103,12 @@ contract Queue is Access, ERC1155Base, ERC1155Enumerable, QueueInternal {
         return _previewUnredeemedShares(account);
     }
 
-    function previewUnredeemedSharesFromEpoch(uint64 epoch, uint256 balance)
+    function previewUnredeemedSharesFromEpoch(uint64 _epoch, uint256 balance)
         external
         view
         returns (uint256)
     {
-        return _previewUnredeemedSharesFromEpoch(epoch, balance);
+        return _previewUnredeemedSharesFromEpoch(_epoch, balance);
     }
 
     function epoch() external view returns (uint64) {
@@ -124,16 +119,16 @@ contract Queue is Access, ERC1155Base, ERC1155Enumerable, QueueInternal {
         return _maxTVL();
     }
 
-    function pricePerShare(uint64 epoch) external view returns (uint256) {
-        return _pricePerShare(epoch);
+    function pricePerShare(uint64 _epoch) external view returns (uint256) {
+        return _pricePerShare(_epoch);
     }
 
     /************************************************
      * HELPERS
      ***********************************************/
 
-    function formatClaimTokenId(uint64 epoch) external view returns (uint256) {
-        return _formatClaimTokenId(epoch);
+    function formatClaimTokenId(uint64 _epoch) external view returns (uint256) {
+        return _formatClaimTokenId(_epoch);
     }
 
     function parseClaimTokenId(uint256 claimTokenId)

@@ -61,13 +61,7 @@
     "web3-units": "^1.4.0"
   },
   "lint-staged": {
-    "*.ts": [
-      "npm run prettier:ts",
-      "npm run lint:ts"
-    ],
-    "*.sol": [
-      "npm run prettier:sol",
-      "npm run lint:sol"
-    ]
+    "*.ts": "npm run lint:ts",
+    "*.sol": "npm run lint:sol"
   }
 }

@@ -72,10 +72,8 @@ contract QueueInternal is ERC1155BaseInternal, ERC1155EnumerableInternal {
 
     function _withdrawFromQueue(uint256 amount) internal {
         QueueStorage.Layout storage l = QueueStorage.layout();
-
         uint256 currentClaimTokenId = _formatClaimTokenId(l.epoch);
         _burn(msg.sender, currentClaimTokenId, amount);
-
         ERC20.safeTransfer(msg.sender, amount);
     }
 
@@ -92,16 +90,7 @@ contract QueueInternal is ERC1155BaseInternal, ERC1155EnumerableInternal {
             uint256 claimTokenId = claimTokenIds[i];
             unredeemedShares += _redeemSharesFromEpoch(claimTokenId, receiver);
         }
-
-        ERC20.safeTransfer(receiver, unredeemedShares);
-
-        // Note: Index receiver
-        // emit RedeemedShares(receiver, unredeemedShares, claimTokenId);
     }
-
-    /************************************************
-     *  REDEEM
-     ***********************************************/
 
     function _redeemSharesFromEpoch(uint256 claimTokenId, address receiver)
         internal
