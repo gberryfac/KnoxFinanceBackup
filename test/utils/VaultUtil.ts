@@ -12,7 +12,6 @@ import {
   VaultAdmin__factory,
   VaultBase__factory,
   VaultView__factory,
-  VaultWrite__factory,
   MockERC20,
 } from "../../types";
 
@@ -97,22 +96,6 @@ export class VaultUtil {
         vaultDiamond,
         vaultAdminContract.address,
         vaultAdminFactory,
-        registeredSelectors
-      )
-    );
-
-    const vaultWriteFactory = new VaultWrite__factory(signers.deployer);
-    const vaultWriteContract = await vaultWriteFactory.deploy(
-      params.isCall,
-      addresses.pool
-    );
-    await vaultWriteContract.deployed();
-
-    registeredSelectors = registeredSelectors.concat(
-      await diamondCut(
-        vaultDiamond,
-        vaultWriteContract.address,
-        vaultWriteFactory,
         registeredSelectors
       )
     );
