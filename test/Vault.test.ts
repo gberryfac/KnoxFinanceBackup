@@ -1,14 +1,15 @@
-import { ethers } from "hardhat";
+import { ethers, network } from "hardhat";
 import { BigNumber } from "ethers";
 const { parseUnits } = ethers.utils;
 
 import {
   IVault,
   MockERC20,
-  MockPremiaPool,
-  MockERC20__factory,
-  MockPremiaPool__factory,
-  IAsset,
+  Auction__factory,
+  AuctionProxy__factory,
+  Queue__factory,
+  QueueProxy__factory,
+  Pricer__factory,
 } from "../types";
 
 import * as assets from "./utils/assets";
@@ -17,13 +18,12 @@ import * as accounts from "./utils/accounts";
 
 import { describeBehaviorOfAdmin } from "../spec/Admin.behavior";
 import { describeBehaviorOfBase } from "../spec/Base.behavior";
-import { describeBehaviorOfQueue } from "../spec/Queue.behavior";
 
 import { VaultUtil } from "./utils/VaultUtil";
 
-import { ADDRESS_ONE } from "../constants";
+import { PREMIA_VOLATILITY_SURFACE_ORACLE } from "../constants";
 
-describe("Vault Unit Tests", () => {
+describe("Vault Tests", () => {
   behavesLikeVault({
     name: `Knox ETH Delta Vault (Put)`,
     tokenName: `Knox ETH Delta Vault`,
@@ -31,11 +31,11 @@ describe("Vault Unit Tests", () => {
     tokenDecimals: 18,
     asset: assets.DAI,
     delta: 0.4,
+    deltaOffset: 0.05,
     pool: assets.PREMIA.WETH_DAI,
-    depositAmount: parseUnits("100000", assets.DAI.decimals),
-    cap: parseUnits("5000000", assets.DAI.decimals),
-    minimumSupply: BigNumber.from("10").pow("3").toString(),
-    minimumContractSize: BigNumber.from("10").pow("17").toString(),
+    deposit: parseUnits("100000", assets.DAI.decimals),
+    maxTVL: parseUnits("5000000", assets.DAI.decimals),
+    minSize: BigNumber.from("10").pow(assets.DAI.decimals - 1),
     performanceFee: BigNumber.from("20000000"),
     withdrawalFee: BigNumber.from("2000000"),
     isCall: false,
@@ -48,11 +48,11 @@ describe("Vault Unit Tests", () => {
     tokenDecimals: 18,
     asset: assets.ETH,
     delta: 0.4,
+    deltaOffset: 0.05,
     pool: assets.PREMIA.WETH_DAI,
-    depositAmount: parseUnits("10", assets.ETH.decimals),
-    cap: parseUnits("1000", assets.ETH.decimals),
-    minimumSupply: BigNumber.from("10").pow("10").toString(),
-    minimumContractSize: BigNumber.from("10").pow("17").toString(),
+    deposit: parseUnits("10", assets.ETH.decimals),
+    maxTVL: parseUnits("1000", assets.ETH.decimals),
+    minSize: BigNumber.from("10").pow(assets.ETH.decimals - 1),
     performanceFee: BigNumber.from("20000000"),
     withdrawalFee: BigNumber.from("2000000"),
     isCall: true,
@@ -65,11 +65,11 @@ describe("Vault Unit Tests", () => {
     tokenDecimals: 18,
     asset: assets.BTC,
     delta: 0.4,
+    deltaOffset: 0.05,
     pool: assets.PREMIA.WBTC_DAI,
-    depositAmount: parseUnits("1", assets.BTC.decimals),
-    cap: parseUnits("100", assets.BTC.decimals),
-    minimumSupply: BigNumber.from("10").pow("3").toString(),
-    minimumContractSize: BigNumber.from("10").pow("7").toString(),
+    deposit: parseUnits("1", assets.BTC.decimals),
+    maxTVL: parseUnits("100", assets.BTC.decimals),
+    minSize: BigNumber.from("10").pow(assets.BTC.decimals - 1),
     performanceFee: BigNumber.from("20000000"),
     withdrawalFee: BigNumber.from("2000000"),
     isCall: true,
@@ -82,30 +82,27 @@ describe("Vault Unit Tests", () => {
     tokenDecimals: 18,
     asset: assets.LINK,
     delta: 0.4,
+    deltaOffset: 0.05,
     pool: assets.PREMIA.LINK_DAI,
-    depositAmount: parseUnits("100", assets.LINK.decimals),
-    cap: parseUnits("100000", assets.LINK.decimals),
-    minimumSupply: BigNumber.from("10").pow("10").toString(),
-    minimumContractSize: BigNumber.from("10").pow("17").toString(),
+    deposit: parseUnits("100", assets.LINK.decimals),
+    maxTVL: parseUnits("100000", assets.LINK.decimals),
+    minSize: BigNumber.from("10").pow(assets.LINK.decimals - 1),
     performanceFee: BigNumber.from("30000000"),
     withdrawalFee: BigNumber.from("1000000"),
     isCall: true,
   });
 });
 
-function behavesLikeVault(params: types.Params) {
-  let signers: types.Signers;
-  let addresses: types.Addresses;
+const chainId = network.config.chainId;
 
+function behavesLikeVault(params: types.VaultParams) {
   describe.only(params.name, () => {
     let snapshotId: number;
 
     let signers: types.Signers;
     let addresses: types.Addresses;
 
-    let assetContract: IAsset;
-    let erc20: MockERC20;
-    let pool: MockPremiaPool;
+    let asset: MockERC20;
 
     let instance: IVault;
     let v: VaultUtil;
@@ -114,29 +111,64 @@ function behavesLikeVault(params: types.Params) {
       signers = await accounts.getSigners();
       addresses = await accounts.getAddresses(signers);
 
-      [signers, addresses, assetContract] = await accounts.impersonateWhale(
+      addresses.pool = params.pool.address;
+
+      v = await VaultUtil.deploy(params, signers, addresses);
+
+      let queue = await new Queue__factory(signers.deployer).deploy(
+        params.isCall,
+        addresses.pool,
+        addresses.vault
+      );
+
+      let queueProxy = await new QueueProxy__factory(signers.deployer).deploy(
+        params.maxTVL,
+        queue.address,
+        addresses.vault
+      );
+
+      queue = Queue__factory.connect(queueProxy.address, signers.lp1);
+
+      let auction = await new Auction__factory(signers.deployer).deploy(
+        params.isCall,
+        addresses.pool,
+        addresses.vault
+      );
+
+      let auctionProxy = await new AuctionProxy__factory(
+        signers.deployer
+      ).deploy(params.minSize, auction.address, addresses.vault);
+
+      auction = Auction__factory.connect(auctionProxy.address, signers.lp1);
+
+      let pricer = await new Pricer__factory(signers.deployer).deploy(
+        addresses.pool,
+        PREMIA_VOLATILITY_SURFACE_ORACLE[chainId]
+      );
+
+      addresses.queue = queue.address;
+      addresses.auction = auction.address;
+      addresses.pricer = pricer.address;
+
+      const initImpl = {
+        auction: addresses.auction,
+        queue: addresses.queue,
+        pricer: addresses.pricer,
+      };
+
+      await v.vault.connect(signers.deployer).initialize(initImpl);
+      instance = v.vault;
+
+      [signers, addresses, asset] = await accounts.impersonateWhale(
         params.asset.buyer,
-        params.asset.address,
-        params.depositAmount,
+        v.asset.address,
+        params.deposit,
         signers,
         addresses
       );
 
-      erc20 = await new MockERC20__factory(signers.owner).deploy("", 18);
-
-      pool = await new MockPremiaPool__factory(signers.owner).deploy(
-        params.pool.underlying.address,
-        params.pool.base.address,
-        ADDRESS_ONE,
-        ADDRESS_ONE
-      );
-
-      addresses.pool = pool.address;
-      addresses.pricer = ADDRESS_ONE;
-
-      v = await VaultUtil.deploy(assetContract, params, signers, addresses);
-
-      instance = v.vault;
+      // if true, the test is configured with the incorrect asset.
+      if (asset.address !== params.asset.address) throw Error;
     });
 
     beforeEach(async () => {
@@ -156,26 +188,13 @@ function behavesLikeVault(params: types.Params) {
       {
         deploy: async () => instance,
         getVaultUtil: async () => v,
-        getAsset: async () => erc20,
+        getAsset: async () => asset,
         mintERC20: undefined as any,
         burnERC20: undefined as any,
         mintAsset: undefined as any,
         supply: ethers.constants.Zero,
       },
       ["::ERC4626Base"]
-    );
-
-    describeBehaviorOfQueue(
-      {
-        deploy: async () => instance,
-        getVaultUtil: async () => v,
-        interfaceIds: undefined as any,
-        transfer: undefined as any,
-        mintERC1155: undefined as any,
-        burnERC1155: undefined as any,
-        tokenId: undefined as any,
-      },
-      ["::ERC165", "::ERC1155Enumerable"]
     );
   });
 }

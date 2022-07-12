@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "./IAdmin.sol";
-import "./IBase.sol";
-import "./IQueue.sol";
-import "./IView.sol";
-import "./IWrite.sol";
+import "./IVaultAdmin.sol";
+import "./IVaultBase.sol";
+import "./IVaultView.sol";
+import "./IVaultWrite.sol";
 
-interface IVault is IAdmin, IBase, IQueue, IView, IWrite {}
+interface IVault is IVaultAdmin, IVaultBase, IVaultView, IVaultWrite {}

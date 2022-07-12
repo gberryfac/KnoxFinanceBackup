@@ -1,16 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-library PoolStorage {
+interface IPremiaPool {
     struct PoolSettings {
         address underlying;
         address base;
         address underlyingOracle;
         address baseOracle;
     }
-}
 
-interface IPremiaPool {
     function exerciseFrom(
         address holder,
         uint256 longTokenId,
@@ -30,10 +28,7 @@ interface IPremiaPool {
 
     function setDivestmentTimestamp(uint64 timestamp, bool isCallPool) external;
 
-    function getPoolSettings()
-        external
-        view
-        returns (PoolStorage.PoolSettings memory);
+    function getPoolSettings() external view returns (PoolSettings memory);
 
     function processExpired(uint256 longTokenId, uint256 contractSize) external;
 
@@ -41,6 +36,14 @@ interface IPremiaPool {
         external
         view
         returns (uint256);
+
+    function safeTransferFrom(
+        address from,
+        address to,
+        uint256 id,
+        uint256 amount,
+        bytes calldata data
+    ) external;
 
     function accountsByToken(uint256 id)
         external

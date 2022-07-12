@@ -1,36 +1,40 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "../auction/IDutchAuction.sol";
+import "../auction/IAuction.sol";
 
 import "../pricer/IPricer.sol";
 
-import "../interfaces/IPremiaPool.sol";
+import "../queue/IQueue.sol";
 
-import "../libraries/Constants.sol";
+library VaultStorage {
+    // @notice Fees are 6-decimal places. For example: 20 * 10**6 = 20%
+    uint256 internal constant FEE_MULTIPLIER = 10**6;
 
-library Storage {
+    // @notice Number of weeks per year = 52.142857 weeks * FEE_MULTIPLIER = 52142857.
+    // Dividing by weeks per year requires doing num.mul(FEE_MULTIPLIER).div(WEEKS_PER_YEAR)
+    uint256 internal constant WEEKS_PER_YEAR = 52142857;
+
     /************************************************
      *  INITIALIZATION STRUCTS
      ***********************************************/
 
-    struct InitParams {
+    struct InitProxy {
         bool isCall;
-        uint64 minimumContractSize;
         int128 delta64x64;
-    }
-
-    struct InitProps {
-        uint64 minimumSupply;
-        uint256 cap;
+        int128 deltaOffset64x64;
         uint256 performanceFee;
         uint256 withdrawalFee;
         string name;
         string symbol;
-        address auction;
         address keeper;
         address feeRecipient;
         address pool;
+    }
+
+    struct InitImpl {
+        address auction;
+        address queue;
         address pricer;
     }
 
@@ -40,7 +44,9 @@ library Storage {
         // @notice Strike price of the option as a 64x64 bit fixed point number
         int128 strike64x64;
         // @notice
-        uint256 optionTokenId;
+        uint256 longTokenId;
+        // @notice
+        uint256 shortTokenId;
     }
 
     /************************************************
@@ -60,8 +66,6 @@ library Storage {
          ***********************************************/
         // @notice Option type the vault is strategy
         bool isCall;
-        // @notice Minimum amount of the underlying a strategy will sell
-        uint64 minimumContractSize;
         // @notice Delta used to calculate strike price
         int128 delta64x64;
         // @notice Offset used to calculate offset strike price
@@ -79,61 +83,39 @@ library Storage {
         uint256 startTime;
         // @notice
         uint256 endTime;
-        // @notice
-        uint256 maxPrice;
-        // @notice
-        uint256 minPrice;
-        /************************************************
-         * VAULT ACCOUNTING
-         ***********************************************/
-        // @notice
-        uint256 totalCollateral;
-        // @notice
-        uint256 totalShort;
-        // @notice
-        uint256 totalPremiums;
-        // @notice
-        uint256 totalDeposits;
-        // @notice
-        uint256 totalWithdrawals;
         /************************************************
          * VAULT STATE
          ***********************************************/
         // @notice
         uint64 epoch;
         // @notice
-        uint256 claimTokenId;
-        // @notice maps claim token id to claim token price
-        mapping(uint256 => uint256) pricePerShare;
+        uint256 totalCollateral;
+        // @notice
+        uint256 totalShort;
+        // @notice
+        uint256 totalPremiums;
         /************************************************
          * VAULT PROPERTIES
          ***********************************************/
         // @notice
-        uint64 minimumSupply;
-        // @notice
-        uint256 cap;
-        // @notice
         uint256 performanceFee;
         // @notice
         uint256 withdrawalFee;
-        /************************************************
-         * ACTORS
-         ***********************************************/
-        // @notice
-        address keeper;
         // @notice
         address feeRecipient;
         /************************************************
          * EXTERNAL CONTRACTS
          ***********************************************/
         // @notice
-        IDutchAuction Auction;
+        IAuction Auction;
+        // @notice
+        IQueue Queue;
         // @notice
         IPricer Pricer;
     }
 
     bytes32 internal constant LAYOUT_SLOT =
-        keccak256("knox.contracts.vault.storage.layout");
+        keccak256("knox.contracts.storage.Vault");
 
     function layout() internal pure returns (Layout storage l) {
         bytes32 slot = LAYOUT_SLOT;
@@ -146,69 +128,49 @@ library Storage {
      *  ADMIN
      ***********************************************/
 
-    function _setFeeRecipient(address newFeeRecipient) internal {
-        Layout storage l = layout();
+    function _setFeeRecipient(Layout storage l, address newFeeRecipient)
+        internal
+    {
         require(newFeeRecipient != address(0), "address not provided");
         require(newFeeRecipient != l.feeRecipient, "new address equals old");
         l.feeRecipient = newFeeRecipient;
     }
 
-    function _setKeeper(address newKeeper) internal {
-        Layout storage l = layout();
-        require(newKeeper != address(0), "address not provided");
-        require(newKeeper != l.keeper, "new address equals old");
-        l.keeper = newKeeper;
-    }
-
-    function _setPricer(address newPricer) internal {
-        Layout storage l = layout();
+    function _setPricer(Layout storage l, address newPricer) internal {
         require(newPricer != address(0), "address not provided");
         require(newPricer != address(l.Pricer), "new address equals old");
         l.Pricer = IPricer(newPricer);
     }
 
-    function _setPerformanceFee(uint256 newPerformanceFee) internal {
-        Layout storage l = layout();
-
-        require(
-            newPerformanceFee < 100 * Constants.FEE_MULTIPLIER,
-            "invalid fee amount"
-        );
+    function _setPerformanceFee(Layout storage l, uint256 newPerformanceFee)
+        internal
+    {
+        require(newPerformanceFee < 100 * FEE_MULTIPLIER, "invalid fee amount");
 
         // emit PerformanceFeeSet(l.performanceFee, newPerformanceFee);
 
         l.performanceFee = newPerformanceFee;
     }
 
-    function _setWithdrawalFee(uint256 newWithdrawalFee) internal {
-        Layout storage l = layout();
-
-        require(
-            newWithdrawalFee < 100 * Constants.FEE_MULTIPLIER,
-            "invalid fee amount"
-        );
+    function _setWithdrawalFee(Layout storage l, uint256 newWithdrawalFee)
+        internal
+    {
+        require(newWithdrawalFee < 100 * FEE_MULTIPLIER, "invalid fee amount");
 
         // Divides annualized withdrawal fee by number of weeks in a year
         uint256 tmpWithdrawalFee =
-            (newWithdrawalFee * Constants.FEE_MULTIPLIER) /
-                Constants.WEEKS_PER_YEAR;
+            (newWithdrawalFee * FEE_MULTIPLIER) / WEEKS_PER_YEAR;
 
         // emit WithdrawalFeeSet(l.withdrawalFee, newWithdrawalFee);
 
         l.withdrawalFee = tmpWithdrawalFee;
     }
 
-    function _setCap(uint256 newCap) internal {
-        Layout storage l = layout();
-        require(newCap > 0, "value exceeds minimum");
-
-        // emit CapSet(l.cap, newCap);
-
-        l.cap = newCap;
-    }
-
-    function _setAuctionWindowOffsets(uint16 start, uint16 end) internal {
-        Layout storage l = layout();
+    function _setAuctionWindowOffsets(
+        Layout storage l,
+        uint16 start,
+        uint16 end
+    ) internal {
         l.startOffset = start;
         l.endOffset = end;
     }
@@ -217,27 +179,15 @@ library Storage {
      *  VIEW
      ***********************************************/
 
-    function _totalDeposits() internal view returns (uint256) {
-        Layout storage l = layout();
-        return l.totalDeposits;
-    }
-
-    function _epoch() internal view returns (uint256) {
-        Layout storage l = layout();
+    function _epoch(Layout storage l) internal view returns (uint64) {
         return l.epoch;
     }
 
-    function _pricePerShare(uint64 epoch) internal view returns (uint256) {
-        Layout storage l = layout();
-        return l.pricePerShare[epoch];
-    }
-
-    function _optionByEpoch(uint64 epoch)
+    function _optionByEpoch(Layout storage l, uint64 epoch)
         internal
         view
         returns (Option memory)
     {
-        Layout storage l = layout();
         return l.options[epoch];
     }
 }

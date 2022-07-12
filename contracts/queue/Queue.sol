@@ -1,36 +1,36 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+import "@solidstate/contracts/introspection/ERC165Storage.sol";
 import "@solidstate/contracts/token/ERC1155/base/ERC1155Base.sol";
 import "@solidstate/contracts/token/ERC1155/enumerable/ERC1155Enumerable.sol";
 
-import "@solidstate/contracts/introspection/ERC165Storage.sol";
-import "@solidstate/contracts/introspection/IERC165.sol";
-import "@solidstate/contracts/utils/ReentrancyGuard.sol";
+import "../access/Access.sol";
 
-import "./internal/QueueInternal.sol";
+import "./QueueInternal.sol";
 
-contract Queue is
-    ERC1155Base,
-    ERC1155Enumerable,
-    QueueInternal,
-    ReentrancyGuard
-{
+contract Queue is Access, ERC1155Base, ERC1155Enumerable, QueueInternal {
     using ERC165Storage for ERC165Storage.Layout;
+    using QueueStorage for QueueStorage.Layout;
     using SafeERC20 for IERC20;
-    using Storage for Storage.Layout;
 
-    constructor(bool isCall, address pool) QueueInternal(isCall, pool) {
-        ERC165Storage.Layout storage l = ERC165Storage.layout();
-        l.setSupportedInterface(type(IERC165).interfaceId, true);
-        l.setSupportedInterface(type(IERC1155).interfaceId, true);
+    constructor(
+        bool isCall,
+        address pool,
+        address vault
+    ) QueueInternal(isCall, pool, vault) {}
+
+    /************************************************
+     *  ADMIN
+     ***********************************************/
+
+    function setMaxTVL(uint256 newMaxTVL) external onlyOwner {
+        _setMaxTVL(newMaxTVL);
     }
 
     /************************************************
-     *  INPUT/OUTPUT
+     *  DEPOSIT
      ***********************************************/
-    // TODO:
-    function swapAndDepositToQueue() external auctionActive nonReentrant {}
 
     function depositToQueue(uint256 amount)
         external
@@ -48,9 +48,17 @@ contract Queue is
         _depositToQueue(amount, receiver);
     }
 
+    /************************************************
+     *  WITHDRAW
+     ***********************************************/
+
     function withdrawFromQueue(uint256 amount) external nonReentrant {
         _withdrawFromQueue(amount);
     }
+
+    /************************************************
+     *  REDEEM
+     ***********************************************/
 
     function redeemSharesFromEpoch(uint64 epoch, address receiver)
         external
@@ -73,6 +81,18 @@ contract Queue is
     }
 
     /************************************************
+     *  PROCESS EPOCH
+     ***********************************************/
+
+    function syncEpoch(uint64 epoch) external onlyVault {
+        _syncEpoch(epoch);
+    }
+
+    function depositToVault() external onlyVault {
+        _depositToVault();
+    }
+
+    /************************************************
      *  VIEW
      ***********************************************/
 
@@ -90,6 +110,34 @@ contract Queue is
         returns (uint256)
     {
         return _previewUnredeemedSharesFromEpoch(epoch, balance);
+    }
+
+    function epoch() external view returns (uint64) {
+        return _epoch();
+    }
+
+    function maxTVL() external view returns (uint256) {
+        return _maxTVL();
+    }
+
+    function pricePerShare(uint64 epoch) external view returns (uint256) {
+        return _pricePerShare(epoch);
+    }
+
+    /************************************************
+     * HELPERS
+     ***********************************************/
+
+    function formatClaimTokenId(uint64 epoch) external view returns (uint256) {
+        return _formatClaimTokenId(epoch);
+    }
+
+    function parseClaimTokenId(uint256 claimTokenId)
+        external
+        pure
+        returns (address, uint64)
+    {
+        return _parseClaimTokenId(claimTokenId);
     }
 
     /************************************************

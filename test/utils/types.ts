@@ -16,49 +16,50 @@ export type Asset = {
 
 export type Signers = {
   deployer: SignerWithAddress;
-  admin: SignerWithAddress;
   lp1: SignerWithAddress;
   lp2: SignerWithAddress;
   lp3: SignerWithAddress;
-  owner: SignerWithAddress;
   keeper: SignerWithAddress;
   feeRecipient: SignerWithAddress;
-  buyer?: SignerWithAddress;
-  strategy?: SignerWithAddress;
+  buyer1: SignerWithAddress;
+  buyer2: SignerWithAddress;
+  buyer3: SignerWithAddress;
 };
 
 export type Addresses = {
   deployer: string;
-  admin: string;
   lp1: string;
   lp2: string;
   lp3: string;
-  owner: string;
   keeper: string;
   feeRecipient: string;
+  buyer1: string;
+  buyer2: string;
+  buyer3: string;
+  auction?: string;
   buyer?: string;
   pool?: string;
   helpers?: string;
   pricer?: string;
-  strategy?: string;
+  queue?: string;
   vault?: string;
   spotOracle?: string;
   volatilityOracle?: string;
 };
 
-export type Params = {
-  name: string;
-  tokenName: string;
-  tokenSymbol: string;
-  tokenDecimals: number;
-  asset: Asset;
-  delta: number;
-  pool: Pool;
-  depositAmount: BigNumber;
-  cap: BigNumber;
-  minimumSupply: string;
-  minimumContractSize: string;
-  performanceFee: BigNumber;
-  withdrawalFee: BigNumber;
-  isCall: boolean;
+export type VaultParams = {
+  name?: string;
+  tokenName?: string;
+  tokenSymbol?: string;
+  tokenDecimals?: number;
+  asset?: Asset;
+  delta?: number;
+  deltaOffset?: number;
+  pool?: Pool;
+  deposit?: BigNumber;
+  maxTVL?: BigNumber;
+  minSize?: BigNumber;
+  performanceFee?: BigNumber;
+  withdrawalFee?: BigNumber;
+  isCall?: boolean;
 };

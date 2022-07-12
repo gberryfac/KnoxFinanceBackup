@@ -6,7 +6,7 @@ import { assert } from "../test/utils/assertions";
 
 import { VaultUtil } from "../test/utils/VaultUtil";
 
-import { IAsset, IVault } from "../types";
+import { MockERC20, IVault } from "../types";
 
 import { NEXT_FRIDAY } from "../constants";
 
@@ -24,8 +24,8 @@ export function describeBehaviorOfAdmin(
   describe("::Admin", () => {
     let instance: IVault;
     let v: VaultUtil;
-    let assetContract: IAsset;
-    let params: types.Params;
+    let asset: MockERC20;
+    let params: types.VaultParams;
     let signers: types.Signers;
     let addresses: types.Addresses;
 
@@ -35,7 +35,7 @@ export function describeBehaviorOfAdmin(
       instance = await deploy();
       v = await getVaultUtil();
 
-      assetContract = v.assetContract;
+      asset = v.asset;
       params = v.params;
 
       signers = v.signers;
@@ -44,11 +44,11 @@ export function describeBehaviorOfAdmin(
 
     describe.skip("#processEpoch", () => {
       time.revertToSnapshotAfterEach(async () => {
-        await assetContract
+        await asset
           .connect(signers.lp1)
-          .approve(addresses.vault, params.depositAmount);
+          .approve(addresses.vault, params.deposit);
 
-        await instance["depositToQueue(uint256)"](params.depositAmount);
+        await instance["depositToQueue(uint256)"](params.deposit);
       });
 
       it("should adjust Queue and Vault balances when processEpoch is called", async () => {
@@ -56,12 +56,12 @@ export function describeBehaviorOfAdmin(
         assert.isTrue(totalAssets.isZero());
 
         let totalDeposits = await instance.totalDeposits();
-        assert.bnEqual(totalDeposits, params.depositAmount);
+        assert.bnEqual(totalDeposits, params.deposit);
 
         await instance.connect(signers.keeper)["processEpoch(bool)"](false);
 
         totalAssets = await instance.totalAssets();
-        assert.bnEqual(totalAssets, params.depositAmount);
+        assert.bnEqual(totalAssets, params.deposit);
 
         totalDeposits = await instance.totalDeposits();
         assert.isTrue(totalDeposits.isZero());
@@ -78,8 +78,8 @@ export function describeBehaviorOfAdmin(
         // // TODO: format claimTokenId
         // assert.bnEqual(claimTokenId, formatTokenId(epoch));
 
-        let [, expiry, claimTokenId] = await instance.option();
-        assert.bnEqual(expiry, NEXT_FRIDAY[chainId]);
+        // let [, expiry, claimTokenId] = await instance.option();
+        // assert.bnEqual(expiry, NEXT_FRIDAY[chainId]);
 
         // // TODO: format claimTokenId
         // assert.bnEqual(claimTokenId, formatTokenId(epoch));

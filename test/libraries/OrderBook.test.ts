@@ -1,5 +1,5 @@
 import { ethers } from "hardhat";
-const { getContractFactory } = ethers;
+import { BigNumber } from "ethers";
 
 import { TestOrderBook, TestOrderBook__factory } from "../../types";
 
@@ -7,10 +7,6 @@ import { assert } from "../utils/assertions";
 import * as time from "../utils/time";
 
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
-
-import moment from "moment-timezone";
-import { BigNumber } from "ethers";
-moment.tz.setDefault("UTC");
 
 describe.only("OrderBook", () => {
   let instance: TestOrderBook;
@@ -22,10 +18,6 @@ describe.only("OrderBook", () => {
   before(async () => {
     bNZero = BigNumber.from("0");
     [signer1, signer2, signer3] = await ethers.getSigners();
-
-    const library = await getContractFactory("OrderBook").then((contract) =>
-      contract.deploy()
-    );
 
     instance = await new TestOrderBook__factory(signer1).deploy();
   });

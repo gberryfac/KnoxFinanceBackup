@@ -1,16 +1,16 @@
 import { BigNumber, ethers } from "ethers";
-const { parseEther } = ethers.utils;
+const { formatUnits, parseUnits } = ethers.utils;
 
-export const wdiv = (x: BigNumber, y: BigNumber) => {
-  return x
-    .mul(parseEther("1"))
-    .add(y.div(BigNumber.from("2")))
-    .div(y);
-};
+let DECIMALS;
 
-export const wmul = (x: BigNumber, y: BigNumber) => {
-  return x
-    .mul(y)
-    .add(parseEther("1").div(BigNumber.from("2")))
-    .div(parseEther("1"));
-};
+export function setDecimals(n: number) {
+  DECIMALS = n;
+}
+
+export function bnToNumber(bn: BigNumber, decimals = DECIMALS) {
+  return Number(formatUnits(bn, decimals));
+}
+
+export function toUnits(n: number, decimals = DECIMALS) {
+  return parseUnits(n.toString(), decimals);
+}

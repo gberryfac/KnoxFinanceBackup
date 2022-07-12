@@ -1,61 +1,56 @@
+import { ethers } from "hardhat";
+const { getContractAt } = ethers;
+
 import * as types from "./types";
 
 import { diamondCut } from "../../scripts/diamond";
 
 import {
   IVault,
-  Admin__factory,
-  Auction__factory,
-  Base__factory,
-  Helpers__factory,
   IVault__factory,
-  Queue__factory,
   VaultDiamond__factory,
-  View__factory,
-  IAsset,
+  VaultAdmin__factory,
+  VaultBase__factory,
+  VaultView__factory,
+  VaultWrite__factory,
+  MockERC20,
 } from "../../types";
 
 import { fixedFromFloat } from "@premia/utils";
 
 interface VaultUtilArgs {
   vault: IVault;
-  assetContract: IAsset;
-  params: types.Params;
+  asset: MockERC20;
+  params: types.VaultParams;
   signers: types.Signers;
   addresses: types.Addresses;
 }
 
 export class VaultUtil {
   vault: IVault;
-  assetContract: IAsset;
-  params: types.Params;
+  asset: MockERC20;
+  params: types.VaultParams;
   signers: types.Signers;
   addresses: types.Addresses;
 
   constructor(props: VaultUtilArgs) {
     this.vault = props.vault;
-    this.assetContract = props.assetContract;
+    this.asset = props.asset;
     this.params = props.params;
     this.signers = props.signers;
     this.addresses = props.addresses;
   }
 
   static async deploy(
-    assetContract: IAsset,
-    params: types.Params,
+    params: types.VaultParams,
     signers: types.Signers,
     addresses: types.Addresses
   ) {
-    const helpers = await new Helpers__factory(signers.admin).deploy();
-
-    const initParams = {
+    const initProxy = {
       isCall: params.isCall,
-      minimumContractSize: params.minimumContractSize,
+      minSize: params.minSize,
       delta64x64: fixedFromFloat(params.delta),
-    };
-    const initProps = {
-      minimumSupply: params.minimumSupply,
-      cap: params.cap,
+      deltaOffset64x64: fixedFromFloat(params.deltaOffset),
       performanceFee: params.performanceFee,
       withdrawalFee: params.withdrawalFee,
       name: params.tokenName,
@@ -63,107 +58,87 @@ export class VaultUtil {
       keeper: addresses.keeper,
       feeRecipient: addresses.feeRecipient,
       pool: addresses.pool,
-      pricer: addresses.pricer,
     };
 
     const vaultDiamond = await new VaultDiamond__factory(
-      signers.admin
-    ).deploy();
+      signers.deployer
+    ).deploy(initProxy);
 
     let registeredSelectors = [
       vaultDiamond.interface.getSighash("supportsInterface(bytes4)"),
     ];
 
-    const baseFactory = new Base__factory(signers.admin);
-    const baseContract = await baseFactory.deploy(
+    const vaultBaseFactory = new VaultBase__factory(signers.deployer);
+    const vaultBaseContract = await vaultBaseFactory.deploy(
       params.isCall,
       addresses.pool
     );
-    await baseContract.deployed();
+    await vaultBaseContract.deployed();
 
     registeredSelectors = registeredSelectors.concat(
       await diamondCut(
         vaultDiamond,
-        baseContract.address,
-        baseFactory,
+        vaultBaseContract.address,
+        vaultBaseFactory,
         registeredSelectors
       )
     );
 
-    const queueFactory = new Queue__factory(signers.admin);
-    const queueContract = await queueFactory.deploy(
+    const vaultAdminFactory = new VaultAdmin__factory(signers.deployer);
+
+    const vaultAdminContract = await vaultAdminFactory.deploy(
       params.isCall,
       addresses.pool
     );
-    await queueContract.deployed();
+    await vaultAdminContract.deployed();
 
     registeredSelectors = registeredSelectors.concat(
       await diamondCut(
         vaultDiamond,
-        queueContract.address,
-        queueFactory,
+        vaultAdminContract.address,
+        vaultAdminFactory,
         registeredSelectors
       )
     );
 
-    const adminFactory = new Admin__factory(
-      {
-        "contracts/libraries/Helpers.sol:Helpers": helpers.address,
-      },
-      signers.admin
-    );
-
-    const adminContract = await adminFactory.deploy(
+    const vaultWriteFactory = new VaultWrite__factory(signers.deployer);
+    const vaultWriteContract = await vaultWriteFactory.deploy(
       params.isCall,
       addresses.pool
     );
-    await adminContract.deployed();
+    await vaultWriteContract.deployed();
 
     registeredSelectors = registeredSelectors.concat(
       await diamondCut(
         vaultDiamond,
-        adminContract.address,
-        adminFactory,
+        vaultWriteContract.address,
+        vaultWriteFactory,
         registeredSelectors
       )
     );
 
-    const auctionFactory = new Auction__factory(signers.admin);
-    const auctionContract = await auctionFactory.deploy(
+    const vaultViewFactory = new VaultView__factory(signers.deployer);
+    const vaultViewContract = await vaultViewFactory.deploy(
       params.isCall,
       addresses.pool
     );
-    await auctionContract.deployed();
+    await vaultViewContract.deployed();
 
-    registeredSelectors = registeredSelectors.concat(
+    registeredSelectors.concat(
       await diamondCut(
         vaultDiamond,
-        auctionContract.address,
-        auctionFactory,
-        registeredSelectors
-      )
-    );
-
-    const viewFactory = new View__factory(signers.admin);
-    const viewContract = await viewFactory.deploy(
-      params.isCall,
-      addresses.pool
-    );
-    await viewContract.deployed();
-
-    registeredSelectors = registeredSelectors.concat(
-      await diamondCut(
-        vaultDiamond,
-        viewContract.address,
-        viewFactory,
+        vaultViewContract.address,
+        vaultViewFactory,
         registeredSelectors
       )
     );
 
     addresses.vault = vaultDiamond.address;
     const vault = IVault__factory.connect(addresses.vault, signers.lp1);
-    await vault.connect(signers.admin).init(initParams, initProps);
+    const collateralAsset = await vault.collateralAsset();
 
-    return new VaultUtil({ vault, assetContract, params, signers, addresses });
+    const asset = await getContractAt("MockERC20", collateralAsset);
+
+    return new VaultUtil({ vault, asset, params, signers, addresses });
   }
 }

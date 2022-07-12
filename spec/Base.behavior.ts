@@ -7,7 +7,7 @@ import { assert } from "../test/utils/assertions";
 
 import { VaultUtil } from "../test/utils/VaultUtil";
 
-import { IAsset, IVault, MockERC20 } from "../types";
+import { MockERC20, IVault } from "../types";
 
 interface BaseBehaviorArgs {
   deploy: () => Promise<IVault>;
@@ -43,8 +43,8 @@ export function describeBehaviorOfBase(
   describe("::Base", () => {
     let instance: IVault;
     let v: VaultUtil;
-    let assetContract: IAsset;
-    let params: types.Params;
+    let asset: MockERC20;
+    let params: types.VaultParams;
     let signers: types.Signers;
     let addresses: types.Addresses;
 
@@ -54,7 +54,7 @@ export function describeBehaviorOfBase(
       instance = await deploy();
       v = await getVaultUtil();
 
-      assetContract = v.assetContract;
+      asset = v.asset;
       params = v.params;
 
       signers = v.signers;
@@ -74,32 +74,7 @@ export function describeBehaviorOfBase(
     );
 
     describe.skip("#withdraw", () => {
-      time.revertToSnapshotAfterEach(async () => {
-        await assetContract
-          .connect(signers.lp1)
-          .approve(addresses.vault, params.depositAmount);
-
-        await instance["depositToQueue(uint256)"](params.depositAmount);
-        await instance.connect(signers.keeper)["processEpoch(bool)"](false);
-      });
-
-      it("should withdraw deposit amount from Vault", async () => {
-        const lpBalanceBefore = await assetContract.balanceOf(addresses.lp1);
-
-        await instance.setApprovalForAll(addresses.vault, true);
-
-        await instance["withdraw(uint256,address,address)"](
-          params.depositAmount,
-          addresses.lp1,
-          addresses.lp1
-        );
-
-        const lpBalanceAfter = await assetContract.balanceOf(addresses.lp1);
-        assert.bnEqual(
-          lpBalanceBefore,
-          lpBalanceAfter.sub(params.depositAmount)
-        );
-      });
+      time.revertToSnapshotAfterEach(async () => {});
     });
   });
 }

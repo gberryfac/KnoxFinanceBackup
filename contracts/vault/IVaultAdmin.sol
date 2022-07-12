@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "./Storage.sol";
+import "./VaultStorage.sol";
 
-interface IAdmin {
+interface IVaultAdmin {
     event OptionParametersSet(bool isCall, uint64 expiry, int128 strike64x64);
 
     event SaleWindowSet(
@@ -17,10 +17,7 @@ interface IAdmin {
     //  * @param
     //  * @param
     //  */
-    function init(
-        Storage.InitParams memory _initParams,
-        Storage.InitProps memory _initProps
-    ) external;
+    function initialize(VaultStorage.InitImpl memory initImpl) external;
 
     /**
      * @notice Pauses the vault during an emergency preventing deposits and borrowing.
@@ -62,12 +59,6 @@ interface IAdmin {
      */
     function setPerformanceFee(uint256 newPerformanceFee) external;
 
-    /**
-     * @notice Sets a new cap for deposits
-     * @param newCap is the new cap for deposits
-     */
-    function setCap(uint256 newCap) external;
-
     // /**
     //  * @notice
     //  * @param
@@ -91,6 +82,11 @@ interface IAdmin {
     function withdrawReservedLiquidity() external;
 
     // /**
+    // /**
+    //  * @notice
+    //  */
+    function collectVaultFees() external;
+
     //  * @notice
     //  */
     function depositQueuedToVault() external;
@@ -98,7 +94,17 @@ interface IAdmin {
     // /**
     //  * @notice
     //  */
-    function collectVaultFees() external;
+    function setNextEpoch() external;
+
+    /**
+     * @notice Sets the start and end time of the auction.
+     */
+    function setAuctionPrices() external;
+
+    /**
+     * @notice
+     */
+    function setAndInitializeAuction() external;
 
     /**
      * @notice Sets the parameters for the next option to be sold
@@ -108,17 +114,17 @@ interface IAdmin {
     /**
      * @notice Sets the start and end time of the auction.
      */
-    function setAuctionPrices() external;
-
-    /**
-     * @notice Sets the start and end time of the auction.
-     */
     function setAuctionWindow() external;
 
     /**
      * @notice
      */
-    function getIntrinsicValue(uint64 epoch, uint256 size)
+    function processAuction() external;
+
+    /**
+     * @notice
+     */
+    function getExerciseAmount(uint64 epoch, uint256 size)
         external
         view
         returns (bool, uint256);
