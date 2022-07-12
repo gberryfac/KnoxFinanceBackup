@@ -1,11 +1,15 @@
 import { ethers } from "hardhat";
-const { provider } = ethers;
 import { BigNumber } from "ethers";
+const { provider } = ethers;
 
 import { fixedFromFloat, fixedToNumber } from "@premia/utils";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { deployMockContract, MockContract } from "ethereum-waffle";
-import { expect } from "chai";
+
+import chai, { expect } from "chai";
+import chaiAlmost from "chai-almost";
+
+chai.use(chaiAlmost());
 
 import { Pricer, Pricer__factory } from "../types";
 
@@ -18,7 +22,7 @@ import { ADDRESS_ZERO } from "../constants";
 import moment from "moment-timezone";
 moment.tz.setDefault("UTC");
 
-describe("Pricer Unit Tests", () => {
+describe("Pricer Tests", () => {
   behavesLikePricer({
     name: "Pricer (Put Options)",
     isCall: false,
@@ -165,12 +169,11 @@ function behavesLikePricer(params: Params) {
 
       it("should convert time to maurity correctly", async () => {
         const expected = (params.expiry - block.timestamp) / 31536000;
-
-        // truncates the last 3 digits of timestamp
-        assert.bnEqual(
-          (await pricer.getTimeToMaturity64x64(params.expiry)).div(1000),
-          fixedFromFloat(expected).div(1000)
+        const actual = fixedToNumber(
+          await pricer.getTimeToMaturity64x64(params.expiry)
         );
+
+        expect(actual).to.almost(expected, 0.001);
       });
     });
 

@@ -23,7 +23,7 @@ import { VaultUtil } from "./utils/VaultUtil";
 
 import { PREMIA_VOLATILITY_SURFACE_ORACLE } from "../constants";
 
-describe("Vault Unit Tests", () => {
+describe("Vault Tests", () => {
   behavesLikeVault({
     name: `Knox ETH Delta Vault (Put)`,
     tokenName: `Knox ETH Delta Vault`,

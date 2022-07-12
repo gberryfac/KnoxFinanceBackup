@@ -13,14 +13,18 @@ library OrderBook {
     }
 
     struct Order {
-        address buyer;
-        int128 price64x64;
-        uint256 id;
-        uint256 size;
+        Data data;
         uint256 parent;
         uint256 left;
         uint256 right;
         uint256 height;
+    }
+
+    struct Data {
+        uint256 id;
+        int128 price64x64;
+        uint256 size;
+        address buyer;
     }
 
     /// @dev Retrieve the highest bid in the order book.
@@ -41,15 +45,9 @@ library OrderBook {
     function _getOrderById(Index storage index, uint256 id)
         internal
         view
-        returns (
-            uint256,
-            int128,
-            uint256,
-            address
-        )
+        returns (Data memory)
     {
-        Order memory order = index.orders[id];
-        return (order.id, order.price64x64, order.size, order.buyer);
+        return index.orders[id].data;
     }
 
     /// @dev Returns the previous bid in descending order.
@@ -62,7 +60,7 @@ library OrderBook {
     {
         Order storage currentOrder = index.orders[id];
 
-        if (currentOrder.id == 0) {
+        if (currentOrder.data.id == 0) {
             // Unknown order, just return 0;
             return 0;
         }
@@ -76,7 +74,7 @@ library OrderBook {
             while (child.right != 0) {
                 child = index.orders[child.right];
             }
-            return child.id;
+            return child.data.id;
         }
 
         if (currentOrder.parent != 0) {
@@ -87,8 +85,8 @@ library OrderBook {
             child = currentOrder;
 
             while (true) {
-                if (parent.right == child.id) {
-                    return parent.id;
+                if (parent.right == child.data.id) {
+                    return parent.data.id;
                 }
 
                 if (parent.parent == 0) {
@@ -113,7 +111,7 @@ library OrderBook {
     {
         Order storage currentOrder = index.orders[id];
 
-        if (currentOrder.id == 0) {
+        if (currentOrder.data.id == 0) {
             // Unknown order, just return 0;
             return 0;
         }
@@ -127,7 +125,7 @@ library OrderBook {
             while (child.left != 0) {
                 child = index.orders[child.left];
             }
-            return child.id;
+            return child.data.id;
         }
 
         if (currentOrder.parent != 0) {
@@ -137,8 +135,8 @@ library OrderBook {
             child = currentOrder;
 
             while (true) {
-                if (parent.left == child.id) {
-                    return parent.id;
+                if (parent.left == child.data.id) {
+                    return parent.data.id;
                 }
 
                 if (parent.parent == 0) {
@@ -170,16 +168,19 @@ library OrderBook {
         index.length = index.length > 0 ? index.length + 1 : 1;
         uint256 id = index.length;
 
-        (, int128 highestPricePaid, , ) = _getOrderById(index, index.head);
+        Data memory data = _getOrderById(index, index.head);
+
+        int128 highestPricePaid = data.price64x64;
+
         if (index.head == 0 || price64x64 > highestPricePaid) {
             index.head = id;
         }
 
-        if (index.orders[id].id == id) {
+        if (index.orders[id].data.id == id) {
             // A order with this id already exists.  If the price is
             // the same, then just return early, otherwise, remove it
             // and reinsert it.
-            if (index.orders[id].price64x64 == price64x64) {
+            if (index.orders[id].data.price64x64 == price64x64) {
                 return id;
             }
             _remove(index, id);
@@ -194,21 +195,21 @@ library OrderBook {
 
         // Do insertion
         while (true) {
-            if (currentOrder.id == 0) {
+            if (currentOrder.data.id == 0) {
                 // This is a new unpopulated order.
-                currentOrder.id = id;
+                currentOrder.data.id = id;
                 currentOrder.parent = previousOrderId;
-                currentOrder.price64x64 = price64x64;
-                currentOrder.size = size;
-                currentOrder.buyer = buyer;
+                currentOrder.data.price64x64 = price64x64;
+                currentOrder.data.size = size;
+                currentOrder.data.buyer = buyer;
                 break;
             }
 
             // Set the previous order id.
-            previousOrderId = currentOrder.id;
+            previousOrderId = currentOrder.data.id;
 
             // The new order belongs in the right subtree
-            if (price64x64 <= currentOrder.price64x64) {
+            if (price64x64 <= currentOrder.data.price64x64) {
                 if (currentOrder.right == 0) {
                     currentOrder.right = id;
                 }
@@ -224,7 +225,7 @@ library OrderBook {
         }
 
         // Rebalance the tree
-        _rebalanceTree(index, currentOrder.id);
+        _rebalanceTree(index, currentOrder.data.id);
 
         return id;
     }
@@ -246,7 +247,7 @@ library OrderBook {
 
         Order storage orderToDelete = index.orders[id];
 
-        if (orderToDelete.id != id) {
+        if (orderToDelete.data.id != id) {
             // The id does not exist in the tree.
             return false;
         }
@@ -257,12 +258,12 @@ library OrderBook {
             if (orderToDelete.left != 0) {
                 // This order is guaranteed to not have a right child.
                 replacementOrder = index.orders[
-                    _getPreviousOrder(index, orderToDelete.id)
+                    _getPreviousOrder(index, orderToDelete.data.id)
                 ];
             } else {
                 // This order is guaranteed to not have a left child.
                 replacementOrder = index.orders[
-                    _getNextOrder(index, orderToDelete.id)
+                    _getNextOrder(index, orderToDelete.data.id)
                 ];
             }
             // The replacementOrder is guaranteed to have a parent.
@@ -270,24 +271,24 @@ library OrderBook {
 
             // Keep note of the location that our tree rebalancing should
             // start at.
-            rebalanceOrigin = replacementOrder.id;
+            rebalanceOrigin = replacementOrder.data.id;
 
             // Join the parent of the replacement order with any subtree of
             // the replacement order.  We can guarantee that the replacement
             // order has at most one subtree because of how getNextOrder and
             // getPreviousOrder are used.
-            if (parent.left == replacementOrder.id) {
+            if (parent.left == replacementOrder.data.id) {
                 parent.left = replacementOrder.right;
                 if (replacementOrder.right != 0) {
                     child = index.orders[replacementOrder.right];
-                    child.parent = parent.id;
+                    child.parent = parent.data.id;
                 }
             }
-            if (parent.right == replacementOrder.id) {
+            if (parent.right == replacementOrder.data.id) {
                 parent.right = replacementOrder.left;
                 if (replacementOrder.left != 0) {
                     child = index.orders[replacementOrder.left];
-                    child.parent = parent.id;
+                    child.parent = parent.data.id;
                 }
             }
 
@@ -297,43 +298,43 @@ library OrderBook {
             replacementOrder.parent = orderToDelete.parent;
             if (orderToDelete.parent != 0) {
                 parent = index.orders[orderToDelete.parent];
-                if (parent.left == orderToDelete.id) {
-                    parent.left = replacementOrder.id;
+                if (parent.left == orderToDelete.data.id) {
+                    parent.left = replacementOrder.data.id;
                 }
-                if (parent.right == orderToDelete.id) {
-                    parent.right = replacementOrder.id;
+                if (parent.right == orderToDelete.data.id) {
+                    parent.right = replacementOrder.data.id;
                 }
             } else {
                 // If the order we are deleting is the root order update the
                 // index root order pointer.
-                index.root = replacementOrder.id;
+                index.root = replacementOrder.data.id;
             }
 
             replacementOrder.left = orderToDelete.left;
             if (orderToDelete.left != 0) {
                 child = index.orders[orderToDelete.left];
-                child.parent = replacementOrder.id;
+                child.parent = replacementOrder.data.id;
             }
 
             replacementOrder.right = orderToDelete.right;
             if (orderToDelete.right != 0) {
                 child = index.orders[orderToDelete.right];
-                child.parent = replacementOrder.id;
+                child.parent = replacementOrder.data.id;
             }
         } else if (orderToDelete.parent != 0) {
             // The order being deleted is a leaf order so we only erase it's
             // parent linkage.
             parent = index.orders[orderToDelete.parent];
 
-            if (parent.left == orderToDelete.id) {
+            if (parent.left == orderToDelete.data.id) {
                 parent.left = 0;
             }
-            if (parent.right == orderToDelete.id) {
+            if (parent.right == orderToDelete.data.id) {
                 parent.right = 0;
             }
 
             // keep note of where the rebalancing should begin.
-            rebalanceOrigin = parent.id;
+            rebalanceOrigin = parent.data.id;
         } else {
             // This is both a leaf order and the root order, so we need to
             // unset the root order pointer.
@@ -341,10 +342,10 @@ library OrderBook {
         }
 
         // Now we zero out all of the fields on the orderToDelete.
-        orderToDelete.id = 0;
-        orderToDelete.price64x64 = 0;
-        orderToDelete.size = 0;
-        orderToDelete.buyer = 0x0000000000000000000000000000000000000000;
+        orderToDelete.data.id = 0;
+        orderToDelete.data.price64x64 = 0;
+        orderToDelete.data.size = 0;
+        orderToDelete.data.buyer = 0x0000000000000000000000000000000000000000;
         orderToDelete.parent = 0;
         orderToDelete.left = 0;
         orderToDelete.right = 0;
@@ -364,7 +365,8 @@ library OrderBook {
         Order storage currentOrder = index.orders[id];
 
         while (true) {
-            int256 balanceFactor = _getBalanceFactor(index, currentOrder.id);
+            int256 balanceFactor =
+                _getBalanceFactor(index, currentOrder.data.id);
 
             if (balanceFactor == 2) {
                 // Right rotation (tree is heavy on the left)
@@ -374,7 +376,7 @@ library OrderBook {
                     // right.
                     _rotateLeft(index, currentOrder.left);
                 }
-                _rotateRight(index, currentOrder.id);
+                _rotateRight(index, currentOrder.data.id);
             }
 
             if (balanceFactor == -2) {
@@ -385,11 +387,11 @@ library OrderBook {
                     // left.
                     _rotateRight(index, currentOrder.right);
                 }
-                _rotateLeft(index, currentOrder.id);
+                _rotateLeft(index, currentOrder.data.id);
             }
 
             if ((-1 <= balanceFactor) && (balanceFactor <= 1)) {
-                _updateOrderHeight(index, currentOrder.id);
+                _updateOrderHeight(index, currentOrder.data.id);
             }
 
             if (currentOrder.parent == 0) {
@@ -454,11 +456,11 @@ library OrderBook {
 
             // figure out if we're a left or right child and have the
             // parent point to the new order.
-            if (parent.left == originalRoot.id) {
-                parent.left = newRoot.id;
+            if (parent.left == originalRoot.data.id) {
+                parent.left = newRoot.data.id;
             }
-            if (parent.right == originalRoot.id) {
-                parent.right = newRoot.id;
+            if (parent.right == originalRoot.data.id) {
+                parent.right = newRoot.data.id;
             }
         }
 
@@ -466,20 +468,20 @@ library OrderBook {
             // If the new root had a left child, that moves to be the
             // new right child of the original root order
             Order storage leftChild = index.orders[newRoot.left];
-            originalRoot.right = leftChild.id;
-            leftChild.parent = originalRoot.id;
+            originalRoot.right = leftChild.data.id;
+            leftChild.parent = originalRoot.data.id;
         }
 
         // Update the newRoot's left order to point at the original order.
-        originalRoot.parent = newRoot.id;
-        newRoot.left = originalRoot.id;
+        originalRoot.parent = newRoot.data.id;
+        newRoot.left = originalRoot.data.id;
 
         if (newRoot.parent == 0) {
-            index.root = newRoot.id;
+            index.root = newRoot.data.id;
         }
 
-        _updateOrderHeight(index, originalRoot.id);
-        _updateOrderHeight(index, newRoot.id);
+        _updateOrderHeight(index, originalRoot.data.id);
+        _updateOrderHeight(index, newRoot.data.id);
     }
 
     function _rotateRight(Index storage index, uint256 id) private {
@@ -504,30 +506,30 @@ library OrderBook {
             // at the newRoot now.
             Order storage parent = index.orders[originalRoot.parent];
 
-            if (parent.left == originalRoot.id) {
-                parent.left = newRoot.id;
+            if (parent.left == originalRoot.data.id) {
+                parent.left = newRoot.data.id;
             }
-            if (parent.right == originalRoot.id) {
-                parent.right = newRoot.id;
+            if (parent.right == originalRoot.data.id) {
+                parent.right = newRoot.data.id;
             }
         }
 
         if (newRoot.right != 0) {
             Order storage rightChild = index.orders[newRoot.right];
             originalRoot.left = newRoot.right;
-            rightChild.parent = originalRoot.id;
+            rightChild.parent = originalRoot.data.id;
         }
 
         // Update the new root's right order to point to the original order.
-        originalRoot.parent = newRoot.id;
-        newRoot.right = originalRoot.id;
+        originalRoot.parent = newRoot.data.id;
+        newRoot.right = originalRoot.data.id;
 
         if (newRoot.parent == 0) {
-            index.root = newRoot.id;
+            index.root = newRoot.data.id;
         }
 
         // Recompute heights.
-        _updateOrderHeight(index, originalRoot.id);
-        _updateOrderHeight(index, newRoot.id);
+        _updateOrderHeight(index, originalRoot.data.id);
+        _updateOrderHeight(index, newRoot.data.id);
     }
 }

@@ -34,18 +34,18 @@ contract Auction is Access, AuctionInternal, IAuction {
      ***********************************************/
 
     // @notice
-    function lastPrice(uint64 epoch) external view returns (int128) {
-        return _lastPrice(epoch);
+    function lastPrice64x64(uint64 epoch) external view returns (int128) {
+        return _lastPrice64x64(epoch);
     }
 
     // @notice
-    function priceCurve(uint64 epoch) external view returns (int128) {
-        return _priceCurve(epoch);
+    function priceCurve64x64(uint64 epoch) external view returns (int128) {
+        return _priceCurve64x64(epoch);
     }
 
     // @notice
-    function clearingPrice(uint64 epoch) external view returns (int128) {
-        return _clearingPrice(epoch);
+    function clearingPrice64x64(uint64 epoch) external view returns (int128) {
+        return _clearingPrice64x64(epoch);
     }
 
     /************************************************
@@ -57,7 +57,7 @@ contract Auction is Access, AuctionInternal, IAuction {
         uint64 epoch,
         int128 price64x64,
         uint256 size
-    ) external nonReentrant returns (uint256) {
+    ) external nonReentrant {
         return _addLimitOrder(epoch, price64x64, size);
     }
 
@@ -68,12 +68,8 @@ contract Auction is Access, AuctionInternal, IAuction {
 
     // @notice
     // @dev must approve contract prior to committing tokens to auction
-    function addOrder(uint64 epoch, uint256 size)
-        external
-        nonReentrant
-        returns (uint256)
-    {
-        return _addOrder(epoch, size);
+    function addMarketOrder(uint64 epoch, uint256 size) external nonReentrant {
+        return _addMarketOrder(epoch, size);
     }
 
     /************************************************
@@ -92,13 +88,6 @@ contract Auction is Access, AuctionInternal, IAuction {
         _transferPremium(epoch);
     }
 
-    function setLongTokenId(uint64 epoch, uint256 longTokenId)
-        external
-        onlyVault
-    {
-        _setLongTokenId(epoch, longTokenId);
-    }
-
     function processAuction(uint64 epoch) external {
         _processAuction(epoch);
     }
@@ -109,6 +98,10 @@ contract Auction is Access, AuctionInternal, IAuction {
 
     function withdraw(uint64 epoch) external {
         _withdraw(epoch);
+    }
+
+    function previewWithdraw(uint64 epoch) external returns (uint256, uint256) {
+        return _previewWithdraw(epoch);
     }
 
     /************************************************
@@ -127,8 +120,12 @@ contract Auction is Access, AuctionInternal, IAuction {
         return _status(epoch);
     }
 
-    function totalCollateralUsed(uint64 epoch) external view returns (uint256) {
-        return _totalCollateralUsed(epoch);
+    function totalContracts(uint64 epoch) external view returns (uint256) {
+        return _totalContracts(epoch);
+    }
+
+    function totalContractsSold(uint64 epoch) external view returns (uint256) {
+        return _totalContractsSold(epoch);
     }
 
     function claimsByBuyer(address buyer)
@@ -150,12 +147,7 @@ contract Auction is Access, AuctionInternal, IAuction {
     function getOrderById(uint64 epoch, uint256 id)
         external
         view
-        returns (
-            uint256,
-            int128,
-            uint256,
-            address
-        )
+        returns (OrderBook.Data memory)
     {
         return _getOrderById(epoch, id);
     }

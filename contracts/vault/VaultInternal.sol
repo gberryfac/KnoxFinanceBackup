@@ -18,9 +18,16 @@ import "hardhat/console.sol";
 
 contract VaultInternal is AccessInternal, ERC4626BaseInternal {
     using ABDKMath64x64 for int128;
+    using ABDKMath64x64 for uint256;
     using ABDKMath64x64Token for int128;
+    using ABDKMath64x64Token for uint256;
     using SafeERC20 for IERC20;
     using VaultStorage for VaultStorage.Layout;
+
+    uint256 private constant UNDERLYING_RESERVED_LIQ_TOKEN_ID =
+        0x0200000000000000000000000000000000000000000000000000000000000000;
+    uint256 private constant BASE_RESERVED_LIQ_TOKEN_ID =
+        0x0300000000000000000000000000000000000000000000000000000000000000;
 
     IERC20 public immutable ERC20;
     IPremiaPool public immutable Pool;
@@ -74,11 +81,31 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal {
 
         strike64x64 = l.Pricer.snapToGrid(l.isCall, strike64x64);
 
+        uint64 nextEpoch = l.epoch + 1;
+
         // Sets parameters for the next option
-        VaultStorage.Option storage nextOption = l.options[l.epoch++];
+        VaultStorage.Option storage nextOption = l.options[nextEpoch];
 
         nextOption.expiry = expiry;
         nextOption.strike64x64 = strike64x64;
+
+        TokenType longTokenType =
+            l.isCall ? TokenType.LONG_CALL : TokenType.LONG_PUT;
+
+        nextOption.longTokenId = _formatTokenId(
+            longTokenType,
+            expiry,
+            strike64x64
+        );
+
+        TokenType shortTokenType =
+            l.isCall ? TokenType.SHORT_CALL : TokenType.SHORT_PUT;
+
+        nextOption.shortTokenId = _formatTokenId(
+            shortTokenType,
+            expiry,
+            strike64x64
+        );
 
         require(nextOption.strike64x64 > 0, "invalid strike price");
 
@@ -100,8 +127,17 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal {
     function _initializeAuction() internal {
         VaultStorage.Layout storage l = VaultStorage.layout();
 
+        uint64 nextEpoch = l.epoch++;
+        VaultStorage.Option storage nextOption = l.options[nextEpoch];
+
         l.Auction.initialize(
-            AuctionStorage.InitAuction(l.epoch++, l.startTime, l.endTime)
+            AuctionStorage.InitAuction(
+                nextEpoch,
+                nextOption.strike64x64,
+                nextOption.longTokenId,
+                l.startTime,
+                l.endTime
+            )
         );
     }
 
@@ -120,22 +156,17 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal {
     }
 
     function _processExpired() internal {
-        uint256[] memory tokenIds = Pool.tokensByAccount(address(this));
+        VaultStorage.Layout storage l = VaultStorage.layout();
+        VaultStorage.Option storage option = l.options[l.epoch];
 
-        for (uint256 i; i < tokenIds.length; i++) {
-            if (
-                tokenIds[i] != Constants.UNDERLYING_RESERVED_LIQ_TOKEN_ID &&
-                tokenIds[i] != Constants.BASE_RESERVED_LIQ_TOKEN_ID
-            ) {
-                uint256 tokenBalance =
-                    Pool.balanceOf(address(this), tokenIds[i]);
+        address[] memory accounts = Pool.accountsByToken(option.longTokenId);
+        uint256 balances;
 
-                // Don't process dust
-                if (tokenBalance >= 10**14) {
-                    Pool.processExpired(tokenIds[i], tokenBalance);
-                }
-            }
+        for (uint256 i; i < accounts.length; i++) {
+            balances += Pool.balanceOf(accounts[i], option.longTokenId);
         }
+
+        Pool.processExpired(option.longTokenId, balances);
     }
 
     function _withdrawReservedLiquidity() internal {
@@ -145,8 +176,8 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal {
             Pool.balanceOf(
                 address(this),
                 l.isCall
-                    ? Constants.UNDERLYING_RESERVED_LIQ_TOKEN_ID
-                    : Constants.BASE_RESERVED_LIQ_TOKEN_ID
+                    ? UNDERLYING_RESERVED_LIQ_TOKEN_ID
+                    : BASE_RESERVED_LIQ_TOKEN_ID
             );
 
         Pool.withdraw(reservedLiquidity, l.isCall);
@@ -157,18 +188,18 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal {
     function _collectVaultFees() internal {
         VaultStorage.Layout storage l = VaultStorage.layout();
 
-        (, uint256 intrinsicValue) = _getIntrinsicValue(l.epoch, l.totalShort);
+        (, uint256 exerciseAmount) = _getExerciseAmount(l.epoch, l.totalShort);
 
-        if (l.totalPremiums > intrinsicValue) {
+        if (l.totalPremiums > exerciseAmount) {
             /**
              * Take performance fee ONLY if premium remaining after the option expires is positive.
              * If it is negative, last week's option expired ITM past breakeven, and the vault took
              * a loss so we do not collect performance fee for last week.
              */
-            uint256 netIncome = l.totalPremiums - intrinsicValue;
+            uint256 netIncome = l.totalPremiums - exerciseAmount;
             uint256 performanceFeeInAsset =
                 (netIncome * l.performanceFee) /
-                    (100 * Constants.FEE_MULTIPLIER);
+                    (100 * VaultStorage.FEE_MULTIPLIER);
 
             ERC20.safeTransfer(l.feeRecipient, performanceFeeInAsset);
         }
@@ -234,6 +265,11 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal {
                 l.isCall
             );
 
+        if (l.isCall) {
+            maxPrice64x64.div(spot64x64);
+            minPrice64x64.div(spot64x64);
+        }
+
         l.Auction.setAuctionPrices(l.epoch, maxPrice64x64, minPrice64x64);
 
         // emit PriceRangeSet(l.maxPrice, l.minPrice);
@@ -245,24 +281,33 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal {
 
     function _processAuction() internal {
         VaultStorage.Layout storage l = VaultStorage.layout();
-        if (!l.Auction.isFinalized(l.epoch)) l.Auction.finalizeAuction(l.epoch);
-        l.Auction.transferPremium(l.epoch);
-
-        uint256 totalCollateralUsed = l.Auction.totalCollateralUsed(l.epoch);
-
         VaultStorage.Option memory option = l.options[l.epoch];
 
-        (uint256 longTokenId, ) =
-            Pool.writeFrom(
-                address(this),
-                address(l.Auction),
-                option.expiry,
-                option.strike64x64,
-                totalCollateralUsed,
-                l.isCall
-            );
+        if (!l.Auction.isFinalized(l.epoch)) l.Auction.finalizeAuction(l.epoch);
 
-        l.Auction.setLongTokenId(l.epoch, longTokenId);
+        l.Auction.transferPremium(l.epoch);
+        uint256 totalContractsSold = l.Auction.totalContractsSold(l.epoch);
+
+        uint256 totalCollateralUsed =
+            l.isCall
+                ? totalContractsSold
+                : ABDKMath64x64Token.toBaseTokenAmount(
+                    l.underlyingDecimals,
+                    l.baseDecimals,
+                    option.strike64x64.mulu(totalContractsSold)
+                );
+
+        ERC20.approve(address(Pool), totalCollateralUsed);
+
+        Pool.writeFrom(
+            address(this),
+            address(l.Auction),
+            option.expiry,
+            option.strike64x64,
+            totalContractsSold,
+            l.isCall
+        );
+
         l.Auction.processAuction(l.epoch);
     }
 
@@ -449,7 +494,7 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal {
     ) private returns (uint256, uint256) {
         VaultStorage.Layout storage l = VaultStorage.layout();
 
-        uint256 multiplier = (100 * Constants.FEE_MULTIPLIER);
+        uint256 multiplier = (100 * VaultStorage.FEE_MULTIPLIER);
 
         uint256 feesInCollateralAsset =
             ((collateralAssetAmount + premiumAssetAmount) * l.withdrawalFee) /
@@ -489,7 +534,7 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal {
         ERC1155.safeTransferFrom(
             address(this),
             receiver,
-            option.optionTokenId,
+            option.shortTokenId,
             shortAmount,
             ""
         );
@@ -499,7 +544,7 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal {
         return uint64(Helpers.getNextFriday(block.timestamp));
     }
 
-    function _getIntrinsicValue(uint64 epoch, uint256 size)
+    function _getExerciseAmount(uint64 epoch, uint256 size)
         internal
         view
         returns (bool, uint256)
@@ -513,15 +558,41 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal {
         if (block.timestamp < expiry) return (false, 0);
 
         int128 spot64x64 = Pool.getPriceAfter64x64(expiry);
-        uint256 intrinsicValue;
+        uint256 amount;
 
         if (l.isCall && spot64x64 > strike64x64) {
-            intrinsicValue = spot64x64.sub(strike64x64).mulu(size);
+            amount = spot64x64.sub(strike64x64).div(spot64x64).mulu(size);
         } else if (!l.isCall && strike64x64 > spot64x64) {
-            intrinsicValue = strike64x64.sub(spot64x64).mulu(size);
+            uint256 value = strike64x64.sub(spot64x64).mulu(size);
+            amount = ABDKMath64x64Token.toBaseTokenAmount(
+                l.underlyingDecimals,
+                l.baseDecimals,
+                value
+            );
         }
 
-        // TODO: toDecimal(?)
-        return (true, intrinsicValue);
+        return (true, amount);
+    }
+
+    enum TokenType {
+        UNDERLYING_FREE_LIQ,
+        BASE_FREE_LIQ,
+        UNDERLYING_RESERVED_LIQ,
+        BASE_RESERVED_LIQ,
+        LONG_CALL,
+        SHORT_CALL,
+        LONG_PUT,
+        SHORT_PUT
+    }
+
+    function _formatTokenId(
+        TokenType tokenType,
+        uint64 maturity,
+        int128 strike64x64
+    ) private pure returns (uint256 tokenId) {
+        tokenId =
+            (uint256(tokenType) << 248) +
+            (uint256(maturity) << 128) +
+            uint256(int256(strike64x64));
     }
 }

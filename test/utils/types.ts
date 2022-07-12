@@ -48,18 +48,18 @@ export type Addresses = {
 };
 
 export type VaultParams = {
-  name: string;
-  tokenName: string;
-  tokenSymbol: string;
-  tokenDecimals: number;
-  asset: Asset;
-  delta: number;
-  deltaOffset: number;
-  pool: Pool;
-  deposit: BigNumber;
-  maxTVL: BigNumber;
-  minSize: BigNumber;
-  performanceFee: BigNumber;
-  withdrawalFee: BigNumber;
-  isCall: boolean;
+  name?: string;
+  tokenName?: string;
+  tokenSymbol?: string;
+  tokenDecimals?: number;
+  asset?: Asset;
+  delta?: number;
+  deltaOffset?: number;
+  pool?: Pool;
+  deposit?: BigNumber;
+  maxTVL?: BigNumber;
+  minSize?: BigNumber;
+  performanceFee?: BigNumber;
+  withdrawalFee?: BigNumber;
+  isCall?: boolean;
 };

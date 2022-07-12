@@ -94,13 +94,6 @@ contract VaultAdmin is Access, VaultInternal {
     }
 
     /**
-     * @notice
-     */
-    function setAuctionPrices() external onlyKeeper {
-        _setAuctionPrices();
-    }
-
-    /**
      * @notice Sets the start and end time of the auction.
      */
     function setAuctionWindow() external onlyKeeper {
@@ -160,6 +153,13 @@ contract VaultAdmin is Access, VaultInternal {
         _setNextEpoch();
     }
 
+    /**
+     * @notice
+     */
+    function setAuctionPrices() external onlyKeeper {
+        _setAuctionPrices();
+    }
+
     /************************************************
      *  PROCESS AUCTION
      ***********************************************/
@@ -175,11 +175,11 @@ contract VaultAdmin is Access, VaultInternal {
      * HELPERS
      ***********************************************/
 
-    function getIntrinsicValue(uint64 epoch, uint256 size)
+    function getExerciseAmount(uint64 epoch, uint256 size)
         external
         view
         returns (bool, uint256)
     {
-        return _getIntrinsicValue(epoch, size);
+        return _getExerciseAmount(epoch, size);
     }
 }

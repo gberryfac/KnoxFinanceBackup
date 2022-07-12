@@ -61,6 +61,7 @@ export class MockPremiaPoolUtil {
     await baseSpotPriceOracle.mock.latestAnswer.returns(base.price);
     await baseSpotPriceOracle.mock.decimals.returns(base.decimals);
 
+    // TODO: add ERC20 tokens as arguement, if they're undefined deploy MockERC20
     const underlyingAsset = await new MockERC20__factory(deployer).deploy(
       "",
       18

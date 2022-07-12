@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+import "./VaultStorage.sol";
+
 interface IVaultView {
     function totalDeposits() external view returns (uint256);
 
@@ -10,12 +12,8 @@ interface IVaultView {
 
     function pricePerShare(uint64 epoch) external view returns (uint256);
 
-    function option()
+    function optionByEpoch(uint64 epoch)
         external
         view
-        returns (
-            bool,
-            uint256,
-            uint256
-        );
+        returns (VaultStorage.Option memory);
 }

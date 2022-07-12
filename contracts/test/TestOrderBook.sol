@@ -19,12 +19,7 @@ contract TestOrderBook {
     function getOrder(uint256 id)
         external
         view
-        returns (
-            uint256,
-            int128,
-            uint256,
-            address
-        )
+        returns (OrderBook.Data memory)
     {
         return index._getOrderById(id);
     }

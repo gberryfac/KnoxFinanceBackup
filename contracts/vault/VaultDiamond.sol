@@ -51,8 +51,8 @@ contract VaultDiamond is SolidStateDiamond {
 
             l.performanceFee = initProxy.performanceFee;
             l.withdrawalFee =
-                (initProxy.withdrawalFee * Constants.FEE_MULTIPLIER) /
-                Constants.WEEKS_PER_YEAR;
+                (initProxy.withdrawalFee * VaultStorage.FEE_MULTIPLIER) /
+                VaultStorage.WEEKS_PER_YEAR;
 
             l.feeRecipient = initProxy.feeRecipient;
 

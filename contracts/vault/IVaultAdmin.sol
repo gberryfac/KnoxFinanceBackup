@@ -82,6 +82,11 @@ interface IVaultAdmin {
     function withdrawReservedLiquidity() external;
 
     // /**
+    // /**
+    //  * @notice
+    //  */
+    function collectVaultFees() external;
+
     //  * @notice
     //  */
     function depositQueuedToVault() external;
@@ -89,7 +94,17 @@ interface IVaultAdmin {
     // /**
     //  * @notice
     //  */
-    function collectVaultFees() external;
+    function setNextEpoch() external;
+
+    /**
+     * @notice Sets the start and end time of the auction.
+     */
+    function setAuctionPrices() external;
+
+    /**
+     * @notice
+     */
+    function setAndInitializeAuction() external;
 
     /**
      * @notice Sets the parameters for the next option to be sold
@@ -99,17 +114,17 @@ interface IVaultAdmin {
     /**
      * @notice Sets the start and end time of the auction.
      */
-    function setAuctionPrices() external;
-
-    /**
-     * @notice Sets the start and end time of the auction.
-     */
     function setAuctionWindow() external;
 
     /**
      * @notice
      */
-    function getIntrinsicValue(uint64 epoch, uint256 size)
+    function processAuction() external;
+
+    /**
+     * @notice
+     */
+    function getExerciseAmount(uint64 epoch, uint256 size)
         external
         view
         returns (bool, uint256);

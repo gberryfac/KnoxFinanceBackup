@@ -12,21 +12,21 @@ interface IAuction {
         int128 minPrice64x64
     ) external;
 
-    function lastPrice(uint64 epoch) external view returns (int128);
+    function lastPrice64x64(uint64 epoch) external view returns (int128);
 
-    function priceCurve(uint64 epoch) external view returns (int128);
+    function priceCurve64x64(uint64 epoch) external view returns (int128);
 
-    function clearingPrice(uint64 epoch) external view returns (int128);
+    function clearingPrice64x64(uint64 epoch) external view returns (int128);
 
     function addLimitOrder(
         uint64 epoch,
         int128 price64x64,
         uint256 size
-    ) external returns (uint256);
+    ) external;
 
     function cancelLimitOrder(uint64 epoch, uint256 id) external;
 
-    function addOrder(uint64 epoch, uint256 size) external returns (uint256);
+    function addMarketOrder(uint64 epoch, uint256 size) external;
 
     function processOrders(uint64 epoch) external returns (bool);
 
@@ -34,17 +34,17 @@ interface IAuction {
 
     function transferPremium(uint64 epoch) external;
 
-    function setLongTokenId(uint64 epoch, uint256 longTokenId) external;
-
     function processAuction(uint64 epoch) external;
 
     function withdraw(uint64 epoch) external;
+
+    function previewWithdraw(uint64 epoch) external returns (uint256, uint256);
 
     function isFinalized(uint64 epoch) external view returns (bool);
 
     function status(uint64 epoch) external view returns (AuctionStorage.Status);
 
-    function totalCollateralUsed(uint64 epoch) external view returns (uint256);
+    function totalContractsSold(uint64 epoch) external view returns (uint256);
 
     function claimsByBuyer(address buyer)
         external

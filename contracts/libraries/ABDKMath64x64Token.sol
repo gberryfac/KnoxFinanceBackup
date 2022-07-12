@@ -212,4 +212,13 @@ library ABDKMath64x64Token {
     function fromWei(uint256 value) internal pure returns (int128 value64x64) {
         value64x64 = fromDecimals(value, 18);
     }
+
+    function toBaseTokenAmount(
+        uint8 underlyingDecimals,
+        uint8 baseDecimals,
+        uint256 value
+    ) internal pure returns (uint256) {
+        int128 value64x64 = fromDecimals(value, underlyingDecimals);
+        return toDecimals(value64x64, baseDecimals);
+    }
 }

@@ -7,9 +7,14 @@ import "../pricer/IPricer.sol";
 
 import "../queue/IQueue.sol";
 
-import "../libraries/Constants.sol";
-
 library VaultStorage {
+    // @notice Fees are 6-decimal places. For example: 20 * 10**6 = 20%
+    uint256 internal constant FEE_MULTIPLIER = 10**6;
+
+    // @notice Number of weeks per year = 52.142857 weeks * FEE_MULTIPLIER = 52142857.
+    // Dividing by weeks per year requires doing num.mul(FEE_MULTIPLIER).div(WEEKS_PER_YEAR)
+    uint256 internal constant WEEKS_PER_YEAR = 52142857;
+
     /************************************************
      *  INITIALIZATION STRUCTS
      ***********************************************/
@@ -39,7 +44,9 @@ library VaultStorage {
         // @notice Strike price of the option as a 64x64 bit fixed point number
         int128 strike64x64;
         // @notice
-        uint256 optionTokenId;
+        uint256 longTokenId;
+        // @notice
+        uint256 shortTokenId;
     }
 
     /************************************************
@@ -87,8 +94,6 @@ library VaultStorage {
         uint256 totalShort;
         // @notice
         uint256 totalPremiums;
-        // @notice
-        uint256 totalWithdrawals;
         /************************************************
          * VAULT PROPERTIES
          ***********************************************/
@@ -140,10 +145,7 @@ library VaultStorage {
     function _setPerformanceFee(Layout storage l, uint256 newPerformanceFee)
         internal
     {
-        require(
-            newPerformanceFee < 100 * Constants.FEE_MULTIPLIER,
-            "invalid fee amount"
-        );
+        require(newPerformanceFee < 100 * FEE_MULTIPLIER, "invalid fee amount");
 
         // emit PerformanceFeeSet(l.performanceFee, newPerformanceFee);
 
@@ -153,15 +155,11 @@ library VaultStorage {
     function _setWithdrawalFee(Layout storage l, uint256 newWithdrawalFee)
         internal
     {
-        require(
-            newWithdrawalFee < 100 * Constants.FEE_MULTIPLIER,
-            "invalid fee amount"
-        );
+        require(newWithdrawalFee < 100 * FEE_MULTIPLIER, "invalid fee amount");
 
         // Divides annualized withdrawal fee by number of weeks in a year
         uint256 tmpWithdrawalFee =
-            (newWithdrawalFee * Constants.FEE_MULTIPLIER) /
-                Constants.WEEKS_PER_YEAR;
+            (newWithdrawalFee * FEE_MULTIPLIER) / WEEKS_PER_YEAR;
 
         // emit WithdrawalFeeSet(l.withdrawalFee, newWithdrawalFee);
 

@@ -7,7 +7,6 @@ import { diamondCut } from "../../scripts/diamond";
 
 import {
   IVault,
-  Helpers__factory,
   IVault__factory,
   VaultDiamond__factory,
   VaultAdmin__factory,
@@ -47,8 +46,6 @@ export class VaultUtil {
     signers: types.Signers,
     addresses: types.Addresses
   ) {
-    const helpers = await new Helpers__factory(signers.deployer).deploy();
-
     const initProxy = {
       isCall: params.isCall,
       minSize: params.minSize,
@@ -87,12 +84,7 @@ export class VaultUtil {
       )
     );
 
-    const vaultAdminFactory = new VaultAdmin__factory(
-      {
-        "contracts/libraries/Helpers.sol:Helpers": helpers.address,
-      },
-      signers.deployer
-    );
+    const vaultAdminFactory = new VaultAdmin__factory(signers.deployer);
 
     const vaultAdminContract = await vaultAdminFactory.deploy(
       params.isCall,

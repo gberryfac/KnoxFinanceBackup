@@ -78,8 +78,8 @@ export function describeBehaviorOfAdmin(
         // // TODO: format claimTokenId
         // assert.bnEqual(claimTokenId, formatTokenId(epoch));
 
-        let [, expiry, claimTokenId] = await instance.option();
-        assert.bnEqual(expiry, NEXT_FRIDAY[chainId]);
+        // let [, expiry, claimTokenId] = await instance.option();
+        // assert.bnEqual(expiry, NEXT_FRIDAY[chainId]);
 
         // // TODO: format claimTokenId
         // assert.bnEqual(claimTokenId, formatTokenId(epoch));

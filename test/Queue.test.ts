@@ -21,7 +21,7 @@ import { assert } from "./utils/assertions";
 
 import { MockPremiaPoolUtil } from "./utils/MockUtil";
 
-describe("Queue Unit Tests", () => {
+describe("Queue Tests", () => {
   behavesLikeQueue({
     name: "Queue (Put Options)",
     isCall: false,

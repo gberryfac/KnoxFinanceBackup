@@ -8,6 +8,8 @@ import "./OrderBook.sol";
 library AuctionStorage {
     struct InitAuction {
         uint64 epoch;
+        int128 strike64x64;
+        uint256 longTokenId;
         uint256 startTime;
         uint256 endTime;
     }
@@ -16,13 +18,14 @@ library AuctionStorage {
 
     struct Auction {
         Status status;
+        int128 strike64x64;
         int128 maxPrice64x64;
         int128 minPrice64x64;
         int128 lastPrice64x64;
         uint256 startTime;
         uint256 endTime;
-        uint256 totalCollateral;
-        uint256 totalCollateralUsed;
+        uint256 totalContracts;
+        uint256 totalContractsSold;
         uint256 totalPremiums;
         uint256 totalTime;
         uint256 longTokenId;
@@ -46,10 +49,10 @@ library AuctionStorage {
     }
 
     // TODO:
-    function setMinSize() internal {}
+    function _setMinSize() internal {}
 
     // TODO:
-    function getMinSize() internal {}
+    function _getMinSize() internal {}
 
     function _getAuction(Layout storage l, uint64 epoch)
         internal
