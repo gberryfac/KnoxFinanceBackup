@@ -132,7 +132,9 @@ contract QueueInternal is ERC1155BaseInternal, ERC1155EnumerableInternal {
 
     function _depositToVault() internal {
         uint256 queueBalance = ERC20.balanceOf(address(this));
-        uint256 shareAmount = Vault.deposit(queueBalance, address(Vault));
+
+        ERC20.approve(address(Vault), queueBalance);
+        uint256 shareAmount = Vault.deposit(queueBalance, address(this));
 
         QueueStorage.Layout storage l = QueueStorage.layout();
 
