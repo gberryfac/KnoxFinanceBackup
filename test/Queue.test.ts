@@ -358,11 +358,15 @@ function behavesLikeQueue(params: Params) {
 
       it("should revert if sender != receiver and sender != approved", async () => {
         await expect(
-          instance.connect(signers.lp2).redeemMaxShares(addresses.lp1)
+          instance
+            .connect(signers.lp2)
+            ["redeemMaxShares(address)"](addresses.lp1)
         ).to.be.revertedWith("ERC1155: caller is not owner nor approved");
 
         await instance.setApprovalForAll(addresses.lp2, true);
-        await instance.connect(signers.lp2).redeemMaxShares(addresses.lp1);
+        await instance
+          .connect(signers.lp2)
+          ["redeemMaxShares(address)"](addresses.lp1);
       });
     });
 
@@ -380,11 +384,15 @@ function behavesLikeQueue(params: Params) {
 
       it("should revert if sender != receiver and sender != approved", async () => {
         await expect(
-          instance.connect(signers.lp2).redeemMaxShares(addresses.lp1)
+          instance
+            .connect(signers.lp2)
+            ["redeemMaxShares(address)"](addresses.lp1)
         ).to.be.revertedWith("ERC1155: caller is not owner nor approved");
 
         await instance.setApprovalForAll(addresses.lp2, true);
-        await instance.connect(signers.lp2).redeemMaxShares(addresses.lp1);
+        await instance
+          .connect(signers.lp2)
+          ["redeemMaxShares(address)"](addresses.lp1);
       });
 
       it("should redeem Queue shares for Vault shares", async () => {
@@ -401,7 +409,7 @@ function behavesLikeQueue(params: Params) {
 
         assert.isTrue(lpVaultSharesBefore.isZero());
 
-        await instance.redeemMaxShares(addresses.lp1);
+        await instance["redeemMaxShares(address)"](addresses.lp1);
 
         const lpQueueSharesAfter = await instance["balanceOf(address,uint256)"](
           addresses.lp1,
