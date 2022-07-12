@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+import "../auction/IDutchAuction.sol";
+
 import "../pricer/IPricer.sol";
 
 import "../interfaces/IPremiaPool.sol";
@@ -25,6 +27,7 @@ library Storage {
         uint256 withdrawalFee;
         string name;
         string symbol;
+        address auction;
         address keeper;
         address feeRecipient;
         address pool;
@@ -59,26 +62,34 @@ library Storage {
         bool isCall;
         // @notice Minimum amount of the underlying a strategy will sell
         uint64 minimumContractSize;
-        // @notice Delta used to calculate strike price as a 64x64 bit fixed point number
+        // @notice Delta used to calculate strike price
         int128 delta64x64;
+        // @notice Offset used to calculate offset strike price
+        int128 deltaOffset64x64;
         // @notice maps epoch to option
         mapping(uint64 => Option) options;
         /************************************************
          * AUCTION PARAMETERS
          ***********************************************/
         // @notice
-        uint16 startOffset;
+        uint64 startOffset;
         // @notice
-        uint16 endOffset;
+        uint64 endOffset;
         // @notice
-        uint256[2] saleWindow;
+        uint256 startTime;
+        // @notice
+        uint256 endTime;
+        // @notice
+        uint256 maxPrice;
+        // @notice
+        uint256 minPrice;
         /************************************************
          * VAULT ACCOUNTING
          ***********************************************/
         // @notice
-        uint256 totalCollateralAssets;
+        uint256 totalCollateral;
         // @notice
-        uint256 totalShortAssets;
+        uint256 totalShort;
         // @notice
         uint256 totalPremiums;
         // @notice
@@ -115,6 +126,8 @@ library Storage {
         /************************************************
          * EXTERNAL CONTRACTS
          ***********************************************/
+        // @notice
+        IDutchAuction Auction;
         // @notice
         IPricer Pricer;
     }

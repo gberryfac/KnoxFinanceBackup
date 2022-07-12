@@ -1,14 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "abdk-libraries-solidity/ABDKMath64x64.sol";
+import "../../auction/DutchAuctionStorage.sol";
 
+import "../../libraries/ABDKMath64x64Token.sol";
 import "../../libraries/Helpers.sol";
 
 import "./BaseInternal.sol";
 
 contract AdminInternal is BaseInternal {
     using ABDKMath64x64 for int128;
+    using ABDKMath64x64Token for int128;
     using SafeERC20 for IERC20;
     using Storage for Storage.Layout;
 
@@ -18,11 +20,11 @@ contract AdminInternal is BaseInternal {
      *  INITIALIZE AUCTION
      ***********************************************/
 
-    function _initializeAuction() internal {
+    function _setAndInitializeAuction() internal {
         _setOptionParameters();
         _setAuctionPrices();
         _setAuctionWindow();
-        // Auction.initializeAuction();
+        _initializeAuction();
     }
 
     function _setOptionParameters() internal {
@@ -36,40 +38,88 @@ contract AdminInternal is BaseInternal {
         strike64x64 = l.Pricer.snapToGrid(l.isCall, strike64x64);
 
         // Sets parameters for the next option
-        Storage.Option storage option = l.options[l.epoch++];
+        Storage.Option storage nextOption = l.options[l.epoch++];
 
-        option.expiry = expiry;
-        option.strike64x64 = strike64x64;
+        nextOption.expiry = expiry;
+        nextOption.strike64x64 = strike64x64;
 
-        require(option.strike64x64 > 0, "invalid strike price");
+        require(nextOption.strike64x64 > 0, "invalid strike price");
 
         // emit OptionParametersSet(l.isCall, option.expiry, option.strike64x64);
     }
 
-    // TODO:
-    function _setAuctionPrices() internal {}
+    function _setAuctionPrices() internal {
+        Storage.Layout storage l = Storage.layout();
+        Storage.Option storage nextOption = l.options[l.epoch++];
+
+        require(nextOption.strike64x64 > 0, "delta strike unset");
+
+        int128 offsetStrike64x64 =
+            l.Pricer.getDeltaStrikePrice64x64(
+                l.isCall,
+                nextOption.expiry,
+                l.delta64x64 - l.deltaOffset64x64
+            );
+
+        offsetStrike64x64 = l.Pricer.snapToGrid(l.isCall, offsetStrike64x64);
+
+        int128 spot64x64 = l.Pricer.latestAnswer64x64();
+        int128 timeToMaturity64x64 =
+            l.Pricer.getTimeToMaturity64x64(nextOption.expiry);
+
+        int128 minPrice =
+            l.Pricer.getBlackScholesPrice64x64(
+                spot64x64,
+                nextOption.strike64x64,
+                timeToMaturity64x64,
+                l.isCall
+            );
+
+        int128 maxPrice =
+            l.Pricer.getBlackScholesPrice64x64(
+                spot64x64,
+                offsetStrike64x64,
+                timeToMaturity64x64,
+                l.isCall
+            );
+
+        // TODO: Skip auction, if true
+        require(maxPrice > minPrice, "maxPrice <= minPrice");
+
+        uint8 decimals = l.isCall ? l.underlyingDecimals : l.baseDecimals;
+
+        l.maxPrice = maxPrice.toDecimals(decimals);
+        l.minPrice = minPrice.toDecimals(decimals);
+
+        // emit PriceRangeSet(l.maxPrice, l.minPrice);
+    }
 
     function _setAuctionWindow() internal {
         Storage.Layout storage l = Storage.layout();
+        Storage.Option memory option = l.options[l.epoch];
 
-        uint256 startTimestamp = block.timestamp;
+        uint256 startTimestamp = option.expiry;
 
-        l.saleWindow[0] = startTimestamp + l.startOffset;
-        l.saleWindow[1] = startTimestamp + l.endOffset;
+        l.startTime = startTimestamp + l.startOffset;
+        l.endTime = startTimestamp + l.endOffset;
 
-        // emit SaleWindowSet(startTimestamp, l.saleWindow[0], l.saleWindow[1]);
+        // emit SaleWindowSet(startTimestamp, l.startTime, l.endTime);
     }
 
-    // // TODO: Change to '_underwrite' function
-    // // TODO: When a position is underwritten update l.totalShortAssets
-    // function _borrow(Storage.Layout storage l, uint256 amount) internal {
-    //     uint256 totalFreeLiquidity = ERC20.balanceOf(address(this)) -
-    //         l.totalDeposits;
+    function _initializeAuction() internal {
+        Storage.Layout storage l = Storage.layout();
 
-    //     require(totalFreeLiquidity >= amount, Errors.FREE_LIQUIDTY_EXCEEDED);
-
-    //     ERC20.safeTransfer(l.strategy, amount);
-    // }
+        l.Auction.initializeAuction(
+            DutchAuctionStorage.InitAuction(
+                l.epoch++,
+                l.startTime,
+                l.endTime,
+                l.maxPrice,
+                l.minPrice,
+                l.minimumContractSize
+            )
+        );
+    }
 
     /************************************************
      *  PROCESS EPOCH
@@ -121,31 +171,16 @@ contract AdminInternal is BaseInternal {
 
     function _collectVaultFees() internal {
         Storage.Layout storage l = Storage.layout();
-        Storage.Option memory option = l.options[l.epoch];
 
-        uint64 expiry = option.expiry;
-        int128 strike64x64 = option.strike64x64;
+        (, uint256 intrinsicValue) = _getIntrinsicValue(l.epoch, l.totalShort);
 
-        int128 spot64x64 = Pool.getPriceAfter64x64(expiry);
-        uint256 intrinsicValue = 0;
-
-        if (l.isCall && spot64x64 > strike64x64) {
-            intrinsicValue = spot64x64.sub(strike64x64).mulu(
-                l.totalShortAssets
-            );
-        } else if (!l.isCall && strike64x64 > spot64x64) {
-            intrinsicValue = strike64x64.sub(spot64x64).mulu(
-                l.totalShortAssets
-            );
-        }
-
-        uint256 netIncome = l.totalPremiums - intrinsicValue;
-        if (netIncome > 0) {
+        if (l.totalPremiums > intrinsicValue) {
             /**
              * Take performance fee ONLY if premium remaining after the option expires is positive.
              * If it is negative, last week's option expired ITM past breakeven, and the vault took
              * a loss so we do not collect performance fee for last week.
              */
+            uint256 netIncome = l.totalPremiums - intrinsicValue;
             uint256 performanceFeeInAsset =
                 (netIncome * l.performanceFee) /
                     (100 * Constants.FEE_MULTIPLIER);
@@ -185,12 +220,39 @@ contract AdminInternal is BaseInternal {
         Storage.Layout storage l = Storage.layout();
 
         l.claimTokenId = _formatClaimTokenId(l.epoch);
-        l.totalShortAssets = 0;
+        l.totalShort = 0;
 
         l.epoch++;
 
         // Note: index epoch
         // emit SetNextEpoch(l.epoch, l.claimTokenId);
+    }
+
+    /************************************************
+     *  PROCESS AUCTION
+     ***********************************************/
+
+    function _processAuction() internal {
+        Storage.Layout storage l = Storage.layout();
+        if (!l.Auction.isFinalized(l.epoch)) l.Auction.finalizeAuction(l.epoch);
+        l.Auction.transferPremium(l.epoch);
+
+        uint256 totalCollateralUsed = l.Auction.totalCollateralUsed(l.epoch);
+
+        Storage.Option memory option = l.options[l.epoch];
+
+        (uint256 longTokenId, ) =
+            Pool.writeFrom(
+                address(this),
+                address(l.Auction),
+                option.expiry,
+                option.strike64x64,
+                totalCollateralUsed,
+                l.isCall
+            );
+
+        l.Auction.setLongTokenId(l.epoch, longTokenId);
+        l.Auction.processAuction(l.epoch);
     }
 
     /************************************************
@@ -201,7 +263,42 @@ contract AdminInternal is BaseInternal {
         return uint64(Helpers.getNextFriday(block.timestamp));
     }
 
-    function _formatClaimTokenId(uint64 epoch) private view returns (uint256) {
+    function _formatClaimTokenId(uint64 epoch) internal view returns (uint256) {
         return (uint256(uint160(address(this))) << 16) + uint16(epoch);
+    }
+
+    // TODO:
+    function _parseClaimTokenId(uint256 claimTokenId)
+        internal
+        view
+        returns (uint64)
+    {
+        // returns epoch
+    }
+
+    function _getIntrinsicValue(uint64 epoch, uint256 size)
+        internal
+        view
+        returns (bool, uint256)
+    {
+        Storage.Layout storage l = Storage.layout();
+        Storage.Option memory option = l.options[epoch];
+
+        uint64 expiry = option.expiry;
+        int128 strike64x64 = option.strike64x64;
+
+        if (block.timestamp < expiry) return (false, 0);
+
+        int128 spot64x64 = Pool.getPriceAfter64x64(expiry);
+        uint256 intrinsicValue;
+
+        if (l.isCall && spot64x64 > strike64x64) {
+            intrinsicValue = spot64x64.sub(strike64x64).mulu(size);
+        } else if (!l.isCall && strike64x64 > spot64x64) {
+            intrinsicValue = strike64x64.sub(spot64x64).mulu(size);
+        }
+
+        // TODO: toDecimal(?)
+        return (true, intrinsicValue);
     }
 }

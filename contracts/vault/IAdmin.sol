@@ -8,8 +8,8 @@ interface IAdmin {
 
     event SaleWindowSet(
         uint256 blockTimestamp,
-        uint256 startTimestamp,
-        uint256 endTimestamp
+        uint256 startTime,
+        uint256 endTime
     );
 
     // /**
@@ -114,4 +114,12 @@ interface IAdmin {
      * @notice Sets the start and end time of the auction.
      */
     function setAuctionWindow() external;
+
+    /**
+     * @notice
+     */
+    function getIntrinsicValue(uint64 epoch, uint256 size)
+        external
+        view
+        returns (bool, uint256);
 }

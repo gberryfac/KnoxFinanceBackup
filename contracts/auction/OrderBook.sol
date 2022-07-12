@@ -16,7 +16,7 @@ library OrderBook {
         address buyer;
         uint256 id;
         uint256 price;
-        uint256 amount;
+        uint256 size;
         uint256 parent;
         uint256 left;
         uint256 right;
@@ -25,7 +25,7 @@ library OrderBook {
 
     /// @dev Retrieve the highest bid in the order book.
     /// @param index The index that the order is part of.
-    function _head(Index storage index) external view returns (uint256) {
+    function _head(Index storage index) internal view returns (uint256) {
         return index.head;
     }
 
@@ -35,7 +35,7 @@ library OrderBook {
         return index.length;
     }
 
-    /// @dev Retrieve the id, price, amount, and buyer for the order.
+    /// @dev Retrieve the id, price, size, and buyer for the order.
     /// @param index The index that the order is part of.
     /// @param id The id for the order to be looked up.
     function _getOrder(Index storage index, uint256 id)
@@ -49,7 +49,7 @@ library OrderBook {
         )
     {
         Order memory order = index.orders[id];
-        return (order.id, order.price, order.amount, order.buyer);
+        return (order.id, order.price, order.size, order.buyer);
     }
 
     /// @dev Returns the previous bid in descending order.
@@ -159,12 +159,12 @@ library OrderBook {
     /// @param index The index that the order is part of.
     // / @param id The unique identifier of the data element the index order will represent.
     /// @param price The unit price specified by the buyer.
-    /// @param amount The amount specified by the buyer.
+    /// @param size The size specified by the buyer.
     /// @param buyer The buyers wallet address.
     function _insert(
         Index storage index,
         uint256 price,
-        uint256 amount,
+        uint256 size,
         address buyer
     ) internal returns (uint256) {
         index.length = index.length > 0 ? index.length + 1 : 1;
@@ -199,7 +199,7 @@ library OrderBook {
                 currentOrder.id = id;
                 currentOrder.parent = previousOrderId;
                 currentOrder.price = price;
-                currentOrder.amount = amount;
+                currentOrder.size = size;
                 currentOrder.buyer = buyer;
                 break;
             }
@@ -232,7 +232,7 @@ library OrderBook {
     /// @dev Remove the order for the given unique identifier from the index.
     /// @param index The index that should be removed
     /// @param id The unique identifier of the data element to remove.
-    function _remove(Index storage index, uint256 id) internal {
+    function _remove(Index storage index, uint256 id) internal returns (bool) {
         index.length = index.length > 0 ? index.length - 1 : 1;
 
         if (id == index.head) {
@@ -248,7 +248,7 @@ library OrderBook {
 
         if (orderToDelete.id != id) {
             // The id does not exist in the tree.
-            return;
+            return false;
         }
 
         if (orderToDelete.left != 0 || orderToDelete.right != 0) {
@@ -343,7 +343,7 @@ library OrderBook {
         // Now we zero out all of the fields on the orderToDelete.
         orderToDelete.id = 0;
         orderToDelete.price = 0;
-        orderToDelete.amount = 0;
+        orderToDelete.size = 0;
         orderToDelete.buyer = 0x0000000000000000000000000000000000000000;
         orderToDelete.parent = 0;
         orderToDelete.left = 0;
@@ -354,6 +354,8 @@ library OrderBook {
         if (rebalanceOrigin != 0) {
             _rebalanceTree(index, rebalanceOrigin);
         }
+
+        return true;
     }
 
     function _rebalanceTree(Index storage index, uint256 id) private {

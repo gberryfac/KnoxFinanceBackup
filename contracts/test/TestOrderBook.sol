@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "../libraries/OrderBook.sol";
+import "../auction/OrderBook.sol";
 
 contract TestOrderBook {
     using OrderBook for OrderBook.Index;
@@ -45,7 +45,7 @@ contract TestOrderBook {
         return index._insert(price, amount, buyer);
     }
 
-    function remove(uint256 id) external {
+    function remove(uint256 id) external returns (bool) {
         return index._remove(id);
     }
 }

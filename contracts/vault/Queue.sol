@@ -93,7 +93,7 @@ contract Queue is
     }
 
     /************************************************
-     *  ERC165 IMPLEMENTATIONS
+     *  ERC165 SUPPORT
      ***********************************************/
 
     function supportsInterface(bytes4 interfaceId)
