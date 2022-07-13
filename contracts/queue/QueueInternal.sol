@@ -97,19 +97,15 @@ contract QueueInternal is ERC1155BaseInternal, ERC1155EnumerableInternal {
         returns (uint256)
     {
         QueueStorage.Layout storage l = QueueStorage.layout();
-
         uint256 currentClaimTokenId = _formatClaimTokenId(l.epoch);
 
         if (claimTokenId != currentClaimTokenId) {
             uint256 claimTokenBalance = _balanceOf(receiver, claimTokenId);
-            _burn(msg.sender, claimTokenId, claimTokenBalance);
 
             uint256 unredeemedShares =
-                _previewUnredeemedSharesFromEpoch(
-                    uint256(claimTokenId),
-                    claimTokenBalance
-                );
+                _previewUnredeemedShares(claimTokenId, msg.sender);
 
+            _burn(msg.sender, claimTokenId, claimTokenBalance);
             require(Vault.transfer(receiver, unredeemedShares));
 
             // Note: Index receiver
@@ -163,25 +159,22 @@ contract QueueInternal is ERC1155BaseInternal, ERC1155EnumerableInternal {
         uint256 unredeemedShares;
         for (uint256 i; i < claimTokenIds.length; i++) {
             uint256 claimTokenId = claimTokenIds[i];
-            uint256 claimTokenBalance = _balanceOf(account, claimTokenId);
-
-            unredeemedShares += _previewUnredeemedSharesFromEpoch(
-                claimTokenId,
-                claimTokenBalance
-            );
+            unredeemedShares += _previewUnredeemedShares(claimTokenId, account);
         }
 
         return unredeemedShares;
     }
 
-    function _previewUnredeemedSharesFromEpoch(
-        uint256 claimTokenId,
-        uint256 claimTokenBalance
-    ) internal view returns (uint256) {
+    function _previewUnredeemedShares(uint256 claimTokenId, address account)
+        internal
+        view
+        returns (uint256)
+    {
         QueueStorage.Layout storage l = QueueStorage.layout();
         uint256 currentClaimTokenId = _formatClaimTokenId(l.epoch);
 
         if (claimTokenId != currentClaimTokenId) {
+            uint256 claimTokenBalance = _balanceOf(account, claimTokenId);
             return (claimTokenBalance * l.pricePerShare[claimTokenId]) / 10**18;
         }
 
