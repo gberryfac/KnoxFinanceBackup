@@ -32,7 +32,7 @@ contract VaultAdmin is Access, VaultInternal {
     }
 
     /************************************************
-     *  ADMIN
+     *  SETTERS
      ***********************************************/
 
     /**
@@ -114,8 +114,8 @@ contract VaultAdmin is Access, VaultInternal {
     /**
      * @notice Prepares the strategy and initiates the next round of option sales
      */
-    function processEpoch(bool processExpired) external {
-        _processEpoch(processExpired);
+    function processEpoch(bool _processExpired) external {
+        _processEpoch(_processExpired);
     }
 
     /**

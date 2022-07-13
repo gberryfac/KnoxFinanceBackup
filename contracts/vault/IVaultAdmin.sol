@@ -4,13 +4,9 @@ pragma solidity ^0.8.0;
 import "./VaultStorage.sol";
 
 interface IVaultAdmin {
-    event OptionParametersSet(bool isCall, uint64 expiry, int128 strike64x64);
-
-    event SaleWindowSet(
-        uint256 blockTimestamp,
-        uint256 startTime,
-        uint256 endTime
-    );
+    /************************************************
+     *  INITIALIZATION
+     ***********************************************/
 
     // /**
     //  * @notice
@@ -19,15 +15,9 @@ interface IVaultAdmin {
     //  */
     function initialize(VaultStorage.InitImpl memory initImpl) external;
 
-    /**
-     * @notice Pauses the vault during an emergency preventing deposits and borrowing.
-     */
-    function pause() external;
-
-    /**
-     * @notice Unpauses the vault during following an emergency allowing deposits and borrowing.
-     */
-    function unpause() external;
+    /************************************************
+     *  SETTERS
+     ***********************************************/
 
     /**
      * @notice Sets the new fee recipient
@@ -66,10 +56,38 @@ interface IVaultAdmin {
     //  */
     function setAuctionWindowOffsets(uint16 start, uint16 end) external;
 
+    /************************************************
+     *  INITIALIZE AUCTION
+     ***********************************************/
+
+    /**
+     * @notice
+     */
+    function setAndInitializeAuction() external;
+
+    /**
+     * @notice Sets the parameters for the next option to be sold
+     */
+    function setOptionParameters() external;
+
+    /**
+     * @notice Sets the start and end time of the auction.
+     */
+    function setAuctionWindow() external;
+
+    /**
+     * @notice
+     */
+    function initializeAuction() external;
+
+    /************************************************
+     *  PROCESS EPOCH
+     ***********************************************/
+
     /**
      * @notice Prepares the strategy and initiates the next round of option sales
      */
-    function processEpoch(bool processExpired) external;
+    function processEpoch(bool _processExpired) external;
 
     /**
      * @notice Processes expired options
@@ -101,25 +119,18 @@ interface IVaultAdmin {
      */
     function setAuctionPrices() external;
 
-    /**
-     * @notice
-     */
-    function setAndInitializeAuction() external;
-
-    /**
-     * @notice Sets the parameters for the next option to be sold
-     */
-    function setOptionParameters() external;
-
-    /**
-     * @notice Sets the start and end time of the auction.
-     */
-    function setAuctionWindow() external;
+    /************************************************
+     *  PROCESS AUCTION
+     ***********************************************/
 
     /**
      * @notice
      */
     function processAuction() external;
+
+    /************************************************
+     * HELPERS
+     ***********************************************/
 
     /**
      * @notice
