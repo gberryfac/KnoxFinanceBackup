@@ -32,20 +32,20 @@ contract Queue is Access, ERC1155Base, ERC1155Enumerable, QueueInternal {
      *  DEPOSIT
      ***********************************************/
 
-    function depositToQueue(uint256 amount, address receiver)
-        external
-        nonReentrant
-        whenNotPaused
-    {
-        _depositToQueue(amount, receiver);
-    }
-
     function depositToQueue(uint256 amount)
         external
         nonReentrant
         whenNotPaused
     {
         _depositToQueue(amount, msg.sender);
+    }
+
+    function depositToQueue(uint256 amount, address receiver)
+        external
+        nonReentrant
+        whenNotPaused
+    {
+        _depositToQueue(amount, receiver);
     }
 
     /************************************************
@@ -60,12 +60,16 @@ contract Queue is Access, ERC1155Base, ERC1155Enumerable, QueueInternal {
      *  REDEEM
      ***********************************************/
 
+    function redeemMaxShares() external nonReentrant {
+        _redeemMaxShares(msg.sender);
+    }
+
     function redeemMaxShares(address receiver) external nonReentrant {
         _redeemMaxShares(receiver);
     }
 
-    function redeemMaxShares() external nonReentrant {
-        _redeemMaxShares(msg.sender);
+    function redeemSharesFromEpoch(uint64 _epoch) external nonReentrant {
+        _redeemSharesFromEpoch(_epoch, msg.sender);
     }
 
     function redeemSharesFromEpoch(uint64 _epoch, address receiver)
@@ -73,10 +77,6 @@ contract Queue is Access, ERC1155Base, ERC1155Enumerable, QueueInternal {
         nonReentrant
     {
         _redeemSharesFromEpoch(_epoch, receiver);
-    }
-
-    function redeemSharesFromEpoch(uint64 _epoch) external nonReentrant {
-        _redeemSharesFromEpoch(_epoch, msg.sender);
     }
 
     /************************************************
