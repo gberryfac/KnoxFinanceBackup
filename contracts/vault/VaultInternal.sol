@@ -43,25 +43,6 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal {
     }
 
     /************************************************
-     *  EXERCISE
-     ***********************************************/
-
-    function _exercise(
-        address holder,
-        uint256 longTokenId,
-        uint256 contractSize
-    ) internal {
-        Pool.exerciseFrom(holder, longTokenId, contractSize);
-    }
-
-    /************************************************
-     * PURCHASE
-     ***********************************************/
-
-    // TODO:
-    function _purchase(uint256 contractSize) internal {}
-
-    /************************************************
      *  INITIALIZE AUCTION
      ***********************************************/
 

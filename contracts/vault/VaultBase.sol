@@ -12,18 +12,6 @@ contract VaultBase is VaultInternal, ERC4626Base {
     constructor(bool isCall, address pool) VaultInternal(isCall, pool) {}
 
     /************************************************
-     * EXERCISE
-     ***********************************************/
-
-    function exercise(
-        address holder,
-        uint256 longTokenId,
-        uint256 contractSize
-    ) external {
-        _exercise(holder, longTokenId, contractSize);
-    }
-
-    /************************************************
      *  ERC4626 OVERRIDES
      ***********************************************/
 
