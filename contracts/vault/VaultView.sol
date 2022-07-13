@@ -12,12 +12,12 @@ contract VaultView is VaultInternal {
         return VaultStorage.layout()._epoch();
     }
 
-    function optionByEpoch(uint64 epoch)
+    function optionByEpoch(uint64 _epoch)
         external
         view
         returns (VaultStorage.Option memory)
     {
-        return VaultStorage.layout()._optionByEpoch(epoch);
+        return VaultStorage.layout()._optionByEpoch(_epoch);
     }
 
     function collateralAsset() external view returns (address) {
