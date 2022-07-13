@@ -20,15 +20,15 @@ interface IQueue is IERC165, IERC1155, IERC1155Enumerable {
      *  DEPOSIT
      ***********************************************/
 
-    function depositToQueue(uint256 amount) external;
+    function deposit(uint256 amount) external;
 
-    function depositToQueue(uint256 amount, address receiver) external;
+    function deposit(uint256 amount, address receiver) external;
 
     /************************************************
      *  WITHDRAW
      ***********************************************/
 
-    function withdrawFromQueue(uint256 amount) external;
+    function withdraw(uint256 amount) external;
 
     /************************************************
      *  REDEEM
@@ -38,9 +38,9 @@ interface IQueue is IERC165, IERC1155, IERC1155Enumerable {
 
     function redeemMaxShares(address receiver) external;
 
-    function redeemSharesFromEpoch(uint64 epoch) external;
+    function redeemShares(uint64 epoch) external;
 
-    function redeemSharesFromEpoch(uint64 epoch, address receiver) external;
+    function redeemShares(uint64 epoch, address receiver) external;
 
     /************************************************
      *  PROCESS EPOCH
@@ -59,7 +59,7 @@ interface IQueue is IERC165, IERC1155, IERC1155Enumerable {
         view
         returns (uint256);
 
-    function previewUnredeemedSharesFromEpoch(uint64 _epoch, uint256 balance)
+    function previewUnredeemedShares(uint256 claimTokenId, address account)
         external
         view
         returns (uint256);

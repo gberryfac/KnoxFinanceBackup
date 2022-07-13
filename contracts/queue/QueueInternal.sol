@@ -44,7 +44,7 @@ contract QueueInternal is ERC1155BaseInternal, ERC1155EnumerableInternal {
      *  DEPOSIT
      ***********************************************/
 
-    function _depositToQueue(uint256 amount, address receiver) internal {
+    function _deposit(uint256 amount, address receiver) internal {
         QueueStorage.Layout storage l = QueueStorage.layout();
 
         uint256 totalWithDepositedAmount =
@@ -70,7 +70,7 @@ contract QueueInternal is ERC1155BaseInternal, ERC1155EnumerableInternal {
      *  WITHDRAW
      ***********************************************/
 
-    function _withdrawFromQueue(uint256 amount) internal {
+    function _withdraw(uint256 amount) internal {
         QueueStorage.Layout storage l = QueueStorage.layout();
         uint256 currentClaimTokenId = _formatClaimTokenId(l.epoch);
         _burn(msg.sender, currentClaimTokenId, amount);
@@ -88,11 +88,11 @@ contract QueueInternal is ERC1155BaseInternal, ERC1155EnumerableInternal {
 
         for (uint256 i; i < claimTokenIds.length; i++) {
             uint256 claimTokenId = claimTokenIds[i];
-            unredeemedShares += _redeemSharesFromEpoch(claimTokenId, receiver);
+            unredeemedShares += _redeemShares(claimTokenId, receiver);
         }
     }
 
-    function _redeemSharesFromEpoch(uint256 claimTokenId, address receiver)
+    function _redeemShares(uint256 claimTokenId, address receiver)
         internal
         returns (uint256)
     {

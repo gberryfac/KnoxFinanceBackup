@@ -43,7 +43,7 @@ export function describeBehaviorOfAdmin(
           .connect(signers.lp1)
           .approve(addresses.vault, params.deposit);
 
-        await instance["depositToQueue(uint256)"](params.deposit);
+        await instance["deposit(uint256)"](params.deposit);
       });
 
       it("should adjust Queue and Vault balances when processEpoch is called", async () => {});
