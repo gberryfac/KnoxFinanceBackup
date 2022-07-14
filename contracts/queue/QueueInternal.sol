@@ -164,15 +164,8 @@ contract QueueInternal is ERC1155BaseInternal, ERC1155EnumerableInternal {
         returns (uint256)
     {
         QueueStorage.Layout storage l = QueueStorage.layout();
-        uint256 currentClaimTokenId = _formatClaimTokenId(l.epoch);
-
-        // TODO: Remove check, pps is 0 if uninitialized
-        if (claimTokenId != currentClaimTokenId) {
-            uint256 claimTokenBalance = _balanceOf(account, claimTokenId);
-            return (claimTokenBalance * l.pricePerShare[claimTokenId]) / 10**18;
-        }
-
-        return 0;
+        uint256 claimTokenBalance = _balanceOf(account, claimTokenId);
+        return (claimTokenBalance * l.pricePerShare[claimTokenId]) / 10**18;
     }
 
     function _epoch() internal view returns (uint64) {
