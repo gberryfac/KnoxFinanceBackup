@@ -84,18 +84,13 @@ contract QueueInternal is ERC1155BaseInternal, ERC1155EnumerableInternal {
     function _redeemMaxShares(address receiver) internal {
         uint256[] memory claimTokenIds = _tokensByAccount(msg.sender);
 
-        uint256 unredeemedShares;
-
         for (uint256 i; i < claimTokenIds.length; i++) {
             uint256 claimTokenId = claimTokenIds[i];
-            unredeemedShares += _redeemShares(claimTokenId, receiver);
+            _redeemShares(claimTokenId, receiver);
         }
     }
 
-    function _redeemShares(uint256 claimTokenId, address receiver)
-        internal
-        returns (uint256)
-    {
+    function _redeemShares(uint256 claimTokenId, address receiver) internal {
         QueueStorage.Layout storage l = QueueStorage.layout();
         uint256 currentClaimTokenId = _formatClaimTokenId(l.epoch);
 
@@ -111,8 +106,6 @@ contract QueueInternal is ERC1155BaseInternal, ERC1155EnumerableInternal {
             // Note: Index receiver
             // emit RedeemedShares(receiver, unredeemedShares, claimTokenId);
         }
-
-        return 0;
     }
 
     /************************************************
