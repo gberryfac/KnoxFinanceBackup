@@ -71,15 +71,15 @@ contract Queue is
         _redeemMaxShares(receiver);
     }
 
-    function redeemShares(uint64 _epoch) external nonReentrant {
-        _redeemShares(_epoch, msg.sender);
+    function redeemShares(uint256 claimTokenId) external nonReentrant {
+        _redeemShares(claimTokenId, msg.sender);
     }
 
-    function redeemShares(uint64 _epoch, address receiver)
+    function redeemShares(uint256 claimTokenId, address receiver)
         external
         nonReentrant
     {
-        _redeemShares(_epoch, receiver);
+        _redeemShares(claimTokenId, receiver);
     }
 
     /************************************************

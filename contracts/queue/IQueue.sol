@@ -38,9 +38,9 @@ interface IQueue is IERC165, IERC1155, IERC1155Enumerable {
 
     function redeemMaxShares(address receiver) external;
 
-    function redeemShares(uint64 epoch) external;
+    function redeemShares(uint256 claimTokenId) external;
 
-    function redeemShares(uint64 epoch, address receiver) external;
+    function redeemShares(uint256 claimTokenId, address receiver) external;
 
     /************************************************
      *  PROCESS EPOCH
