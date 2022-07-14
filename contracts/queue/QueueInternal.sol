@@ -82,10 +82,14 @@ contract QueueInternal is ERC1155BaseInternal, ERC1155EnumerableInternal {
      ***********************************************/
 
     function _redeemMaxShares(address receiver) internal {
+        QueueStorage.Layout storage l = QueueStorage.layout();
+
         uint256[] memory claimTokenIds = _tokensByAccount(msg.sender);
+        uint256 currentClaimTokenId = _formatClaimTokenId(l.epoch);
 
         for (uint256 i; i < claimTokenIds.length; i++) {
             uint256 claimTokenId = claimTokenIds[i];
+            if (claimTokenId == currentClaimTokenId) continue;
             _redeemShares(claimTokenId, receiver);
         }
     }
@@ -94,18 +98,21 @@ contract QueueInternal is ERC1155BaseInternal, ERC1155EnumerableInternal {
         QueueStorage.Layout storage l = QueueStorage.layout();
         uint256 currentClaimTokenId = _formatClaimTokenId(l.epoch);
 
-        if (claimTokenId != currentClaimTokenId) {
-            uint256 claimTokenBalance = _balanceOf(receiver, claimTokenId);
+        require(
+            claimTokenId != currentClaimTokenId,
+            "current claim token cannot be redeemed"
+        );
 
-            uint256 unredeemedShares =
-                _previewUnredeemedShares(claimTokenId, msg.sender);
+        uint256 claimTokenBalance = _balanceOf(receiver, claimTokenId);
 
-            _burn(msg.sender, claimTokenId, claimTokenBalance);
-            require(Vault.transfer(receiver, unredeemedShares));
+        uint256 unredeemedShares =
+            _previewUnredeemedShares(claimTokenId, msg.sender);
 
-            // Note: Index receiver
-            // emit RedeemedShares(receiver, unredeemedShares, claimTokenId);
-        }
+        _burn(msg.sender, claimTokenId, claimTokenBalance);
+        require(Vault.transfer(receiver, unredeemedShares));
+
+        // Note: Index receiver
+        // emit RedeemedShares(receiver, unredeemedShares, claimTokenId);
     }
 
     /************************************************
