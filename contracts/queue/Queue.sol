@@ -98,6 +98,10 @@ contract Queue is
      *  VIEW
      ***********************************************/
 
+    function previewUnredeemedShares() external view returns (uint256) {
+        return _previewUnredeemedShares(msg.sender);
+    }
+
     function previewUnredeemedShares(address account)
         external
         view

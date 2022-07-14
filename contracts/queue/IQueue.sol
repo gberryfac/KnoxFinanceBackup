@@ -54,6 +54,8 @@ interface IQueue is IERC165, IERC1155, IERC1155Enumerable {
      *  VIEW
      ***********************************************/
 
+    function previewUnredeemedShares() external view returns (uint256);
+
     function previewUnredeemedShares(address account)
         external
         view
