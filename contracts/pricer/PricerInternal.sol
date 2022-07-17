@@ -48,9 +48,6 @@ contract PricerInternal {
         (, int256 underlyingPrice, , , ) =
             UnderlyingSpotOracle.latestRoundData();
 
-        // int256 basePrice = BaseSpotOracle.latestAnswer();
-        // int256 underlyingPrice = UnderlyingSpotOracle.latestAnswer();
-
         return ABDKMath64x64.divi(underlyingPrice, basePrice);
     }
 

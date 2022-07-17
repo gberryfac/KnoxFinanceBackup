@@ -1,9 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+import "@solidstate/contracts/token/ERC1155/IERC1155Receiver.sol";
+
 import "./AuctionStorage.sol";
 
-interface IAuction {
+interface IAuction is IERC1155Receiver {
+    /************************************************
+     *  INITIALIZATION
+     ***********************************************/
+
     function initialize(AuctionStorage.InitAuction memory initAuction) external;
 
     function setAuctionPrices(
@@ -12,11 +18,19 @@ interface IAuction {
         int128 minPrice64x64
     ) external;
 
+    /************************************************
+     *  PRICING
+     ***********************************************/
+
     function lastPrice64x64(uint64 epoch) external view returns (int128);
 
     function priceCurve64x64(uint64 epoch) external view returns (int128);
 
     function clearingPrice64x64(uint64 epoch) external view returns (int128);
+
+    /************************************************
+     *  PURCHASE
+     ***********************************************/
 
     function addLimitOrder(
         uint64 epoch,
@@ -28,6 +42,18 @@ interface IAuction {
 
     function addMarketOrder(uint64 epoch, uint256 size) external;
 
+    /************************************************
+     *  WITHDRAW
+     ***********************************************/
+
+    function withdraw(uint64 epoch) external;
+
+    function previewWithdraw(uint64 epoch) external returns (uint256, uint256);
+
+    /************************************************
+     *  MAINTENANCE
+     ***********************************************/
+
     function processOrders(uint64 epoch) external returns (bool);
 
     function finalizeAuction(uint64 epoch) external returns (bool);
@@ -36,13 +62,15 @@ interface IAuction {
 
     function processAuction(uint64 epoch) external;
 
-    function withdraw(uint64 epoch) external;
-
-    function previewWithdraw(uint64 epoch) external returns (uint256, uint256);
+    /************************************************
+     *  VIEW
+     ***********************************************/
 
     function isFinalized(uint64 epoch) external view returns (bool);
 
     function status(uint64 epoch) external view returns (AuctionStorage.Status);
+
+    function totalContracts(uint64 epoch) external view returns (uint256);
 
     function totalContractsSold(uint64 epoch) external view returns (uint256);
 
@@ -55,4 +83,9 @@ interface IAuction {
         external
         view
         returns (AuctionStorage.Auction memory);
+
+    function getOrderById(uint64 epoch, uint256 id)
+        external
+        view
+        returns (OrderBook.Data memory);
 }

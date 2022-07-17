@@ -7,9 +7,16 @@ import "@solidstate/contracts/token/ERC1155/enumerable/ERC1155Enumerable.sol";
 
 import "../access/Access.sol";
 
+import "./IQueue.sol";
 import "./QueueInternal.sol";
 
-contract Queue is Access, ERC1155Base, ERC1155Enumerable, QueueInternal {
+contract Queue is
+    Access,
+    ERC1155Base,
+    ERC1155Enumerable,
+    IQueue,
+    QueueInternal
+{
     using ERC165Storage for ERC165Storage.Layout;
     using QueueStorage for QueueStorage.Layout;
     using SafeERC20 for IERC20;
@@ -32,51 +39,47 @@ contract Queue is Access, ERC1155Base, ERC1155Enumerable, QueueInternal {
      *  DEPOSIT
      ***********************************************/
 
-    function depositToQueue(uint256 amount, address receiver)
-        external
-        nonReentrant
-        whenNotPaused
-    {
-        _depositToQueue(amount, receiver);
+    function deposit(uint256 amount) external nonReentrant whenNotPaused {
+        _deposit(amount, msg.sender);
     }
 
-    function depositToQueue(uint256 amount)
+    function deposit(uint256 amount, address receiver)
         external
         nonReentrant
         whenNotPaused
     {
-        _depositToQueue(amount, msg.sender);
+        _deposit(amount, receiver);
     }
 
     /************************************************
      *  WITHDRAW
      ***********************************************/
 
-    function withdrawFromQueue(uint256 amount) external nonReentrant {
-        _withdrawFromQueue(amount);
+    function withdraw(uint256 amount) external nonReentrant {
+        _withdraw(amount);
     }
 
     /************************************************
      *  REDEEM
      ***********************************************/
 
-    function redeemMaxShares(address receiver) external nonReentrant {
-        _redeemMaxShares(receiver);
-    }
-
     function redeemMaxShares() external nonReentrant {
         _redeemMaxShares(msg.sender);
     }
 
-    function redeemSharesFromEpoch(uint64 _epoch, address receiver)
+    function redeemMaxShares(address receiver) external nonReentrant {
+        _redeemMaxShares(receiver);
+    }
+
+    function redeemShares(uint256 claimTokenId) external nonReentrant {
+        _redeemShares(claimTokenId, msg.sender);
+    }
+
+    function redeemShares(uint256 claimTokenId, address receiver)
         external
         nonReentrant
     {
-        _redeemSharesFromEpoch(_epoch, receiver);
-    }
-
-    function redeemSharesFromEpoch(uint64 _epoch) external nonReentrant {
-        _redeemSharesFromEpoch(_epoch, msg.sender);
+        _redeemShares(claimTokenId, receiver);
     }
 
     /************************************************
@@ -95,6 +98,10 @@ contract Queue is Access, ERC1155Base, ERC1155Enumerable, QueueInternal {
      *  VIEW
      ***********************************************/
 
+    function previewUnredeemedShares() external view returns (uint256) {
+        return _previewUnredeemedShares(msg.sender);
+    }
+
     function previewUnredeemedShares(address account)
         external
         view
@@ -103,12 +110,12 @@ contract Queue is Access, ERC1155Base, ERC1155Enumerable, QueueInternal {
         return _previewUnredeemedShares(account);
     }
 
-    function previewUnredeemedSharesFromEpoch(uint64 _epoch, uint256 balance)
+    function previewUnredeemedShares(uint256 claimTokenId, address account)
         external
         view
         returns (uint256)
     {
-        return _previewUnredeemedSharesFromEpoch(_epoch, balance);
+        return _previewUnredeemedShares(claimTokenId, account);
     }
 
     function epoch() external view returns (uint64) {

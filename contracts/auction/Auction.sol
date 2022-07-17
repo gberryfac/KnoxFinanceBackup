@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+import "@solidstate/contracts/introspection/ERC165Storage.sol";
+
 import "../access/Access.sol";
 
 import "./AuctionInternal.sol";
@@ -8,11 +10,17 @@ import "./IAuction.sol";
 
 // TODO: Switch to stage modifiers
 contract Auction is Access, AuctionInternal, IAuction {
+    using ERC165Storage for ERC165Storage.Layout;
+
     constructor(
         bool isCall,
         address pool,
         address vault
     ) AuctionInternal(isCall, pool, vault) {}
+
+    /************************************************
+     *  INITIALIZATION
+     ***********************************************/
 
     function initialize(AuctionStorage.InitAuction memory initAuction)
         external
@@ -49,7 +57,7 @@ contract Auction is Access, AuctionInternal, IAuction {
     }
 
     /************************************************
-     *  AUCTION ORDER
+     *  PURCHASE
      ***********************************************/
 
     // @notice
@@ -73,6 +81,18 @@ contract Auction is Access, AuctionInternal, IAuction {
     }
 
     /************************************************
+     *  WITHDRAW
+     ***********************************************/
+
+    function withdraw(uint64 epoch) external {
+        _withdraw(epoch);
+    }
+
+    function previewWithdraw(uint64 epoch) external returns (uint256, uint256) {
+        return _previewWithdraw(epoch);
+    }
+
+    /************************************************
      *  MAINTENANCE
      ***********************************************/
 
@@ -90,18 +110,6 @@ contract Auction is Access, AuctionInternal, IAuction {
 
     function processAuction(uint64 epoch) external {
         _processAuction(epoch);
-    }
-
-    /************************************************
-     *  WITHDRAW
-     ***********************************************/
-
-    function withdraw(uint64 epoch) external {
-        _withdraw(epoch);
-    }
-
-    function previewWithdraw(uint64 epoch) external returns (uint256, uint256) {
-        return _previewWithdraw(epoch);
     }
 
     /************************************************
@@ -150,6 +158,18 @@ contract Auction is Access, AuctionInternal, IAuction {
         returns (OrderBook.Data memory)
     {
         return _getOrderById(epoch, id);
+    }
+
+    /************************************************
+     *  ERC165 SUPPORT
+     ***********************************************/
+
+    function supportsInterface(bytes4 interfaceId)
+        external
+        view
+        returns (bool)
+    {
+        return ERC165Storage.layout().isSupportedInterface(interfaceId);
     }
 
     /************************************************

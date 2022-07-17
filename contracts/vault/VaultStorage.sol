@@ -125,7 +125,7 @@ library VaultStorage {
     }
 
     /************************************************
-     *  ADMIN
+     *  SETTERS
      ***********************************************/
 
     function _setFeeRecipient(Layout storage l, address newFeeRecipient)

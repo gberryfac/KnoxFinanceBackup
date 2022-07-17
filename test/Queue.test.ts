@@ -140,13 +140,13 @@ function behavesLikeQueue(params: Params) {
       });
     });
 
-    describe("#depositToQueue(uint256)", () => {
+    describe("#deposit(uint256)", () => {
       time.revertToSnapshotAfterEach(async () => {});
 
       it("should revert if Queue is paused", async () => {
         await instance.connect(signers.deployer).pause();
         await expect(
-          instance["depositToQueue(uint256)"](params.deposit)
+          instance["deposit(uint256)"](params.deposit)
         ).to.be.revertedWith("Pausable: paused");
       });
 
@@ -156,13 +156,13 @@ function behavesLikeQueue(params: Params) {
         await asset.connect(signers.lp3).approve(addresses.queue, deposit);
 
         await expect(
-          instance.connect(signers.lp3)["depositToQueue(uint256)"](deposit)
+          instance.connect(signers.lp3)["deposit(uint256)"](deposit)
         ).to.be.revertedWith("maxTVL exceeded");
       });
 
       it("should revert if value is <= 0", async () => {
         await expect(
-          instance["depositToQueue(uint256)"](ethers.constants.Zero)
+          instance["deposit(uint256)"](ethers.constants.Zero)
         ).to.be.revertedWith("value exceeds minimum");
       });
 
@@ -171,7 +171,7 @@ function behavesLikeQueue(params: Params) {
           .connect(signers.lp1)
           .approve(addresses.queue, params.deposit);
 
-        await instance["depositToQueue(uint256)"](params.deposit);
+        await instance["deposit(uint256)"](params.deposit);
 
         const epoch = await instance.epoch();
         const claimTokenBalance = await instance["balanceOf(address,uint256)"](
@@ -190,7 +190,7 @@ function behavesLikeQueue(params: Params) {
 
         await asset.connect(signers.lp1).approve(addresses.queue, firstDeposit);
 
-        await instance["depositToQueue(uint256)"](firstDeposit);
+        await instance["deposit(uint256)"](firstDeposit);
 
         let epoch = await instance["epoch()"]();
         let claimTokenBalance = await instance["balanceOf(address,uint256)"](
@@ -204,7 +204,7 @@ function behavesLikeQueue(params: Params) {
           .connect(signers.lp1)
           .approve(addresses.queue, secondDeposit);
 
-        await instance["depositToQueue(uint256)"](secondDeposit);
+        await instance["deposit(uint256)"](secondDeposit);
 
         epoch = await instance["epoch()"]();
         claimTokenBalance = await instance["balanceOf(address,uint256)"](
@@ -223,16 +223,13 @@ function behavesLikeQueue(params: Params) {
       it.skip("should redeem vault shares if LP deposited in past epoch", async () => {});
     });
 
-    describe("#depositToQueue(uint256,address)", () => {
+    describe("#deposit(uint256,address)", () => {
       time.revertToSnapshotAfterEach(async () => {});
 
       it("should revert if Queue is paused", async () => {
         await instance.connect(signers.deployer).pause();
         await expect(
-          instance["depositToQueue(uint256,address)"](
-            params.deposit,
-            addresses.lp2
-          )
+          instance["deposit(uint256,address)"](params.deposit, addresses.lp2)
         ).to.be.revertedWith("Pausable: paused");
       });
 
@@ -244,13 +241,13 @@ function behavesLikeQueue(params: Params) {
         await expect(
           instance
             .connect(signers.lp3)
-            ["depositToQueue(uint256,address)"](deposit, addresses.lp2)
+            ["deposit(uint256,address)"](deposit, addresses.lp2)
         ).to.be.revertedWith("maxTVL exceeded");
       });
 
       it("should revert if value is <= 0", async () => {
         await expect(
-          instance["depositToQueue(uint256,address)"](
+          instance["deposit(uint256,address)"](
             ethers.constants.Zero,
             addresses.lp2
           )
@@ -262,7 +259,7 @@ function behavesLikeQueue(params: Params) {
           .connect(signers.lp1)
           .approve(addresses.queue, params.deposit);
 
-        await instance["depositToQueue(uint256,address)"](
+        await instance["deposit(uint256,address)"](
           params.deposit,
           addresses.lp2
         );
@@ -284,10 +281,7 @@ function behavesLikeQueue(params: Params) {
 
         await asset.connect(signers.lp1).approve(addresses.queue, firstDeposit);
 
-        await instance["depositToQueue(uint256,address)"](
-          firstDeposit,
-          addresses.lp2
-        );
+        await instance["deposit(uint256,address)"](firstDeposit, addresses.lp2);
 
         let epoch = await instance["epoch()"]();
         let claimTokenBalance = await instance["balanceOf(address,uint256)"](
@@ -301,7 +295,7 @@ function behavesLikeQueue(params: Params) {
           .connect(signers.lp1)
           .approve(addresses.queue, secondDeposit);
 
-        await instance["depositToQueue(uint256,address)"](
+        await instance["deposit(uint256,address)"](
           secondDeposit,
           addresses.lp2
         );
@@ -323,19 +317,19 @@ function behavesLikeQueue(params: Params) {
       it.skip("should redeem vault shares if LP deposited in past epoch", async () => {});
     });
 
-    describe("#withdrawFromQueue(uint256)", () => {
+    describe("#withdraw(uint256)", () => {
       time.revertToSnapshotAfterEach(async () => {
         await asset
           .connect(signers.lp1)
           .approve(addresses.queue, params.deposit);
 
-        await instance["depositToQueue(uint256)"](params.deposit);
+        await instance["deposit(uint256)"](params.deposit);
       });
 
       it("should withdraw exact amount deposited", async () => {
         const lpBalanceBefore = await asset.balanceOf(addresses.lp1);
 
-        await instance.withdrawFromQueue(params.deposit);
+        await instance.withdraw(params.deposit);
 
         const lpBalanceAfter = await asset.balanceOf(addresses.lp1);
         assert.bnEqual(lpBalanceBefore, lpBalanceAfter.sub(params.deposit));
@@ -353,7 +347,7 @@ function behavesLikeQueue(params: Params) {
 
     // TODO:
     // TODO: Move to integration tests
-    describe.skip("#redeemSharesFromEpoch(uint64,address)", () => {
+    describe.skip("#redeemShares(uint64,address)", () => {
       time.revertToSnapshotAfterEach(async () => {});
 
       it("should revert if sender != receiver and sender != approved", async () => {
@@ -378,7 +372,7 @@ function behavesLikeQueue(params: Params) {
           .connect(signers.lp1)
           .approve(addresses.vault, params.deposit);
 
-        await instance["depositToQueue(uint256)"](params.deposit);
+        await instance["deposit(uint256)"](params.deposit);
         await instance.connect(signers.keeper)["processEpoch(bool)"](false);
       });
 
@@ -446,7 +440,7 @@ function behavesLikeQueue(params: Params) {
 
     // TODO:
     // TODO: Move to integration tests
-    describe.skip("#previewUnredeemedSharesFromEpoch(uint64,uint256)", () => {
+    describe.skip("#previewUnredeemedShares(uint64,uint256)", () => {
       time.revertToSnapshotAfterEach(async () => {});
     });
 

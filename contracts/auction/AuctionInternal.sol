@@ -54,6 +54,10 @@ contract AuctionInternal is IAuctionInternal {
         Vault = IVault(vault);
     }
 
+    /************************************************
+     *  INITIALIZATION
+     ***********************************************/
+
     function _initialize(AuctionStorage.InitAuction memory initAuction)
         internal
     {
@@ -165,7 +169,7 @@ contract AuctionInternal is IAuctionInternal {
     }
 
     /************************************************
-     *  AUCTION ORDER
+     *  PURCHASE
      ***********************************************/
 
     function _addLimitOrder(
@@ -240,6 +244,105 @@ contract AuctionInternal is IAuctionInternal {
 
         uint256 id = l.orderbooks[epoch]._insert(price64x64, size, msg.sender);
         emit OrderAdded(id, msg.sender, price64x64, size, false);
+    }
+
+    /************************************************
+     *  WITHDRAW
+     ***********************************************/
+
+    function _withdraw(uint64 epoch) internal {
+        // modifier: reject if auction is not processed
+        AuctionStorage.Layout storage l = AuctionStorage.layout();
+
+        (uint256 refund, uint256 fill) = _previewWithdraw(l, epoch, false);
+
+        l.claimsByBuyer[msg.sender].remove(epoch);
+
+        (bool expired, uint256 exercisedAmount) =
+            Vault.getExerciseAmount(epoch, fill);
+
+        if (expired) {
+            // If expired ITM, adjust refund
+            if (exercisedAmount > 0) refund += exercisedAmount;
+            fill = 0;
+        }
+
+        if (fill > 0) {
+            Pool.safeTransferFrom(
+                address(this),
+                msg.sender,
+                l.auctions[epoch].longTokenId,
+                fill,
+                ""
+            );
+        }
+
+        if (refund > 0) {
+            ERC20.safeTransfer(msg.sender, refund);
+        }
+
+        // emit Withdrawn()
+    }
+
+    function _previewWithdraw(uint64 epoch)
+        internal
+        returns (uint256, uint256)
+    {
+        AuctionStorage.Layout storage l = AuctionStorage.layout();
+        return _previewWithdraw(l, epoch, true);
+    }
+
+    function _previewWithdraw(
+        AuctionStorage.Layout storage l,
+        uint64 epoch,
+        bool isPreview
+    ) private returns (uint256, uint256) {
+        // modifier: reject if auction is not processed
+        OrderBook.Index storage orderbook = l.orderbooks[epoch];
+        AuctionStorage.Auction memory auction = l.auctions[epoch];
+
+        uint256 refund;
+        uint256 fill;
+
+        // If auction is cancelled, buyers are refunded.
+        int128 lastPrice64x64 = _clearingPrice64x64(epoch);
+
+        uint256 totalContractsSold;
+        uint256 next = orderbook._head();
+        uint256 length = orderbook._length();
+
+        for (uint256 i = 1; i <= length; i++) {
+            OrderBook.Data memory data = orderbook._getOrderById(next);
+
+            if (data.buyer == msg.sender) {
+                if (data.price64x64 >= lastPrice64x64) {
+                    uint256 paid = data.price64x64.mulu(data.size);
+                    uint256 cost = lastPrice64x64.mulu(data.size);
+
+                    if (
+                        totalContractsSold + data.size >= auction.totalContracts
+                    ) {
+                        uint256 remainder =
+                            auction.totalContracts - totalContractsSold;
+
+                        cost = lastPrice64x64.mulu(remainder);
+                        fill += remainder;
+                    } else {
+                        fill += data.size;
+                    }
+                    refund += paid - cost;
+                } else {
+                    refund += data.price64x64.mulu(data.size);
+                }
+
+                if (!isPreview) orderbook._remove(data.id);
+            }
+
+            totalContractsSold += data.size;
+            next = orderbook._getNextOrder(next);
+        }
+
+        return (refund, fill);
     }
 
     /************************************************
@@ -360,105 +463,6 @@ contract AuctionInternal is IAuctionInternal {
 
         auction.status = AuctionStorage.Status.PROCESSED;
         emit AuctionStatus(AuctionStorage.Status.PROCESSED);
-    }
-
-    /************************************************
-     *  WITHDRAW
-     ***********************************************/
-
-    function _withdraw(uint64 epoch) internal {
-        // modifier: reject if auction is not processed
-        AuctionStorage.Layout storage l = AuctionStorage.layout();
-
-        (uint256 refund, uint256 fill) = _previewWithdraw(l, epoch, false);
-
-        l.claimsByBuyer[msg.sender].remove(epoch);
-
-        (bool expired, uint256 exercisedAmount) =
-            Vault.getExerciseAmount(epoch, fill);
-
-        if (expired) {
-            // If expired ITM, adjust refund
-            if (exercisedAmount > 0) refund += exercisedAmount;
-            fill = 0;
-        }
-
-        if (fill > 0) {
-            Pool.safeTransferFrom(
-                address(this),
-                msg.sender,
-                l.auctions[epoch].longTokenId,
-                fill,
-                ""
-            );
-        }
-
-        if (refund > 0) {
-            ERC20.safeTransfer(msg.sender, refund);
-        }
-
-        // emit Withdrawn()
-    }
-
-    function _previewWithdraw(uint64 epoch)
-        internal
-        returns (uint256, uint256)
-    {
-        AuctionStorage.Layout storage l = AuctionStorage.layout();
-        return _previewWithdraw(l, epoch, true);
-    }
-
-    function _previewWithdraw(
-        AuctionStorage.Layout storage l,
-        uint64 epoch,
-        bool isPreview
-    ) private returns (uint256, uint256) {
-        // modifier: reject if auction is not processed
-        OrderBook.Index storage orderbook = l.orderbooks[epoch];
-        AuctionStorage.Auction memory auction = l.auctions[epoch];
-
-        uint256 refund;
-        uint256 fill;
-
-        // If auction is cancelled, buyers are refunded.
-        int128 lastPrice64x64 = _clearingPrice64x64(epoch);
-
-        uint256 totalContractsSold;
-        uint256 next = orderbook._head();
-        uint256 length = orderbook._length();
-
-        for (uint256 i = 1; i <= length; i++) {
-            OrderBook.Data memory data = orderbook._getOrderById(next);
-
-            if (data.buyer == msg.sender) {
-                if (data.price64x64 >= lastPrice64x64) {
-                    uint256 paid = data.price64x64.mulu(data.size);
-                    uint256 cost = lastPrice64x64.mulu(data.size);
-
-                    if (
-                        totalContractsSold + data.size >= auction.totalContracts
-                    ) {
-                        uint256 remainder =
-                            auction.totalContracts - totalContractsSold;
-
-                        cost = lastPrice64x64.mulu(remainder);
-                        fill += remainder;
-                    } else {
-                        fill += data.size;
-                    }
-                    refund += paid - cost;
-                } else {
-                    refund += data.price64x64.mulu(data.size);
-                }
-
-                if (!isPreview) orderbook._remove(data.id);
-            }
-
-            totalContractsSold += data.size;
-            next = orderbook._getNextOrder(next);
-        }
-
-        return (refund, fill);
     }
 
     /************************************************
