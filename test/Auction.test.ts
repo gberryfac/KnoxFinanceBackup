@@ -417,9 +417,25 @@ function behavesLikeAuction(params: Params) {
         });
 
         it("should return max price", async () => {
-          assert.bnEqual(await instance.priceCurve64x64(epoch), maxPrice64x64);
+          const priceBeforeAuctionStart = fixedToNumber(
+            await instance.priceCurve64x64(epoch)
+          );
+
+          expect(priceBeforeAuctionStart).to.almost(
+            fixedToNumber(maxPrice64x64),
+            0.01
+          );
+
           await time.increaseTo(startTime);
-          assert.bnEqual(await instance.priceCurve64x64(epoch), maxPrice64x64);
+
+          const priceAtAuctionStart = fixedToNumber(
+            await instance.priceCurve64x64(epoch)
+          );
+
+          expect(priceAtAuctionStart).to.almost(
+            fixedToNumber(maxPrice64x64),
+            0.01
+          );
         });
 
         it("should return min price", async () => {

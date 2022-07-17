@@ -17,8 +17,8 @@ contract PricerInternal {
     address public immutable base;
     address public immutable underlying;
     IVolatilitySurfaceOracle public immutable IVolOracle;
-    AggregatorInterface public immutable BaseSpotOracle;
-    AggregatorInterface public immutable UnderlyingSpotOracle;
+    AggregatorV3Interface public immutable BaseSpotOracle;
+    AggregatorV3Interface public immutable UnderlyingSpotOracle;
 
     constructor(address pool, address volatilityOracle) {
         require(pool != address(0), "address not provided");
@@ -32,8 +32,8 @@ contract PricerInternal {
         base = settings.base;
         underlying = settings.underlying;
 
-        BaseSpotOracle = AggregatorInterface(settings.baseOracle);
-        UnderlyingSpotOracle = AggregatorInterface(settings.underlyingOracle);
+        BaseSpotOracle = AggregatorV3Interface(settings.baseOracle);
+        UnderlyingSpotOracle = AggregatorV3Interface(settings.underlyingOracle);
 
         uint8 decimals = UnderlyingSpotOracle.decimals();
 
@@ -44,8 +44,12 @@ contract PricerInternal {
     }
 
     function _latestAnswer64x64() internal view returns (int128) {
-        int256 basePrice = BaseSpotOracle.latestAnswer();
-        int256 underlyingPrice = UnderlyingSpotOracle.latestAnswer();
+        (, int256 basePrice, , , ) = BaseSpotOracle.latestRoundData();
+        (, int256 underlyingPrice, , , ) =
+            UnderlyingSpotOracle.latestRoundData();
+
+        // int256 basePrice = BaseSpotOracle.latestAnswer();
+        // int256 underlyingPrice = UnderlyingSpotOracle.latestAnswer();
 
         return ABDKMath64x64.divi(underlyingPrice, basePrice);
     }
@@ -112,7 +116,7 @@ contract PricerInternal {
         int128 w = timeToMaturity64x64.mul(iv_atm.pow(2)) >> 1;
 
         if (!isCall) delta64x64 = int128(0x010000000000000000).sub(delta64x64);
-        int128 beta = delta64x64.invCDF();
+        int128 beta = delta64x64.invCDF64x64();
 
         int128 z = w.sub(beta.mul(v));
         return spot64x64.mul(z.exp());

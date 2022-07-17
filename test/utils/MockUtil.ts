@@ -45,21 +45,33 @@ export class MockPremiaPoolUtil {
     const underlyingSpotPriceOracle = await deployMockContract(
       deployer as any,
       [
-        "function latestAnswer() external view returns (int256)",
         "function decimals() external view returns (uint8)",
+        "function latestRoundData() external view returns (uint80,int256,uint256,uint256,uint80)",
       ]
     );
 
-    await underlyingSpotPriceOracle.mock.latestAnswer.returns(underlying.price);
     await underlyingSpotPriceOracle.mock.decimals.returns(underlying.decimals);
+    await underlyingSpotPriceOracle.mock.latestRoundData.returns(
+      0,
+      underlying.price,
+      0,
+      0,
+      0
+    );
 
     const baseSpotPriceOracle = await deployMockContract(deployer as any, [
-      "function latestAnswer() external view returns (int256)",
       "function decimals() external view returns (uint8)",
+      "function latestRoundData() external view returns (uint80,int256,uint256,uint256,uint80)",
     ]);
 
-    await baseSpotPriceOracle.mock.latestAnswer.returns(base.price);
     await baseSpotPriceOracle.mock.decimals.returns(base.decimals);
+    await baseSpotPriceOracle.mock.latestRoundData.returns(
+      0,
+      base.price,
+      0,
+      0,
+      0
+    );
 
     // TODO: add ERC20 tokens as arguement, if they're undefined deploy MockERC20
     const underlyingAsset = await new MockERC20__factory(deployer).deploy(

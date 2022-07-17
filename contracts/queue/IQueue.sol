@@ -17,7 +17,7 @@ interface IQueue is IERC1155, IERC1155Enumerable {
 
     function withdrawFromQueue(uint256 amount) external;
 
-    function maxRedeemShares(address receiver) external;
+    function redeemMaxShares(address receiver) external;
 
     function syncEpoch(uint64 epoch) external;
 

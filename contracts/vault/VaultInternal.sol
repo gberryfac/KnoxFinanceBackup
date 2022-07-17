@@ -352,7 +352,7 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal {
         address owner
     ) internal virtual override(ERC4626BaseInternal) returns (uint256) {
         VaultStorage.Layout storage l = VaultStorage.layout();
-        l.Queue.maxRedeemShares(owner);
+        l.Queue.redeemMaxShares(owner);
 
         require(
             assetAmount <= _maxWithdraw(owner),
@@ -361,7 +361,7 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal {
 
         uint256 shareAmount = _previewWithdraw(assetAmount);
 
-        __withdraw(msg.sender, receiver, owner, assetAmount, shareAmount);
+        _withdraw(msg.sender, receiver, owner, assetAmount, shareAmount);
 
         return shareAmount;
     }
@@ -380,7 +380,7 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal {
         address owner
     ) internal virtual override(ERC4626BaseInternal) returns (uint256) {
         VaultStorage.Layout storage l = VaultStorage.layout();
-        l.Queue.maxRedeemShares(owner);
+        l.Queue.redeemMaxShares(owner);
 
         require(
             shareAmount <= _maxRedeem(owner),
@@ -389,7 +389,7 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal {
 
         uint256 assetAmount = _previewRedeem(shareAmount);
 
-        __withdraw(msg.sender, receiver, owner, assetAmount, shareAmount);
+        _withdraw(msg.sender, receiver, owner, assetAmount, shareAmount);
 
         return assetAmount;
     }
@@ -402,7 +402,7 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal {
      * @param assetAmount quantity of assets to withdraw
      * @param shareAmount quantity of shares to redeem
      */
-    function __withdraw(
+    function _withdraw(
         address caller,
         address receiver,
         address owner,

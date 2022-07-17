@@ -370,7 +370,7 @@ contract AuctionInternal is IAuctionInternal {
         // modifier: reject if auction is not processed
         AuctionStorage.Layout storage l = AuctionStorage.layout();
 
-        (uint256 refund, uint256 fill) = __previewWithdraw(l, epoch, false);
+        (uint256 refund, uint256 fill) = _previewWithdraw(l, epoch, false);
 
         l.claimsByBuyer[msg.sender].remove(epoch);
 
@@ -405,10 +405,10 @@ contract AuctionInternal is IAuctionInternal {
         returns (uint256, uint256)
     {
         AuctionStorage.Layout storage l = AuctionStorage.layout();
-        return __previewWithdraw(l, epoch, true);
+        return _previewWithdraw(l, epoch, true);
     }
 
-    function __previewWithdraw(
+    function _previewWithdraw(
         AuctionStorage.Layout storage l,
         uint64 epoch,
         bool isPreview

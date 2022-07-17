@@ -32,20 +32,20 @@ contract Queue is Access, ERC1155Base, ERC1155Enumerable, QueueInternal {
      *  DEPOSIT
      ***********************************************/
 
-    function depositToQueue(uint256 amount)
-        external
-        nonReentrant
-        whenNotPaused
-    {
-        _depositToQueue(amount, msg.sender);
-    }
-
     function depositToQueue(uint256 amount, address receiver)
         external
         nonReentrant
         whenNotPaused
     {
         _depositToQueue(amount, receiver);
+    }
+
+    function depositToQueue(uint256 amount)
+        external
+        nonReentrant
+        whenNotPaused
+    {
+        _depositToQueue(amount, msg.sender);
     }
 
     /************************************************
@@ -60,32 +60,31 @@ contract Queue is Access, ERC1155Base, ERC1155Enumerable, QueueInternal {
      *  REDEEM
      ***********************************************/
 
-    function redeemSharesFromEpoch(uint64 epoch, address receiver)
+    function redeemMaxShares(address receiver) external nonReentrant {
+        _redeemMaxShares(receiver);
+    }
+
+    function redeemMaxShares() external nonReentrant {
+        _redeemMaxShares(msg.sender);
+    }
+
+    function redeemSharesFromEpoch(uint64 _epoch, address receiver)
         external
         nonReentrant
     {
-        require(
-            receiver == msg.sender || isApprovedForAll(receiver, msg.sender),
-            "ERC1155: caller is not owner nor approved"
-        );
-        _redeemSharesFromEpoch(epoch, receiver);
+        _redeemSharesFromEpoch(_epoch, receiver);
     }
 
-    function maxRedeemShares(address receiver) external nonReentrant {
-        require(
-            receiver == msg.sender || isApprovedForAll(receiver, msg.sender),
-            "ERC1155: caller is not owner nor approved"
-        );
-
-        _maxRedeemShares(receiver);
+    function redeemSharesFromEpoch(uint64 _epoch) external nonReentrant {
+        _redeemSharesFromEpoch(_epoch, msg.sender);
     }
 
     /************************************************
      *  PROCESS EPOCH
      ***********************************************/
 
-    function syncEpoch(uint64 epoch) external onlyVault {
-        _syncEpoch(epoch);
+    function syncEpoch(uint64 _epoch) external onlyVault {
+        _syncEpoch(_epoch);
     }
 
     function depositToVault() external onlyVault {
@@ -104,12 +103,12 @@ contract Queue is Access, ERC1155Base, ERC1155Enumerable, QueueInternal {
         return _previewUnredeemedShares(account);
     }
 
-    function previewUnredeemedSharesFromEpoch(uint64 epoch, uint256 balance)
+    function previewUnredeemedSharesFromEpoch(uint64 _epoch, uint256 balance)
         external
         view
         returns (uint256)
     {
-        return _previewUnredeemedSharesFromEpoch(epoch, balance);
+        return _previewUnredeemedSharesFromEpoch(_epoch, balance);
     }
 
     function epoch() external view returns (uint64) {
@@ -120,16 +119,16 @@ contract Queue is Access, ERC1155Base, ERC1155Enumerable, QueueInternal {
         return _maxTVL();
     }
 
-    function pricePerShare(uint64 epoch) external view returns (uint256) {
-        return _pricePerShare(epoch);
+    function pricePerShare(uint64 _epoch) external view returns (uint256) {
+        return _pricePerShare(_epoch);
     }
 
     /************************************************
      * HELPERS
      ***********************************************/
 
-    function formatClaimTokenId(uint64 epoch) external view returns (uint256) {
-        return _formatClaimTokenId(epoch);
+    function formatClaimTokenId(uint64 _epoch) external view returns (uint256) {
+        return _formatClaimTokenId(_epoch);
     }
 
     function parseClaimTokenId(uint256 claimTokenId)
