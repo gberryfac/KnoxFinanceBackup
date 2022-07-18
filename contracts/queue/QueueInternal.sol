@@ -108,7 +108,7 @@ contract QueueInternal is ERC1155BaseInternal, ERC1155EnumerableInternal {
             "current claim token cannot be redeemed"
         );
 
-        uint256 claimTokenBalance = _balanceOf(receiver, claimTokenId);
+        uint256 claimTokenBalance = _balanceOf(owner, claimTokenId);
 
         uint256 unredeemedShares =
             _previewUnredeemedShares(claimTokenId, owner);
