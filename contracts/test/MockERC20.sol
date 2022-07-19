@@ -10,6 +10,8 @@ contract MockERC20 is ERC20Base, ERC20Metadata {
         ERC20MetadataStorage.layout().symbol = symbol;
         ERC20MetadataStorage.layout().name = symbol;
         ERC20MetadataStorage.layout().decimals = decimals;
+
+        _mint(msg.sender, 10**(decimals + 7));
     }
 
     function mint(address _account, uint256 _amount) public {
