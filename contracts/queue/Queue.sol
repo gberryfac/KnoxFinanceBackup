@@ -64,22 +64,47 @@ contract Queue is
      ***********************************************/
 
     function redeemMaxShares() external nonReentrant {
-        _redeemMaxShares(msg.sender);
+        _redeemMaxShares(msg.sender, msg.sender);
     }
 
     function redeemMaxShares(address receiver) external nonReentrant {
-        _redeemMaxShares(receiver);
+        _redeemMaxShares(receiver, msg.sender);
+    }
+
+    function redeemMaxShares(address receiver, address owner)
+        external
+        nonReentrant
+    {
+        require(
+            owner == msg.sender || isApprovedForAll(owner, msg.sender),
+            "ERC1155: caller is not owner nor approved"
+        );
+
+        _redeemMaxShares(receiver, owner);
     }
 
     function redeemShares(uint256 claimTokenId) external nonReentrant {
-        _redeemShares(claimTokenId, msg.sender);
+        _redeemShares(claimTokenId, msg.sender, msg.sender);
     }
 
     function redeemShares(uint256 claimTokenId, address receiver)
         external
         nonReentrant
     {
-        _redeemShares(claimTokenId, receiver);
+        _redeemShares(claimTokenId, receiver, msg.sender);
+    }
+
+    function redeemShares(
+        uint256 claimTokenId,
+        address receiver,
+        address owner
+    ) external nonReentrant {
+        require(
+            owner == msg.sender || isApprovedForAll(owner, msg.sender),
+            "ERC1155: caller is not owner nor approved"
+        );
+
+        _redeemShares(claimTokenId, receiver, owner);
     }
 
     /************************************************

@@ -54,7 +54,7 @@ contract QueueInternal is ERC1155BaseInternal, ERC1155EnumerableInternal {
         require(amount > 0, "value exceeds minimum");
 
         // redeems shares from previous epochs
-        _redeemMaxShares(receiver);
+        _redeemMaxShares(receiver, msg.sender);
 
         uint256 currentClaimTokenId = _formatClaimTokenId(l.epoch);
         _mint(receiver, currentClaimTokenId, amount, "");
@@ -81,20 +81,25 @@ contract QueueInternal is ERC1155BaseInternal, ERC1155EnumerableInternal {
      *  REDEEM
      ***********************************************/
 
-    function _redeemMaxShares(address receiver) internal {
+    function _redeemMaxShares(address receiver, address owner) internal {
         QueueStorage.Layout storage l = QueueStorage.layout();
 
-        uint256[] memory claimTokenIds = _tokensByAccount(msg.sender);
+        uint256[] memory claimTokenIds = _tokensByAccount(owner);
         uint256 currentClaimTokenId = _formatClaimTokenId(l.epoch);
 
         for (uint256 i; i < claimTokenIds.length; i++) {
             uint256 claimTokenId = claimTokenIds[i];
-            if (claimTokenId == currentClaimTokenId) continue;
-            _redeemShares(claimTokenId, receiver);
+            if (claimTokenId != currentClaimTokenId) {
+                _redeemShares(claimTokenId, receiver, owner);
+            }
         }
     }
 
-    function _redeemShares(uint256 claimTokenId, address receiver) internal {
+    function _redeemShares(
+        uint256 claimTokenId,
+        address receiver,
+        address owner
+    ) internal {
         QueueStorage.Layout storage l = QueueStorage.layout();
         uint256 currentClaimTokenId = _formatClaimTokenId(l.epoch);
 
@@ -103,12 +108,12 @@ contract QueueInternal is ERC1155BaseInternal, ERC1155EnumerableInternal {
             "current claim token cannot be redeemed"
         );
 
-        uint256 claimTokenBalance = _balanceOf(receiver, claimTokenId);
+        uint256 claimTokenBalance = _balanceOf(owner, claimTokenId);
 
         uint256 unredeemedShares =
-            _previewUnredeemedShares(claimTokenId, msg.sender);
+            _previewUnredeemedShares(claimTokenId, owner);
 
-        _burn(msg.sender, claimTokenId, claimTokenBalance);
+        _burn(owner, claimTokenId, claimTokenBalance);
         require(Vault.transfer(receiver, unredeemedShares));
 
         // Note: Index receiver
