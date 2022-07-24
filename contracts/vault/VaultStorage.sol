@@ -23,6 +23,7 @@ library VaultStorage {
         bool isCall;
         int128 delta64x64;
         int128 deltaOffset64x64;
+        int128 reserveRate;
         uint256 performanceFee;
         uint256 withdrawalFee;
         string name;
@@ -97,6 +98,8 @@ library VaultStorage {
         /************************************************
          * VAULT PROPERTIES
          ***********************************************/
+        // @notice
+        int128 reserveRate;
         // @notice
         uint256 performanceFee;
         // @notice

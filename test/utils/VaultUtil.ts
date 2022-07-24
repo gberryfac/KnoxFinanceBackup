@@ -1,7 +1,7 @@
 import { ethers } from "hardhat";
 const { getContractAt } = ethers;
 
-import * as types from "./types";
+import { types } from "./";
 
 import { diamondCut } from "../../scripts/diamond";
 
@@ -50,6 +50,7 @@ export class VaultUtil {
       minSize: params.minSize,
       delta64x64: fixedFromFloat(params.delta),
       deltaOffset64x64: fixedFromFloat(params.deltaOffset),
+      reserveRate: fixedFromFloat(params.reserveRate),
       performanceFee: params.performanceFee,
       withdrawalFee: params.withdrawalFee,
       name: params.tokenName,

@@ -108,7 +108,7 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal {
     function _initializeAuction() internal {
         VaultStorage.Layout storage l = VaultStorage.layout();
 
-        uint64 nextEpoch = l.epoch++;
+        uint64 nextEpoch = l.epoch + 1;
         VaultStorage.Option storage nextOption = l.options[nextEpoch];
 
         l.Auction.initialize(
@@ -203,7 +203,7 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal {
     function _setNextEpoch() internal {
         VaultStorage.Layout storage l = VaultStorage.layout();
         l.totalShort = 0;
-        l.epoch++;
+        l.epoch = l.epoch + 1;
 
         l.Queue.syncEpoch(l.epoch);
 
@@ -221,7 +221,7 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal {
             l.Pricer.getDeltaStrikePrice64x64(
                 l.isCall,
                 option.expiry,
-                l.delta64x64 - l.deltaOffset64x64
+                l.delta64x64.sub(l.deltaOffset64x64)
             );
 
         offsetStrike64x64 = l.Pricer.snapToGrid(l.isCall, offsetStrike64x64);
@@ -278,7 +278,7 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal {
                     option.strike64x64.mulu(totalContractsSold)
                 );
 
-        ERC20.approve(address(Pool), totalCollateralUsed);
+        ERC20.approve(address(Pool), totalCollateralUsed + _totalReserves());
 
         Pool.writeFrom(
             address(this),
@@ -296,9 +296,18 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal {
      *  VIEW
      ***********************************************/
 
+    function _totalReserves() internal view returns (uint256) {
+        VaultStorage.Layout storage l = VaultStorage.layout();
+        return
+            l.reserveRate.mulu(
+                ERC20.balanceOf(address(this)) - l.totalPremiums
+            );
+    }
+
     function _totalCollateral() internal view returns (uint256) {
         VaultStorage.Layout storage l = VaultStorage.layout();
-        return ERC20.balanceOf(address(this)) - l.totalPremiums;
+        return
+            ERC20.balanceOf(address(this)) - l.totalPremiums - _totalReserves();
     }
 
     /************************************************
@@ -522,7 +531,7 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal {
     }
 
     function _getNextFriday() private view returns (uint64) {
-        return uint64(Helpers.getNextFriday(block.timestamp));
+        return uint64(Helpers._getNextFriday(block.timestamp));
     }
 
     function _getExerciseAmount(uint64 epoch, uint256 size)
