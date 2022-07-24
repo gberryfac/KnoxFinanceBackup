@@ -1,6 +1,7 @@
 import { ethers, network } from "hardhat";
 import { BigNumber } from "ethers";
 const { getContractAt } = ethers;
+import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 
 import * as types from "./types";
 
@@ -19,6 +20,7 @@ export async function getSigners(): Promise<types.Signers> {
     buyer2Signer,
     buyer3Signer,
   ] = await ethers.getSigners();
+
   const signers = {
     deployer: deployerSigner,
     lp1: lp1Signer,
@@ -47,27 +49,38 @@ export async function getAddresses(
     buyer1: signers.buyer1.address,
     buyer2: signers.buyer2.address,
     buyer3: signers.buyer3.address,
+    vault: ethers.constants.AddressZero,
+    queue: ethers.constants.AddressZero,
+    auction: ethers.constants.AddressZero,
   };
 
   return addresses;
 }
 
-export async function impersonateWhale(
-  buyer: string,
+export async function impersonateVault(
+  signers: types.Signers,
+  addresses: types.Addresses
+): Promise<SignerWithAddress> {
+  await network.provider.request({
+    method: "hardhat_impersonateAccount",
+    params: [addresses.vault],
+  });
+
+  // send enough ETH to contract to cover tx cost.
+  await signers.deployer.sendTransaction({
+    to: addresses.vault,
+    value: ethers.utils.parseEther("5"),
+  });
+
+  return await ethers.getSigner(addresses.vault);
+}
+
+export async function setERC20Balances(
   asset: string,
   deposit: BigNumber,
   signers: types.Signers,
   addresses: types.Addresses
 ): Promise<[types.Signers, types.Addresses, MockERC20]> {
-  addresses.buyer1 = buyer;
-
-  await network.provider.request({
-    method: "hardhat_impersonateAccount",
-    params: [addresses.buyer1],
-  });
-
-  signers.buyer1 = await ethers.getSigner(addresses.buyer1);
-
   for (let s in signers) {
     let address = signers[s].address;
 
@@ -79,8 +92,7 @@ export async function impersonateWhale(
     );
   }
 
-  const erc20 = await getContractAt("MockERC20", asset);
-  return [signers, addresses, erc20];
+  return [signers, addresses, await getContractAt("MockERC20", asset)];
 }
 
 async function _setERC20Balance(
