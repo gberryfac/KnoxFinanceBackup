@@ -11,13 +11,14 @@ import chaiAlmost from "chai-almost";
 
 chai.use(chaiAlmost());
 
-import { Pricer, Pricer__factory } from "../types";
+import {
+  MockERC20,
+  Pricer,
+  MockERC20__factory,
+  Pricer__factory,
+} from "../types";
 
-import { assert } from "./utils/assertions";
-import * as time from "./utils/time";
-import { MockPremiaPoolUtil } from "./utils/MockUtil";
-
-import { ADDRESS_ZERO } from "../constants";
+import { assert, time } from "./utils";
 
 import moment from "moment-timezone";
 moment.tz.setDefault("UTC");
@@ -26,14 +27,12 @@ describe("Pricer Tests", () => {
   behavesLikePricer({
     name: "Pricer (Put Options)",
     isCall: false,
-    expiry: 1653033600, // 8AM GMT, Friday after block 14765000
     delta64x64: fixedFromFloat(0.25),
   });
 
   behavesLikePricer({
     name: "Pricer (Call Options)",
     isCall: true,
-    expiry: 1653033600, // 8AM GMT, Friday after block 14765000
     delta64x64: fixedFromFloat(0.4),
   });
 });
@@ -41,14 +40,17 @@ describe("Pricer Tests", () => {
 type Params = {
   name: string;
   isCall: boolean;
-  expiry: number;
   delta64x64: BigNumber;
 };
 
 function behavesLikePricer(params: Params) {
   describe.only(params.name, () => {
     let block;
-    let mockPremiaPool: MockPremiaPoolUtil;
+    let underlyingSpotPriceOracle: MockContract;
+    let baseSpotPriceOracle: MockContract;
+    let underlyingAsset: MockERC20;
+    let baseAsset: MockERC20;
+    let mockPool: MockContract;
     let mockVolatilityOracle: MockContract;
     let pricer: Pricer;
     let deployer: SignerWithAddress;
@@ -56,16 +58,41 @@ function behavesLikePricer(params: Params) {
     before(async () => {
       [deployer] = await ethers.getSigners();
 
-      mockPremiaPool = await MockPremiaPoolUtil.deploy(
-        {
-          decimals: 8,
-          price: 200000000,
-        },
-        {
-          decimals: 8,
-          price: 100000000,
-        },
-        deployer
+      underlyingSpotPriceOracle = await deployMockContract(deployer as any, [
+        "function decimals() external view returns (uint8)",
+        "function latestRoundData() external view returns (uint80,int256,uint256,uint256,uint80)",
+      ]);
+
+      await underlyingSpotPriceOracle.mock.decimals.returns(8);
+      await underlyingSpotPriceOracle.mock.latestRoundData.returns(
+        0,
+        2000,
+        0,
+        0,
+        0
+      );
+
+      baseSpotPriceOracle = await deployMockContract(deployer as any, [
+        "function decimals() external view returns (uint8)",
+        "function latestRoundData() external view returns (uint80,int256,uint256,uint256,uint80)",
+      ]);
+
+      await baseSpotPriceOracle.mock.decimals.returns(8);
+      await baseSpotPriceOracle.mock.latestRoundData.returns(0, 1, 0, 0, 0);
+
+      underlyingAsset = await new MockERC20__factory(deployer).deploy("", 18);
+
+      baseAsset = await new MockERC20__factory(deployer).deploy("", 18);
+
+      mockPool = await deployMockContract(deployer as any, [
+        "function getPoolSettings() external view returns (address,address,address,address)",
+      ]);
+
+      await mockPool.mock.getPoolSettings.returns(
+        underlyingAsset.address,
+        baseAsset.address,
+        underlyingSpotPriceOracle.address,
+        baseSpotPriceOracle.address
       );
 
       mockVolatilityOracle = await deployMockContract(deployer as any, [
@@ -77,7 +104,7 @@ function behavesLikePricer(params: Params) {
       );
 
       pricer = await new Pricer__factory(deployer).deploy(
-        mockPremiaPool.pool.address,
+        mockPool.address,
         mockVolatilityOracle.address
       );
 
@@ -90,7 +117,7 @@ function behavesLikePricer(params: Params) {
       it("should revert if pool address is 0x0", async () => {
         await expect(
           new Pricer__factory(deployer).deploy(
-            ADDRESS_ZERO,
+            ethers.constants.AddressZero,
             mockVolatilityOracle.address
           )
         ).to.be.revertedWith("address not provided");
@@ -99,8 +126,8 @@ function behavesLikePricer(params: Params) {
       it("should revert if volatility oracle address is 0x0", async () => {
         await expect(
           new Pricer__factory(deployer).deploy(
-            mockPremiaPool.pool.address,
-            ADDRESS_ZERO
+            mockPool.address,
+            ethers.constants.AddressZero
           )
         ).to.be.revertedWith("address not provided");
       });
@@ -111,38 +138,45 @@ function behavesLikePricer(params: Params) {
 
         assert.equal(
           await pricer.BaseSpotOracle(),
-          mockPremiaPool.baseSpotPriceOracle.address
+          baseSpotPriceOracle.address
         );
 
         assert.equal(
           await pricer.UnderlyingSpotOracle(),
-          mockPremiaPool.underlyingSpotPriceOracle.address
+          underlyingSpotPriceOracle.address
         );
 
         // Check Asset Properties
         const base = await pricer.base();
         const underlying = await pricer.underlying();
 
-        assert.equal(base, mockPremiaPool.baseAsset.address);
-        assert.equal(underlying, mockPremiaPool.underlyingAsset.address);
+        assert.equal(base, baseAsset.address);
+        assert.equal(underlying, underlyingAsset.address);
       });
 
       it("should revert if base and underlying decimals do not match", async () => {
-        const mockPremiaPool = await MockPremiaPoolUtil.deploy(
-          {
-            decimals: 8,
-            price: 200000000,
-          },
-          {
-            decimals: 18,
-            price: 100000000,
-          },
-          deployer
+        const baseSpotPriceOracle = await deployMockContract(deployer as any, [
+          "function decimals() external view returns (uint8)",
+          "function latestRoundData() external view returns (uint80,int256,uint256,uint256,uint80)",
+        ]);
+
+        await baseSpotPriceOracle.mock.decimals.returns(7);
+        await baseSpotPriceOracle.mock.latestRoundData.returns(0, 1, 0, 0, 0);
+
+        const mockPool = await deployMockContract(deployer as any, [
+          "function getPoolSettings() external view returns (address,address,address,address)",
+        ]);
+
+        await mockPool.mock.getPoolSettings.returns(
+          underlyingAsset.address,
+          baseAsset.address,
+          underlyingSpotPriceOracle.address,
+          baseSpotPriceOracle.address
         );
 
         await expect(
           new Pricer__factory(deployer).deploy(
-            mockPremiaPool.pool.address,
+            mockPool.address,
             mockVolatilityOracle.address
           )
         ).to.be.revertedWith("oracle decimals must match");
@@ -153,7 +187,7 @@ function behavesLikePricer(params: Params) {
       time.revertToSnapshotAfterEach(async () => {});
 
       it("should convert price correctly", async () => {
-        assert.equal(fixedToNumber(await pricer.latestAnswer64x64()), 2);
+        assert.equal(fixedToNumber(await pricer.latestAnswer64x64()), 2000);
       });
     });
 
@@ -168,9 +202,11 @@ function behavesLikePricer(params: Params) {
       });
 
       it("should convert time to maurity correctly", async () => {
-        const expected = (params.expiry - block.timestamp) / 31536000;
+        let expiry = await time.getFriday8AM(block.timestamp);
+
+        const expected = (expiry - block.timestamp) / 31536000;
         const actual = fixedToNumber(
-          await pricer.getTimeToMaturity64x64(params.expiry)
+          await pricer.getTimeToMaturity64x64(expiry)
         );
 
         expect(actual).to.almost(expected, 0.001);
@@ -188,14 +224,16 @@ function behavesLikePricer(params: Params) {
         await mockVolatilityOracle.mock.getAnnualizedVolatility64x64.returns(0);
 
         const testPricer = await new Pricer__factory(deployer).deploy(
-          mockPremiaPool.pool.address,
+          mockPool.address,
           mockVolatilityOracle.address
         );
+
+        let expiry = await time.getFriday8AM(block.timestamp);
 
         await expect(
           testPricer.getDeltaStrikePrice64x64(
             params.isCall,
-            params.expiry,
+            expiry,
             params.delta64x64
           )
         ).to.be.revertedWith("iv_atm <= 0");
@@ -212,9 +250,11 @@ function behavesLikePricer(params: Params) {
       });
 
       it("should calculate delta strike price for call option", async () => {
+        let expiry = await time.getFriday8AM(block.timestamp);
+
         const strike = await pricer.getDeltaStrikePrice64x64(
           params.isCall,
-          params.expiry,
+          expiry,
           params.delta64x64
         );
 
@@ -222,9 +262,11 @@ function behavesLikePricer(params: Params) {
       });
 
       it("should calculate delta strike price for put option", async () => {
+        let expiry = await time.getFriday8AM(block.timestamp);
+
         const strike = await pricer.getDeltaStrikePrice64x64(
           !params.isCall,
-          params.expiry,
+          expiry,
           fixedFromFloat(0.25)
         );
 
