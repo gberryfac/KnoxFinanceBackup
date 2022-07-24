@@ -17,11 +17,11 @@ interface ViewBehaviorArgs {
   getParams: () => types.VaultParams;
 }
 
-export function describeBehaviorOfView(
+export function describeBehaviorOfVaultView(
   { getKnoxUtil, getParams }: ViewBehaviorArgs,
   skips?: string[]
 ) {
-  describe("::View", () => {
+  describe("::VaultView", () => {
     // Signers and Addresses
     let addresses: types.Addresses;
     let signers: types.Signers;
@@ -58,6 +58,8 @@ export function describeBehaviorOfView(
 
     describe.skip("#constructor", () => {
       time.revertToSnapshotAfterEach(async () => {});
+
+      it("should initialize VaultView with correct state", async () => {});
     });
   });
 }

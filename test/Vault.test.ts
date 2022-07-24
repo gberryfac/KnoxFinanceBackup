@@ -6,9 +6,9 @@ import { IVault } from "../types";
 
 import { accounts, assets, types, KnoxUtil } from "./utils";
 
-import { describeBehaviorOfAdmin } from "../spec/Admin.behavior";
-import { describeBehaviorOfBase } from "../spec/Base.behavior";
-import { describeBehaviorOfView } from "../spec/View.behavior";
+import { describeBehaviorOfVaultAdmin } from "../spec/VaultAdmin.behavior";
+import { describeBehaviorOfVaultBase } from "../spec/VaultBase.behavior";
+import { describeBehaviorOfVaultView } from "../spec/VaultView.behavior";
 
 describe("Vault Tests", () => {
   behavesLikeVault({
@@ -70,12 +70,12 @@ function behavesLikeVault(params: types.VaultParams) {
       vault = knoxUtil.vaultUtil.vault;
     });
 
-    describeBehaviorOfAdmin({
+    describeBehaviorOfVaultAdmin({
       getKnoxUtil: async () => knoxUtil,
       getParams: () => params,
     });
 
-    describeBehaviorOfBase(
+    describeBehaviorOfVaultBase(
       {
         getKnoxUtil: async () => knoxUtil,
         getParams: () => params,
@@ -87,7 +87,7 @@ function behavesLikeVault(params: types.VaultParams) {
       ["::ERC4626Base"]
     );
 
-    describeBehaviorOfView({
+    describeBehaviorOfVaultView({
       getKnoxUtil: async () => knoxUtil,
       getParams: () => params,
     });

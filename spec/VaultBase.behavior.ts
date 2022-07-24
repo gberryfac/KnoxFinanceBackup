@@ -17,7 +17,7 @@ import { Auction, IPremiaPool, IVault, MockERC20 } from "../types";
 
 import { time, types, KnoxUtil, PoolUtil } from "../test/utils";
 
-interface BaseBehaviorArgs {
+interface VaultBaseBehaviorArgs {
   getKnoxUtil: () => Promise<KnoxUtil>;
   getParams: () => types.VaultParams;
   mintERC4626: (
@@ -35,7 +35,7 @@ interface BaseBehaviorArgs {
   supply: BigNumber;
 }
 
-export function describeBehaviorOfBase(
+export function describeBehaviorOfVaultBase(
   {
     getKnoxUtil,
     getParams,
@@ -43,10 +43,10 @@ export function describeBehaviorOfBase(
     burnERC4626,
     mintAsset,
     supply,
-  }: BaseBehaviorArgs,
+  }: VaultBaseBehaviorArgs,
   skips?: string[]
 ) {
-  describe("::Base", () => {
+  describe("::VaultBase", () => {
     // Signers and Addresses
     let addresses: types.Addresses;
     let signers: types.Signers;
@@ -100,6 +100,8 @@ export function describeBehaviorOfBase(
 
     describe.skip("#constructor", () => {
       time.revertToSnapshotAfterEach(async () => {});
+
+      it("should initialize VaultBase with correct state", async () => {});
     });
   });
 }

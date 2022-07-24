@@ -12,16 +12,16 @@ import { Auction, IPremiaPool, IVault, MockERC20 } from "../types";
 
 import { time, types, KnoxUtil, PoolUtil } from "../test/utils";
 
-interface AdminBehaviorArgs {
+interface VaultAdminBehaviorArgs {
   getKnoxUtil: () => Promise<KnoxUtil>;
   getParams: () => types.VaultParams;
 }
 
-export function describeBehaviorOfAdmin(
-  { getKnoxUtil, getParams }: AdminBehaviorArgs,
+export function describeBehaviorOfVaultAdmin(
+  { getKnoxUtil, getParams }: VaultAdminBehaviorArgs,
   skips?: string[]
 ) {
-  describe("::Admin", () => {
+  describe("::VaultAdmin", () => {
     // Signers and Addresses
     let addresses: types.Addresses;
     let signers: types.Signers;
@@ -63,6 +63,8 @@ export function describeBehaviorOfAdmin(
 
     describe.skip("#constructor", () => {
       time.revertToSnapshotAfterEach(async () => {});
+
+      it("should initialize VaultAdmin with correct state", async () => {});
     });
 
     describe.skip("#processEpoch", () => {
