@@ -10,6 +10,7 @@ import "./IAuction.sol";
 
 // TODO: Switch to stage modifiers
 contract Auction is Access, AuctionInternal, IAuction {
+    using AuctionStorage for AuctionStorage.Layout;
     using ERC165Storage for ERC165Storage.Layout;
 
     constructor(
@@ -117,7 +118,8 @@ contract Auction is Access, AuctionInternal, IAuction {
      ***********************************************/
 
     function isFinalized(uint64 epoch) external view returns (bool) {
-        return _isFinalized(epoch);
+        AuctionStorage.Layout storage l = AuctionStorage.layout();
+        return l._isFinalized(epoch);
     }
 
     function status(uint64 epoch)
@@ -125,7 +127,31 @@ contract Auction is Access, AuctionInternal, IAuction {
         view
         returns (AuctionStorage.Status)
     {
-        return _status(epoch);
+        AuctionStorage.Layout storage l = AuctionStorage.layout();
+        return l._status(epoch);
+    }
+
+    function getAuction(uint64 epoch)
+        external
+        view
+        returns (AuctionStorage.Auction memory)
+    {
+        AuctionStorage.Layout storage l = AuctionStorage.layout();
+        return l._getAuction(epoch);
+    }
+
+    function getMinSize() external view returns (uint256) {
+        AuctionStorage.Layout storage l = AuctionStorage.layout();
+        return l._getMinSize();
+    }
+
+    function getOrderById(uint64 epoch, uint256 id)
+        external
+        view
+        returns (OrderBook.Data memory)
+    {
+        AuctionStorage.Layout storage l = AuctionStorage.layout();
+        return l._getOrderById(epoch, id);
     }
 
     function totalContracts(uint64 epoch) external view returns (uint256) {
@@ -142,22 +168,6 @@ contract Auction is Access, AuctionInternal, IAuction {
         returns (uint64[] memory)
     {
         return _claimsByBuyer(buyer);
-    }
-
-    function getAuction(uint64 epoch)
-        external
-        view
-        returns (AuctionStorage.Auction memory)
-    {
-        return _getAuction(epoch);
-    }
-
-    function getOrderById(uint64 epoch, uint256 id)
-        external
-        view
-        returns (OrderBook.Data memory)
-    {
-        return _getOrderById(epoch, id);
     }
 
     /************************************************

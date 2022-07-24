@@ -6,6 +6,8 @@ import "@solidstate/contracts/utils/EnumerableSet.sol";
 import "./OrderBook.sol";
 
 library AuctionStorage {
+    using OrderBook for OrderBook.Index;
+
     struct InitAuction {
         uint64 epoch;
         int128 strike64x64;
@@ -48,11 +50,21 @@ library AuctionStorage {
         }
     }
 
-    // TODO:
-    function _setMinSize() internal {}
+    function _isFinalized(Layout storage l, uint64 epoch)
+        internal
+        view
+        returns (bool)
+    {
+        return l.auctions[epoch].status == Status.FINALIZED;
+    }
 
-    // TODO:
-    function _getMinSize() internal {}
+    function _status(Layout storage l, uint64 epoch)
+        internal
+        view
+        returns (AuctionStorage.Status)
+    {
+        return l.auctions[epoch].status;
+    }
 
     function _getAuction(Layout storage l, uint64 epoch)
         internal
@@ -60,5 +72,18 @@ library AuctionStorage {
         returns (Auction memory)
     {
         return l.auctions[epoch];
+    }
+
+    function _getMinSize(Layout storage l) internal view returns (uint256) {
+        return l.minSize;
+    }
+
+    function _getOrderById(
+        Layout storage l,
+        uint64 epoch,
+        uint256 id
+    ) internal view returns (OrderBook.Data memory) {
+        OrderBook.Index storage orderbook = l.orderbooks[epoch];
+        return orderbook._getOrderById(id);
     }
 }
