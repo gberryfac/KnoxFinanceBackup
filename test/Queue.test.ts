@@ -442,6 +442,8 @@ function behavesLikeQueue(params: Params) {
     // TODO: Move to integration tests
     describe.skip("#previewUnredeemedShares(uint64,uint256)", () => {
       time.revertToSnapshotAfterEach(async () => {});
+
+      it("should return 0 if claimTokenId == currentClaimTokenId", async () => {});
     });
 
     // TODO:

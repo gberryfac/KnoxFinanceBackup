@@ -321,6 +321,7 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal {
 
     /**
      * @notice execute a withdrawal of assets on behalf of given address
+     * @dev owner must approve vault to redeem claim tokens
      * @dev this function may not be called while the auction is in progress
      * @param assetAmount quantity of assets to withdraw
      * @param receiver recipient of assets resulting from withdrawal
@@ -333,7 +334,7 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal {
         address owner
     ) internal virtual override(ERC4626BaseInternal) returns (uint256) {
         VaultStorage.Layout storage l = VaultStorage.layout();
-        l.Queue.redeemMaxShares(owner);
+        l.Queue.redeemMaxShares(receiver, owner);
 
         require(
             assetAmount <= _maxWithdraw(owner),
@@ -349,6 +350,7 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal {
 
     /**
      * @notice execute a redemption of shares on behalf of given address
+     * @dev owner must approve vault to redeem claim tokens
      * @dev this function may not be called while the auction is in progress
      * @param shareAmount quantity of shares to redeem
      * @param receiver recipient of assets resulting from withdrawal
@@ -361,7 +363,7 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal {
         address owner
     ) internal virtual override(ERC4626BaseInternal) returns (uint256) {
         VaultStorage.Layout storage l = VaultStorage.layout();
-        l.Queue.redeemMaxShares(owner);
+        l.Queue.redeemMaxShares(receiver, owner);
 
         require(
             shareAmount <= _maxRedeem(owner),
