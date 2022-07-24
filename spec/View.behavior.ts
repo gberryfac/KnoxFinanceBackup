@@ -1,8 +1,3 @@
-import { ethers } from "hardhat";
-import { BigNumber, ContractTransaction } from "ethers";
-
-import { describeBehaviorOfERC4626Base } from "@solidstate/spec";
-
 import { Block } from "@ethersproject/abstract-provider";
 
 import chai, { expect } from "chai";
@@ -17,36 +12,16 @@ import { Auction, IPremiaPool, IVault, MockERC20 } from "../types";
 
 import { time, types, KnoxUtil, PoolUtil } from "../test/utils";
 
-interface BaseBehaviorArgs {
+interface ViewBehaviorArgs {
   getKnoxUtil: () => Promise<KnoxUtil>;
   getParams: () => types.VaultParams;
-  mintERC4626: (
-    address: string,
-    amount: BigNumber
-  ) => Promise<ContractTransaction>;
-  burnERC4626: (
-    address: string,
-    amount: BigNumber
-  ) => Promise<ContractTransaction>;
-  mintAsset: (
-    address: string,
-    amount: BigNumber
-  ) => Promise<ContractTransaction>;
-  supply: BigNumber;
 }
 
-export function describeBehaviorOfBase(
-  {
-    getKnoxUtil,
-    getParams,
-    mintERC4626,
-    burnERC4626,
-    mintAsset,
-    supply,
-  }: BaseBehaviorArgs,
+export function describeBehaviorOfView(
+  { getKnoxUtil, getParams }: ViewBehaviorArgs,
   skips?: string[]
 ) {
-  describe("::Base", () => {
+  describe("::View", () => {
     // Signers and Addresses
     let addresses: types.Addresses;
     let signers: types.Signers;
@@ -79,24 +54,7 @@ export function describeBehaviorOfBase(
       auction = knoxUtil.auction;
 
       poolUtil = knoxUtil.poolUtil;
-
-      asset.connect(signers.deployer).mint(addresses.buyer1, params.mint);
-      asset.connect(signers.deployer).mint(addresses.buyer2, params.mint);
-      asset.connect(signers.deployer).mint(addresses.buyer3, params.mint);
-      asset.connect(signers.deployer).mint(addresses.vault, params.mint);
     });
-
-    describeBehaviorOfERC4626Base(
-      async () => vault,
-      {
-        getAsset: async () => asset,
-        mint: mintERC4626,
-        burn: burnERC4626,
-        mintAsset,
-        supply,
-      },
-      skips
-    );
 
     describe.skip("#constructor", () => {
       time.revertToSnapshotAfterEach(async () => {});

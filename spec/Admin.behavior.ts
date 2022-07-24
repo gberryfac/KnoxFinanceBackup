@@ -1,40 +1,68 @@
-import { network } from "hardhat";
+import { Block } from "@ethersproject/abstract-provider";
 
-import * as time from "../test/utils/time";
-import * as types from "../test/utils/types";
+import chai, { expect } from "chai";
+import chaiAlmost from "chai-almost";
 
-import { VaultUtil } from "../test/utils/VaultUtil";
+chai.use(chaiAlmost());
 
-import { MockERC20, IVault } from "../types";
+import moment from "moment-timezone";
+moment.tz.setDefault("UTC");
+
+import { Auction, IPremiaPool, IVault, MockERC20 } from "../types";
+
+import { time, types, KnoxUtil, PoolUtil } from "../test/utils";
 
 interface AdminBehaviorArgs {
-  deploy: () => Promise<IVault>;
-  getVaultUtil: () => Promise<VaultUtil>;
+  getKnoxUtil: () => Promise<KnoxUtil>;
+  getParams: () => types.VaultParams;
 }
 
 export function describeBehaviorOfAdmin(
-  { deploy, getVaultUtil }: AdminBehaviorArgs,
+  { getKnoxUtil, getParams }: AdminBehaviorArgs,
   skips?: string[]
 ) {
   describe("::Admin", () => {
-    let instance: IVault;
-    let v: VaultUtil;
-    let asset: MockERC20;
-    let params: types.VaultParams;
-    let signers: types.Signers;
+    // Signers and Addresses
     let addresses: types.Addresses;
+    let signers: types.Signers;
 
-    before(async () => {});
+    // Contract Instances and Proxies
+    let asset: MockERC20;
+    let auction: Auction;
+    let vault: IVault;
+    let pool: IPremiaPool;
 
-    beforeEach(async () => {
-      instance = await deploy();
-      v = await getVaultUtil();
+    // Contract Utilities
+    let knoxUtil: KnoxUtil;
+    let poolUtil: PoolUtil;
 
-      asset = v.asset;
-      params = v.params;
+    // Test Suite Globals
+    let block: Block;
+    let epoch = 1;
 
-      signers = v.signers;
-      addresses = v.addresses;
+    const params = getParams();
+
+    before(async () => {
+      knoxUtil = await getKnoxUtil();
+
+      signers = knoxUtil.signers;
+      addresses = knoxUtil.addresses;
+
+      asset = knoxUtil.asset;
+      vault = knoxUtil.vaultUtil.vault;
+      pool = knoxUtil.poolUtil.pool;
+      auction = knoxUtil.auction;
+
+      poolUtil = knoxUtil.poolUtil;
+
+      asset.connect(signers.deployer).mint(addresses.buyer1, params.mint);
+      asset.connect(signers.deployer).mint(addresses.buyer2, params.mint);
+      asset.connect(signers.deployer).mint(addresses.buyer3, params.mint);
+      asset.connect(signers.deployer).mint(addresses.vault, params.mint);
+    });
+
+    describe.skip("#constructor", () => {
+      time.revertToSnapshotAfterEach(async () => {});
     });
 
     describe.skip("#processEpoch", () => {
@@ -43,7 +71,7 @@ export function describeBehaviorOfAdmin(
           .connect(signers.lp1)
           .approve(addresses.vault, params.deposit);
 
-        await instance["deposit(uint256)"](params.deposit);
+        await vault["deposit(uint256)"](params.deposit);
       });
 
       it("should adjust Queue and Vault balances when processEpoch is called", async () => {});
