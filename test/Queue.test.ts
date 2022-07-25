@@ -19,12 +19,13 @@ describe("Queue Tests", () => {
     deltaOffset: 0.05,
     maxTVL: parseUnits("1000000", assets.DAI.decimals),
     minSize: BigNumber.from("10").pow(assets.DAI.decimals - 1),
-    reserveRate: 0.001,
+    reserveRate: 0,
     performanceFee: BigNumber.from("20000000"),
     withdrawalFee: BigNumber.from("2000000"),
     isCall: false,
     mint: parseUnits("1000000", assets.DAI.decimals),
     deposit: parseUnits("10000", assets.ETH.decimals),
+    price: { max: 100, min: 10 },
   });
 
   behavesLikeQueue({
@@ -37,14 +38,15 @@ describe("Queue Tests", () => {
     collateral: assets.ETH,
     delta: 0.4,
     deltaOffset: 0.05,
-    maxTVL: parseUnits("100", assets.ETH.decimals),
+    maxTVL: parseUnits("1000", assets.ETH.decimals),
     minSize: BigNumber.from("10").pow(assets.ETH.decimals - 1),
-    reserveRate: 0.001,
+    reserveRate: 0,
     performanceFee: BigNumber.from("20000000"),
     withdrawalFee: BigNumber.from("2000000"),
     isCall: true,
     mint: parseUnits("1000", assets.ETH.decimals),
     deposit: parseUnits("10", assets.ETH.decimals),
+    price: { max: 0.1, min: 0.01 },
   });
 });
 

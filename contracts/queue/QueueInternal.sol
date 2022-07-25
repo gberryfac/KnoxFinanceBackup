@@ -138,7 +138,9 @@ contract QueueInternal is ERC1155BaseInternal, ERC1155EnumerableInternal {
         uint256 totalSupply = _totalSupply(currentTokenId);
         uint256 pricePerShare = QueueStorage.ONE_SHARE;
 
-        if (shareAmount > 0 && totalSupply > 0) {
+        if (shareAmount == 0) {
+            pricePerShare = 0;
+        } else if (totalSupply > 0) {
             pricePerShare = (pricePerShare * shareAmount) / totalSupply;
         }
 

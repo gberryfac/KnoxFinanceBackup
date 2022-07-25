@@ -187,11 +187,9 @@ export class KnoxUtil {
     await time.increaseTo(await time.getThursday8AM(block.timestamp));
 
     const vault = this.vaultUtil.vault;
-
     await vault.connect(this.signers.keeper).setAndInitializeAuction();
 
     const auction = await this.auction.getAuction(epoch);
-
     return [auction.startTime, auction.endTime];
   }
 

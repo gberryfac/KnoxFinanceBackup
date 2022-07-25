@@ -1,22 +1,21 @@
 import { ethers } from "hardhat";
 import { BigNumber, ContractTransaction } from "ethers";
-import { Block } from "@ethersproject/abstract-provider";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 
 import { describeBehaviorOfERC1155Enumerable } from "@solidstate/spec";
 
 import { expect } from "chai";
 
-import { IPremiaPool, IVault, MockERC20, Queue } from "../types";
+import { IVault, MockERC20, Queue } from "../types";
 
 import {
   assert,
   time,
   types,
   KnoxUtil,
-  PoolUtil,
   formatClaimTokenId,
 } from "../test/utils";
+import { parseUnits } from "ethers/lib/utils";
 
 interface QueueBehaviorArgs {
   getKnoxUtil: () => Promise<KnoxUtil>;
@@ -60,16 +59,11 @@ export async function describeBehaviorOfQueue(
     let asset: MockERC20;
     let queue: Queue;
     let vault: IVault;
-    let pool: IPremiaPool;
 
     // Contract Utilities
     let knoxUtil: KnoxUtil;
-    let poolUtil: PoolUtil;
 
     // Test Suite Globals
-    let block: Block;
-    let epoch = 1;
-
     const params = getParams();
 
     before(async () => {
@@ -80,11 +74,9 @@ export async function describeBehaviorOfQueue(
 
       asset = knoxUtil.asset;
       vault = knoxUtil.vaultUtil.vault;
-      pool = knoxUtil.poolUtil.pool;
       queue = knoxUtil.queue;
 
-      poolUtil = knoxUtil.poolUtil;
-
+      asset.connect(signers.deployer).mint(addresses.deployer, params.mint);
       asset.connect(signers.lp1).mint(addresses.lp1, params.mint);
       asset.connect(signers.lp2).mint(addresses.lp2, params.mint);
       asset.connect(signers.lp3).mint(addresses.lp3, params.mint);
@@ -107,8 +99,8 @@ export async function describeBehaviorOfQueue(
       it("should initialize Queue with correct state", async () => {
         await assert.equal(await queue.ERC20(), asset.address);
         await assert.equal(await queue.Vault(), addresses.vault);
-        await assert.bnEqual(await queue.epoch(), ethers.constants.Zero);
-        await assert.bnEqual(await queue.maxTVL(), params.maxTVL);
+        await assert.bnEqual(await queue.getEpoch(), ethers.constants.Zero);
+        await assert.bnEqual(await queue.getMaxTVL(), params.maxTVL);
       });
     });
 
@@ -129,12 +121,16 @@ export async function describeBehaviorOfQueue(
 
       it("should set newMaxTVL", async () => {
         await queue.connect(signers.deployer).setMaxTVL(1000);
-        await assert.bnEqual(await queue.maxTVL(), BigNumber.from("1000"));
+        await assert.bnEqual(await queue.getMaxTVL(), BigNumber.from("1000"));
       });
     });
 
     describe("#deposit(uint256)", () => {
-      time.revertToSnapshotAfterEach(async () => {});
+      let epoch: number;
+
+      time.revertToSnapshotAfterEach(async () => {
+        epoch = 1;
+      });
 
       it("should revert if Queue is paused", async () => {
         await queue.connect(signers.deployer).pause();
@@ -161,117 +157,83 @@ export async function describeBehaviorOfQueue(
         await asset
           .connect(signers.lp1)
           .approve(addresses.queue, params.deposit);
+
         await queue["deposit(uint256)"](params.deposit);
-        const epoch = await queue.epoch();
-        const claimTokenBalance = await queue["balanceOf(address,uint256)"](
+
+        let lpClaimBalance = await queue["balanceOf(address,uint256)"](
           addresses.lp1,
-          await queue.formatClaimTokenId(epoch)
+          await queue.getCurrentTokenId()
         );
+
         const queueBalance = await asset.balanceOf(addresses.queue);
+
         assert.bnEqual(queueBalance, params.deposit);
-        assert.bnEqual(claimTokenBalance, params.deposit);
+        assert.bnEqual(lpClaimBalance, queueBalance);
       });
 
       it("should mint claim tokens if LP deposits multiple times within same epoch", async () => {
         const firstDeposit = params.deposit;
+
         await asset.connect(signers.lp1).approve(addresses.queue, firstDeposit);
         await queue["deposit(uint256)"](firstDeposit);
-        let epoch = await queue["epoch()"]();
-        let claimTokenBalance = await queue["balanceOf(address,uint256)"](
-          addresses.lp1,
-          await queue.formatClaimTokenId(epoch)
-        );
+
         const secondDeposit = params.deposit.div(2);
+
         await asset
           .connect(signers.lp1)
           .approve(addresses.queue, secondDeposit);
+
         await queue["deposit(uint256)"](secondDeposit);
-        epoch = await queue["epoch()"]();
-        claimTokenBalance = await queue["balanceOf(address,uint256)"](
+
+        let lpClaimBalance = await queue["balanceOf(address,uint256)"](
           addresses.lp1,
-          await queue.formatClaimTokenId(epoch)
+          await queue.getCurrentTokenId()
         );
+
         const totalDeposits = firstDeposit.add(secondDeposit);
-        const queueBalance = await asset.balanceOf(addresses.queue);
-        assert.bnEqual(queueBalance, totalDeposits);
-        assert.bnEqual(claimTokenBalance, totalDeposits);
-      });
-      // TODO: Move to integration tests
 
-      it.skip("should redeem vault shares if LP deposited in past epoch", async () => {});
-    });
-
-    describe("#deposit(uint256,address)", () => {
-      time.revertToSnapshotAfterEach(async () => {});
-
-      it("should revert if Queue is paused", async () => {
-        await queue.connect(signers.deployer).pause();
-        await expect(
-          queue["deposit(uint256,address)"](params.deposit, addresses.lp2)
-        ).to.be.revertedWith("Pausable: paused");
+        assert.bnEqual(lpClaimBalance, totalDeposits);
       });
 
-      it("should revert if maxTVL is exceeded", async () => {
-        const deposit = params.maxTVL.add(BigNumber.from("1"));
-        await asset.connect(signers.lp3).approve(addresses.queue, deposit);
-        await expect(
-          queue
-            .connect(signers.lp3)
-            ["deposit(uint256,address)"](deposit, addresses.lp2)
-        ).to.be.revertedWith("maxTVL exceeded");
-      });
+      it("should redeem vault shares if LP deposited in past epoch", async () => {
+        await knoxUtil.initializeAuction(epoch);
 
-      it("should revert if value is <= 0", async () => {
-        await expect(
-          queue["deposit(uint256,address)"](
-            ethers.constants.Zero,
-            addresses.lp2
-          )
-        ).to.be.revertedWith("value exceeds minimum");
-      });
-
-      it("should mint claim token 1:1 for collateral deposited", async () => {
         await asset
           .connect(signers.lp1)
           .approve(addresses.queue, params.deposit);
-        await queue["deposit(uint256,address)"](params.deposit, addresses.lp2);
-        const epoch = await queue.epoch();
-        const claimTokenBalance = await queue["balanceOf(address,uint256)"](
-          addresses.lp2,
-          await queue.formatClaimTokenId(epoch)
-        );
-        const queueBalance = await asset.balanceOf(addresses.queue);
-        assert.bnEqual(queueBalance, params.deposit);
-        assert.bnEqual(claimTokenBalance, params.deposit);
-      });
 
-      it("should mint claim tokens if LP deposits multiple times within same epoch", async () => {
-        const firstDeposit = params.deposit;
-        await asset.connect(signers.lp1).approve(addresses.queue, firstDeposit);
-        await queue["deposit(uint256,address)"](firstDeposit, addresses.lp2);
-        let epoch = await queue["epoch()"]();
-        let claimTokenBalance = await queue["balanceOf(address,uint256)"](
-          addresses.lp2,
-          await queue.formatClaimTokenId(epoch)
-        );
-        const secondDeposit = params.deposit.div(2);
+        // deposits in epoch 0
+        await queue["deposit(uint256)"](params.deposit);
+        const tokenId1 = await queue.getCurrentTokenId();
+
+        let lpTokenId1Balance = await queue.balanceOf(addresses.lp1, tokenId1);
+        assert.bnEqual(lpTokenId1Balance, params.deposit);
+
+        let lpBalance = await vault.balanceOf(addresses.lp1);
+        assert.isTrue(lpBalance.isZero());
+
+        await knoxUtil.processEpoch(epoch);
+
+        epoch++;
+        await knoxUtil.initializeAuction(epoch);
+
         await asset
           .connect(signers.lp1)
-          .approve(addresses.queue, secondDeposit);
-        await queue["deposit(uint256,address)"](secondDeposit, addresses.lp2);
-        epoch = await queue["epoch()"]();
-        claimTokenBalance = await queue["balanceOf(address,uint256)"](
-          addresses.lp2,
-          await queue.formatClaimTokenId(epoch)
-        );
-        const totalDeposits = firstDeposit.add(secondDeposit);
-        const queueBalance = await asset.balanceOf(addresses.queue);
-        assert.bnEqual(queueBalance, totalDeposits);
-        assert.bnEqual(claimTokenBalance, totalDeposits);
-      });
-      // TODO: Move to integration tests
+          .approve(addresses.queue, params.deposit);
 
-      it.skip("should redeem vault shares if LP deposited in past epoch", async () => {});
+        // deposits in epoch 1
+        await queue["deposit(uint256)"](params.deposit);
+        const tokenId2 = await queue.getCurrentTokenId();
+
+        lpTokenId1Balance = await queue.balanceOf(addresses.lp1, tokenId1);
+        assert.isTrue(lpTokenId1Balance.isZero());
+
+        let lpTokenId2Balance = await queue.balanceOf(addresses.lp1, tokenId2);
+        assert.bnEqual(lpTokenId2Balance, params.deposit);
+
+        lpBalance = await vault.balanceOf(addresses.lp1);
+        assert.bnEqual(lpBalance, params.deposit);
+      });
     });
 
     describe("#withdraw(uint256)", () => {
@@ -279,113 +241,345 @@ export async function describeBehaviorOfQueue(
         await asset
           .connect(signers.lp1)
           .approve(addresses.queue, params.deposit);
+
         await queue["deposit(uint256)"](params.deposit);
       });
 
       it("should withdraw exact amount deposited", async () => {
         const lpBalanceBefore = await asset.balanceOf(addresses.lp1);
         await queue.withdraw(params.deposit);
+
         const lpBalanceAfter = await asset.balanceOf(addresses.lp1);
         assert.bnEqual(lpBalanceBefore, lpBalanceAfter.sub(params.deposit));
-        const epoch = await queue.epoch();
-        const claimTokenBalance = await queue["balanceOf(address,uint256)"](
+
+        let lpClaimBalance = await queue["balanceOf(address,uint256)"](
           addresses.lp1,
-          await queue.formatClaimTokenId(epoch)
+          await queue.getCurrentTokenId()
         );
+
         // LPs Queue token is burned
-        assert.isTrue(claimTokenBalance.isZero());
+        assert.isTrue(lpClaimBalance.isZero());
       });
     });
-    // TODO:
-    // TODO: Move to integration tests
 
-    describe.skip("#redeemShares(uint64,address)", () => {
-      time.revertToSnapshotAfterEach(async () => {});
+    describe("#redeem(uint256)", () => {
+      describe("if epoch has not been incremented", () => {
+        time.revertToSnapshotAfterEach(async () => {
+          await asset
+            .connect(signers.lp1)
+            .approve(addresses.queue, params.deposit);
 
-      it("should revert if sender != receiver and sender != approved", async () => {
-        await expect(
-          queue.connect(signers.lp2)["redeemMaxShares(address)"](addresses.lp1)
-        ).to.be.revertedWith("ERC1155: caller is not owner nor approved");
-        await queue.setApprovalForAll(addresses.lp2, true);
-        await queue
-          .connect(signers.lp2)
-          ["redeemMaxShares(address)"](addresses.lp1);
+          await queue["deposit(uint256)"](params.deposit);
+        });
+
+        it("should revert if tokenId == currentTokenId", async () => {
+          const tokenId = await queue.getCurrentTokenId();
+
+          await expect(queue["redeem(uint256)"](tokenId)).to.be.revertedWith(
+            "current claim token cannot be redeemed"
+          );
+        });
+      });
+
+      describe("else", () => {
+        let epoch: number;
+        let tokenId: BigNumber;
+
+        time.revertToSnapshotAfterEach(async () => {
+          epoch = 1;
+
+          await knoxUtil.initializeAuction(epoch);
+
+          await asset
+            .connect(signers.lp1)
+            .approve(addresses.queue, params.deposit);
+
+          await queue["deposit(uint256)"](params.deposit);
+
+          tokenId = await queue.getCurrentTokenId();
+
+          await knoxUtil.processEpoch(epoch);
+        });
+
+        it("should burn claim tokens when shares are redeemed", async () => {
+          await queue["redeem(uint256)"](tokenId);
+          const balance = await queue.balanceOf(addresses.lp1, tokenId);
+          assert.isTrue(balance.isZero());
+        });
+
+        it("should send redeemed vault shares to receiver", async () => {
+          await queue["redeem(uint256)"](tokenId);
+
+          const lpBalance = await vault.balanceOf(addresses.lp1);
+          assert.bnEqual(lpBalance, params.deposit);
+
+          const queueBalance = await vault.balanceOf(addresses.queue);
+          assert.isTrue(queueBalance.isZero());
+        });
       });
     });
-    // TODO:
-    // TODO: Move to integration tests
 
-    describe.skip("#redeemMaxShares(address)", () => {
+    describe("#redeemMax()", () => {
+      let epoch: number;
+      let tokenId1: BigNumber;
+      let tokenId2: BigNumber;
+      let tokenId3: BigNumber;
+
       time.revertToSnapshotAfterEach(async () => {
+        epoch = 1;
+        await knoxUtil.initializeAuction(epoch);
+
         await asset
           .connect(signers.lp1)
-          .approve(addresses.vault, params.deposit);
+          .approve(addresses.queue, params.deposit);
+
+        // deposits in epoch 0
         await queue["deposit(uint256)"](params.deposit);
-        await queue.connect(signers.keeper)["processEpoch(bool)"](false);
+        tokenId1 = await queue.getCurrentTokenId();
+
+        await knoxUtil.processEpoch(epoch);
+
+        epoch++;
+        await knoxUtil.initializeAuction(epoch);
+
+        await asset
+          .connect(signers.lp1)
+          .approve(addresses.queue, params.deposit);
+
+        // deposits in epoch 1
+        await queue["deposit(uint256)"](params.deposit);
+        tokenId2 = await queue.getCurrentTokenId();
+
+        await knoxUtil.processEpoch(epoch);
+
+        epoch++;
+        await knoxUtil.initializeAuction(epoch);
+
+        await asset
+          .connect(signers.lp1)
+          .approve(addresses.queue, params.deposit);
+
+        // deposits in epoch 2
+        await queue["deposit(uint256)"](params.deposit);
+        tokenId3 = await queue.getCurrentTokenId();
+
+        await knoxUtil.processEpoch(epoch);
       });
 
-      it("should revert if sender != receiver and sender != approved", async () => {
-        await expect(
-          queue.connect(signers.lp2)["redeemMaxShares(address)"](addresses.lp1)
-        ).to.be.revertedWith("ERC1155: caller is not owner nor approved");
-        await queue.setApprovalForAll(addresses.lp2, true);
-        await queue
-          .connect(signers.lp2)
-          ["redeemMaxShares(address)"](addresses.lp1);
+      it("should burn all claim tokens when shares are redeemed", async () => {
+        await queue["redeemMax()"]();
+
+        const balance1 = await queue.balanceOf(addresses.lp1, tokenId1);
+        assert.isTrue(balance1.isZero());
+
+        const balance2 = await queue.balanceOf(addresses.lp1, tokenId2);
+        assert.isTrue(balance2.isZero());
+
+        const balance3 = await queue.balanceOf(addresses.lp1, tokenId3);
+        assert.isTrue(balance3.isZero());
       });
 
-      it("should redeem Queue shares for Vault shares", async () => {
-        const previousEpoch = (await queue.epoch()).sub(1);
-        const lpQueueSharesBefore = await queue["balanceOf(address,uint256)"](
-          addresses.lp1,
-          previousEpoch
-        );
-        assert.bnEqual(lpQueueSharesBefore, params.deposit);
-        const lpVaultSharesBefore = await queue["balanceOf(address)"](
-          addresses.lp1
-        );
-        assert.isTrue(lpVaultSharesBefore.isZero());
-        await queue["redeemMaxShares(address)"](addresses.lp1);
-        const lpQueueSharesAfter = await queue["balanceOf(address,uint256)"](
-          addresses.lp1,
-          previousEpoch
-        );
-        assert.isTrue(lpQueueSharesAfter.isZero());
-        const lpVaultSharesAfter = await queue["balanceOf(address)"](
-          addresses.lp1
-        );
-        assert.bnEqual(lpVaultSharesAfter, params.deposit);
+      it("should send all of redeemed vault shares to reciever", async () => {
+        await queue["redeemMax()"]();
+
+        const lpBalance = await vault.balanceOf(addresses.lp1);
+        assert.bnEqual(lpBalance, params.deposit.mul(3));
+
+        const queueBalance = await vault.balanceOf(addresses.queue);
+        assert.isTrue(queueBalance.isZero());
       });
     });
-    // TODO:
-    // TODO: Move to integration tests
 
-    describe.skip("#syncEpoch(uint64)", () => {
+    describe("#syncEpoch(uint64)", () => {
       time.revertToSnapshotAfterEach(async () => {});
+
+      it("should revert if !vault", async () => {
+        await expect(queue.syncEpoch(0)).to.be.revertedWith("!vault");
+      });
+
+      it("should set the current epoch of the queue", async () => {
+        assert.bnEqual(await queue.getEpoch(), BigNumber.from(0));
+        await queue.connect(signers.vault).syncEpoch(1);
+        assert.bnEqual(await queue.getEpoch(), BigNumber.from(1));
+      });
     });
-    // TODO:
-    // TODO: Move to integration tests
 
-    describe.skip("#depositToVault()", () => {
-      time.revertToSnapshotAfterEach(async () => {});
+    describe("#depositToVault()", () => {
+      describe("if shares are not minted", () => {
+        time.revertToSnapshotAfterEach(async () => {});
+
+        it("should revert if !vault", async () => {
+          await expect(queue.depositToVault()).to.be.revertedWith("!vault");
+        });
+
+        it("should set price per share to 0 if shares are not minted", async () => {
+          let tokenId = await queue.getCurrentTokenId();
+          await queue.connect(signers.vault).depositToVault();
+
+          let pricePerShare = await queue.getPricePerShare(tokenId);
+          assert.isTrue(pricePerShare.isZero());
+        });
+      });
+
+      describe("else", () => {
+        let epoch: number;
+
+        time.revertToSnapshotAfterEach(async () => {
+          epoch = 1;
+          await knoxUtil.initializeAuction(epoch);
+
+          await asset
+            .connect(signers.lp1)
+            .approve(addresses.queue, params.deposit);
+
+          // deposits in epoch 0
+          await queue["deposit(uint256)"](params.deposit);
+
+          await asset
+            .connect(signers.lp2)
+            .approve(addresses.queue, params.deposit);
+
+          // deposits in epoch 0
+          await queue.connect(signers.lp2)["deposit(uint256)"](params.deposit);
+
+          await asset
+            .connect(signers.lp3)
+            .approve(addresses.queue, params.deposit);
+
+          // deposits in epoch 0
+          await queue.connect(signers.lp3)["deposit(uint256)"](params.deposit);
+
+          // fast forward to expiry of previously sold option
+          const [expiry] = await vault.optionByEpoch(epoch - 1);
+          await time.increaseTo(expiry);
+        });
+
+        it("should deposit all of queued ERC20 tokens into vault", async () => {
+          let erc20Balance = await asset.balanceOf(addresses.queue);
+          assert.bnEqual(erc20Balance, params.deposit.mul(3));
+
+          await queue.connect(signers.vault).depositToVault();
+
+          erc20Balance = await asset.balanceOf(addresses.queue);
+          assert.isTrue(erc20Balance.isZero());
+        });
+
+        it("should calculate price per share correctly", async () => {
+          let tokenId = await queue.getCurrentTokenId();
+
+          await queue.connect(signers.vault).depositToVault();
+          await vault.connect(signers.keeper).setNextEpoch();
+
+          let pricePerShare = await queue.getPricePerShare(tokenId);
+
+          assert.bnEqual(pricePerShare, parseUnits("1", 18));
+
+          epoch++;
+          await knoxUtil.initializeAuction(epoch);
+
+          // simluate vault profits, dilute shares by half
+          await asset
+            .connect(signers.deployer)
+            .transfer(addresses.vault, params.deposit.mul(3));
+
+          await asset
+            .connect(signers.lp1)
+            .approve(addresses.queue, params.deposit);
+
+          // deposits in epoch 1
+          await queue["deposit(uint256)"](params.deposit);
+
+          await asset
+            .connect(signers.lp2)
+            .approve(addresses.queue, params.deposit);
+
+          // deposits in epoch 1
+          await queue.connect(signers.lp2)["deposit(uint256)"](params.deposit);
+
+          tokenId = await queue.getCurrentTokenId();
+
+          // fast forward to expiry of previously sold option
+          const [expiry] = await vault.optionByEpoch(epoch - 1);
+          await time.increaseTo(expiry);
+
+          await queue.connect(signers.vault).depositToVault();
+          await vault.connect(signers.keeper).setNextEpoch();
+
+          pricePerShare = await queue.getPricePerShare(tokenId);
+
+          assert.bnEqual(pricePerShare, parseUnits("5", 17));
+        });
+      });
     });
-    // TODO:
-    // TODO: Move to integration tests
 
-    describe.skip("#previewUnredeemedShares(address)", () => {
+    describe("#previewUnredeemed(uint256)", () => {
       time.revertToSnapshotAfterEach(async () => {});
-    });
-    // TODO:
-    // TODO: Move to integration tests
 
-    describe.skip("#previewUnredeemedShares(uint64,uint256)", () => {
-      time.revertToSnapshotAfterEach(async () => {});
-    });
-    // TODO:
-    // TODO: Move to integration tests
+      it("should preview unredeemed shares", async () => {
+        let tokenId = await queue.getCurrentTokenId();
+        let shares = await queue["previewUnredeemed(uint256)"](tokenId);
 
-    describe.skip("#pricePerShare(uint64)", () => {
-      time.revertToSnapshotAfterEach(async () => {});
+        assert.isTrue(shares.isZero());
+
+        // simluate vault profits, not included in totalSupply
+        await asset
+          .connect(signers.deployer)
+          .transfer(addresses.vault, params.deposit.mul(4));
+
+        let epoch = 1;
+        await knoxUtil.initializeAuction(epoch);
+
+        await asset
+          .connect(signers.lp1)
+          .approve(addresses.queue, params.deposit);
+
+        // deposits in epoch 0
+        await queue["deposit(uint256)"](params.deposit);
+
+        tokenId = await queue.getCurrentTokenId();
+
+        // fast forward to expiry of previously sold option
+        let [expiry] = await vault.optionByEpoch(epoch - 1);
+        await time.increaseTo(expiry);
+
+        // totalAssets = 40,000
+        // totalSupply = 0
+        await queue.connect(signers.vault).depositToVault();
+        await vault.connect(signers.keeper).setNextEpoch();
+
+        shares = await queue["previewUnredeemed(uint256)"](tokenId);
+        assert.bnEqual(shares, params.deposit);
+
+        epoch++;
+        await knoxUtil.initializeAuction(epoch);
+
+        await asset
+          .connect(signers.lp1)
+          .approve(addresses.queue, params.deposit);
+
+        // deposits in epoch 1
+        await queue["deposit(uint256)"](params.deposit);
+
+        tokenId = await queue.getCurrentTokenId();
+
+        // fast forward to expiry of previously sold option
+        [expiry] = await vault.optionByEpoch(epoch - 1);
+        await time.increaseTo(expiry);
+
+        // totalAssets = 50,000
+        // totalSupply = 10,000
+        await queue.connect(signers.vault).depositToVault();
+        await vault.connect(signers.keeper).setNextEpoch();
+
+        shares = await queue["previewUnredeemed(uint256)"](tokenId);
+
+        const pricePerShare = await queue.getPricePerShare(tokenId);
+        const expectedShares = pricePerShare
+          .mul(params.deposit)
+          .div(parseUnits("1", 18));
+
+        assert.bnEqual(shares, expectedShares);
+      });
     });
 
     describe("#formatClaimTokenId(uint64)", () => {
@@ -393,13 +587,13 @@ export async function describeBehaviorOfQueue(
 
       it("should format claim token id correctly", async () => {
         for (let i = 0; i < 10000; i++) {
-          let claimTokenId = formatClaimTokenId({
+          let tokenId = formatClaimTokenId({
             address: addresses.queue,
             epoch: BigNumber.from(i),
           });
           assert.bnEqual(
             await queue.formatClaimTokenId(i),
-            BigNumber.from(claimTokenId)
+            BigNumber.from(tokenId)
           );
         }
       });
@@ -411,11 +605,11 @@ export async function describeBehaviorOfQueue(
       it("should parse claim token id correctly", async () => {
         for (let i = 0; i < 10000; i++) {
           const bn = BigNumber.from(i);
-          let claimTokenId = formatClaimTokenId({
+          let tokenId = formatClaimTokenId({
             address: addresses.queue,
             epoch: bn,
           });
-          let [address, epoch] = await queue.parseClaimTokenId(claimTokenId);
+          let [address, epoch] = await queue.parseClaimTokenId(tokenId);
           assert.equal(address, addresses.queue);
           assert.bnEqual(epoch, bn);
         }

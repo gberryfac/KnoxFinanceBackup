@@ -50,7 +50,8 @@ export class VaultUtil {
       minSize: params.minSize,
       delta64x64: fixedFromFloat(params.delta),
       deltaOffset64x64: fixedFromFloat(params.deltaOffset),
-      reserveRate: fixedFromFloat(params.reserveRate),
+      reserveRate:
+        params.reserveRate > 0 ? fixedFromFloat(params.reserveRate) : 0,
       performanceFee: params.performanceFee,
       withdrawalFee: params.withdrawalFee,
       name: params.tokenName,
