@@ -119,7 +119,7 @@ export class VaultUtil {
 
     addresses.vault = vaultDiamond.address;
     const vault = IVault__factory.connect(addresses.vault, signers.lp1);
-    const collateralAsset = await vault.collateralAsset();
+    const collateralAsset = await vault.getCollateralAsset();
 
     const asset = await getContractAt("MockERC20", collateralAsset);
 

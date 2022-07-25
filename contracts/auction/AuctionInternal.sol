@@ -371,7 +371,7 @@ contract AuctionInternal is IAuctionInternal {
         uint256 next = orderbook._head();
         uint256 length = orderbook._length();
 
-        uint256 totalContracts = _totalContracts(epoch);
+        uint256 totalContracts = _getTotalContracts(epoch);
 
         if (
             auction.totalContracts <= 0 &&
@@ -480,7 +480,7 @@ contract AuctionInternal is IAuctionInternal {
      *  VIEW
      ***********************************************/
 
-    function _totalContracts(uint64 epoch) internal view returns (uint256) {
+    function _getTotalContracts(uint64 epoch) internal view returns (uint256) {
         AuctionStorage.Layout storage l = AuctionStorage.layout();
         AuctionStorage.Auction storage auction = l.auctions[epoch];
 
@@ -503,7 +503,11 @@ contract AuctionInternal is IAuctionInternal {
         return auction.totalContracts;
     }
 
-    function _totalContractsSold(uint64 epoch) internal view returns (uint256) {
+    function _getTotalContractsSold(uint64 epoch)
+        internal
+        view
+        returns (uint256)
+    {
         AuctionStorage.Layout storage l = AuctionStorage.layout();
         return l.auctions[epoch].totalContractsSold;
     }

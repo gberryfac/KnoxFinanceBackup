@@ -114,7 +114,7 @@ export function describeBehaviorOfAuction(
     const setupAdvancedAuction = async (processAuction: boolean) => {
       const [startTime, endTime] = await knoxUtil.initializeAuction(epoch);
 
-      const totalContracts = await auction.totalContracts(epoch);
+      const totalContracts = await auction.getTotalContracts(epoch);
 
       const buyer1OrderSize = totalContracts.sub(totalContracts.div(10));
       const buyer2OrderSize = totalContracts;
@@ -166,7 +166,7 @@ export function describeBehaviorOfAuction(
     const utilizeAllContractsMarketOrdersOnly = async (
       epoch: number
     ): Promise<[ContractTransaction[], BigNumber]> => {
-      let totalContracts = await auction.totalContracts(epoch);
+      let totalContracts = await auction.getTotalContracts(epoch);
       const size = totalContracts.div(3).add(1);
 
       await asset
@@ -259,7 +259,7 @@ export function describeBehaviorOfAuction(
 
         const data = await auction.getAuction(epoch);
 
-        assert.equal(await auction.status(epoch), 0);
+        assert.equal(await auction.getStatus(epoch), 0);
 
         await assert.bnEqual(data.startTime, initAuction.startTime);
         await assert.bnEqual(data.endTime, initAuction.endTime);
@@ -301,7 +301,7 @@ export function describeBehaviorOfAuction(
             .connect(signers.vault)
             .setAuctionPrices(epoch, minPrice64x64, maxPrice64x64);
 
-          assert.equal(await auction.status(epoch), 3);
+          assert.equal(await auction.getStatus(epoch), 3);
         });
 
         it("should cancel auction if maxPrice64x64 <= 0", async () => {
@@ -309,7 +309,7 @@ export function describeBehaviorOfAuction(
             .connect(signers.vault)
             .setAuctionPrices(epoch, 0, minPrice64x64);
 
-          assert.equal(await auction.status(epoch), 3);
+          assert.equal(await auction.getStatus(epoch), 3);
         });
 
         it("should cancel auction if minPrice64x64 <= 0", async () => {
@@ -317,7 +317,7 @@ export function describeBehaviorOfAuction(
             .connect(signers.vault)
             .setAuctionPrices(epoch, maxPrice64x64, 0);
 
-          assert.equal(await auction.status(epoch), 3);
+          assert.equal(await auction.getStatus(epoch), 3);
         });
 
         it("should set correct auction prices", async () => {
@@ -574,7 +574,7 @@ export function describeBehaviorOfAuction(
         it.skip("should revert auction finalizes", async () => {});
 
         it("should set the totalContracts equal to Vault ERC20 balance if totalContracts is unset", async () => {
-          let totalContracts = await auction.totalContracts(epoch);
+          let totalContracts = await auction.getTotalContracts(epoch);
 
           const price64x64 = await auction.priceCurve64x64(epoch);
           const price = fixedToNumber(price64x64);
@@ -702,7 +702,7 @@ export function describeBehaviorOfAuction(
           assert.isTrue(await auction.callStatic.processOrders(epoch));
 
           assert.bnEqual(
-            await auction.totalContractsSold(epoch),
+            await auction.getTotalContractsSold(epoch),
             totalContractsSold
           );
 
@@ -725,7 +725,10 @@ export function describeBehaviorOfAuction(
           await auction.processOrders(epoch);
           assert.isFalse(await auction.callStatic.processOrders(epoch));
 
-          assert.bnEqual(await auction.totalContractsSold(epoch), params.size);
+          assert.bnEqual(
+            await auction.getTotalContractsSold(epoch),
+            params.size
+          );
           assert.bnEqual(await auction.lastPrice64x64(epoch), args.price64x64);
         });
 
@@ -773,7 +776,10 @@ export function describeBehaviorOfAuction(
           await auction.processOrders(epoch);
 
           assert.isFalse(await auction.callStatic.processOrders(epoch));
-          assert.bnEqual(await auction.totalContractsSold(epoch), params.size);
+          assert.bnEqual(
+            await auction.getTotalContractsSold(epoch),
+            params.size
+          );
           assert.bnEqual(await auction.lastPrice64x64(epoch), args.price64x64);
         });
       });
@@ -1704,7 +1710,7 @@ export function describeBehaviorOfAuction(
       });
     });
 
-    describe.skip("#totalContracts(uint64)", () => {
+    describe.skip("#getTotalContracts(uint64)", () => {
       time.revertToSnapshotAfterEach(async () => {});
 
       it("", async () => {});

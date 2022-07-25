@@ -8,8 +8,8 @@ contract VaultView is VaultInternal {
 
     constructor(bool isCall, address pool) VaultInternal(isCall, pool) {}
 
-    function epoch() external view returns (uint64) {
-        return VaultStorage.layout()._epoch();
+    function getEpoch() external view returns (uint64) {
+        return VaultStorage.layout()._getEpoch();
     }
 
     function optionByEpoch(uint64 _epoch)
@@ -20,7 +20,7 @@ contract VaultView is VaultInternal {
         return VaultStorage.layout()._optionByEpoch(_epoch);
     }
 
-    function collateralAsset() external view returns (address) {
+    function getCollateralAsset() external view returns (address) {
         return address(ERC20);
     }
 

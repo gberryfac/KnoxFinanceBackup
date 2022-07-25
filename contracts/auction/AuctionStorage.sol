@@ -58,7 +58,7 @@ library AuctionStorage {
         return l.auctions[epoch].status == Status.FINALIZED;
     }
 
-    function _status(Layout storage l, uint64 epoch)
+    function _getStatus(Layout storage l, uint64 epoch)
         internal
         view
         returns (AuctionStorage.Status)

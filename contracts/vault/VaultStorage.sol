@@ -182,7 +182,7 @@ library VaultStorage {
      *  VIEW
      ***********************************************/
 
-    function _epoch(Layout storage l) internal view returns (uint64) {
+    function _getEpoch(Layout storage l) internal view returns (uint64) {
         return l.epoch;
     }
 

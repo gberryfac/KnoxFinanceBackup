@@ -208,7 +208,7 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal {
         l.Queue.syncEpoch(l.epoch);
 
         // Note: index epoch
-        // emit SetNextEpoch(l.epoch, l.claimTokenId);
+        // emit SetNextEpoch(l.epoch, l.tokenId);
     }
 
     function _setAuctionPrices() internal {
@@ -267,7 +267,7 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal {
         if (!l.Auction.isFinalized(l.epoch)) l.Auction.finalizeAuction(l.epoch);
 
         l.Auction.transferPremium(l.epoch);
-        uint256 totalContractsSold = l.Auction.totalContractsSold(l.epoch);
+        uint256 totalContractsSold = l.Auction.getTotalContractsSold(l.epoch);
 
         uint256 totalCollateralUsed =
             l.isCall
@@ -343,7 +343,7 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal {
         address owner
     ) internal virtual override(ERC4626BaseInternal) returns (uint256) {
         VaultStorage.Layout storage l = VaultStorage.layout();
-        l.Queue.redeemMaxShares(receiver, owner);
+        l.Queue.redeemMax(receiver, owner);
 
         require(
             assetAmount <= _maxWithdraw(owner),
@@ -372,7 +372,7 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal {
         address owner
     ) internal virtual override(ERC4626BaseInternal) returns (uint256) {
         VaultStorage.Layout storage l = VaultStorage.layout();
-        l.Queue.redeemMaxShares(receiver, owner);
+        l.Queue.redeemMax(receiver, owner);
 
         require(
             shareAmount <= _maxRedeem(owner),

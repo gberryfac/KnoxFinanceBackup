@@ -63,39 +63,16 @@ contract Queue is
      *  REDEEM
      ***********************************************/
 
-    function redeemMaxShares() external nonReentrant {
-        _redeemMaxShares(msg.sender, msg.sender);
+    function redeem(uint256 tokenId) external nonReentrant {
+        _redeem(tokenId, msg.sender, msg.sender);
     }
 
-    function redeemMaxShares(address receiver) external nonReentrant {
-        _redeemMaxShares(receiver, msg.sender);
+    function redeem(uint256 tokenId, address receiver) external nonReentrant {
+        _redeem(tokenId, receiver, msg.sender);
     }
 
-    function redeemMaxShares(address receiver, address owner)
-        external
-        nonReentrant
-    {
-        require(
-            owner == msg.sender || isApprovedForAll(owner, msg.sender),
-            "ERC1155: caller is not owner nor approved"
-        );
-
-        _redeemMaxShares(receiver, owner);
-    }
-
-    function redeemShares(uint256 claimTokenId) external nonReentrant {
-        _redeemShares(claimTokenId, msg.sender, msg.sender);
-    }
-
-    function redeemShares(uint256 claimTokenId, address receiver)
-        external
-        nonReentrant
-    {
-        _redeemShares(claimTokenId, receiver, msg.sender);
-    }
-
-    function redeemShares(
-        uint256 claimTokenId,
+    function redeem(
+        uint256 tokenId,
         address receiver,
         address owner
     ) external nonReentrant {
@@ -104,7 +81,24 @@ contract Queue is
             "ERC1155: caller is not owner nor approved"
         );
 
-        _redeemShares(claimTokenId, receiver, owner);
+        _redeem(tokenId, receiver, owner);
+    }
+
+    function redeemMax() external nonReentrant {
+        _redeemMax(msg.sender, msg.sender);
+    }
+
+    function redeemMax(address receiver) external nonReentrant {
+        _redeemMax(receiver, msg.sender);
+    }
+
+    function redeemMax(address receiver, address owner) external nonReentrant {
+        require(
+            owner == msg.sender || isApprovedForAll(owner, msg.sender),
+            "ERC1155: caller is not owner nor approved"
+        );
+
+        _redeemMax(receiver, owner);
     }
 
     /************************************************
@@ -123,36 +117,36 @@ contract Queue is
      *  VIEW
      ***********************************************/
 
-    function previewUnredeemedShares() external view returns (uint256) {
-        return _previewUnredeemedShares(msg.sender);
-    }
-
-    function previewUnredeemedShares(address account)
+    function previewUnredeemed(uint256 tokenId)
         external
         view
         returns (uint256)
     {
-        return _previewUnredeemedShares(account);
+        return _previewUnredeemed(tokenId, msg.sender);
     }
 
-    function previewUnredeemedShares(uint256 claimTokenId, address account)
+    function previewUnredeemed(uint256 tokenId, address account)
         external
         view
         returns (uint256)
     {
-        return _previewUnredeemedShares(claimTokenId, account);
+        return _previewUnredeemed(tokenId, account);
     }
 
-    function epoch() external view returns (uint64) {
-        return _epoch();
+    function getEpoch() external view returns (uint64) {
+        return _getEpoch();
     }
 
-    function maxTVL() external view returns (uint256) {
-        return _maxTVL();
+    function getMaxTVL() external view returns (uint256) {
+        return _getMaxTVL();
     }
 
-    function pricePerShare(uint64 _epoch) external view returns (uint256) {
-        return _pricePerShare(_epoch);
+    function getCurrentTokenId() external view returns (uint256) {
+        return _getCurrentTokenId();
+    }
+
+    function getPricePerShare(uint256 tokenId) external view returns (uint256) {
+        return _getPricePerShare(tokenId);
     }
 
     /************************************************
@@ -160,15 +154,15 @@ contract Queue is
      ***********************************************/
 
     function formatClaimTokenId(uint64 _epoch) external view returns (uint256) {
-        return _formatClaimTokenId(_epoch);
+        return _formatTokenId(_epoch);
     }
 
-    function parseClaimTokenId(uint256 claimTokenId)
+    function parseClaimTokenId(uint256 tokenId)
         external
         pure
         returns (address, uint64)
     {
-        return _parseClaimTokenId(claimTokenId);
+        return _parseTokenId(tokenId);
     }
 
     /************************************************

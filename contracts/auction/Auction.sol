@@ -122,13 +122,13 @@ contract Auction is Access, AuctionInternal, IAuction {
         return l._isFinalized(epoch);
     }
 
-    function status(uint64 epoch)
+    function getStatus(uint64 epoch)
         external
         view
         returns (AuctionStorage.Status)
     {
         AuctionStorage.Layout storage l = AuctionStorage.layout();
-        return l._status(epoch);
+        return l._getStatus(epoch);
     }
 
     function getAuction(uint64 epoch)
@@ -154,12 +154,16 @@ contract Auction is Access, AuctionInternal, IAuction {
         return l._getOrderById(epoch, id);
     }
 
-    function totalContracts(uint64 epoch) external view returns (uint256) {
-        return _totalContracts(epoch);
+    function getTotalContracts(uint64 epoch) external view returns (uint256) {
+        return _getTotalContracts(epoch);
     }
 
-    function totalContractsSold(uint64 epoch) external view returns (uint256) {
-        return _totalContractsSold(epoch);
+    function getTotalContractsSold(uint64 epoch)
+        external
+        view
+        returns (uint256)
+    {
+        return _getTotalContractsSold(epoch);
     }
 
     function claimsByBuyer(address buyer)
