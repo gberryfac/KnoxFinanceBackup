@@ -1,6 +1,9 @@
 import { ethers } from "hardhat";
 import { BigNumber } from "ethers";
 
+import moment from "moment-timezone";
+moment.tz.setDefault("UTC");
+
 // Increases ganache time by the passed duration in seconds
 export async function increase(duration: number | BigNumber) {
   if (!BigNumber.isBigNumber(duration)) {
@@ -15,9 +18,33 @@ export async function increase(duration: number | BigNumber) {
   await ethers.provider.send("evm_mine", []);
 }
 
-// gets current time
+// returns the current timestamp
 export async function now() {
   return BigNumber.from((await ethers.provider.getBlock("latest")).timestamp);
+}
+
+// returns the next Thursday 8AM timestamp
+// e.g. Monday Week 0 -> Friday Week 0
+// e.g. Thursday 7:59AM Week 0 -> Thursday 8:00AM Week 0
+// e.g. Thursday 8:01AM Week 0 -> Thursday 8:00AM Week 1
+export async function getThursday8AM(timestamp: number) {
+  const currentTime = moment.unix(timestamp);
+
+  // The block we're hardcoded to is a Monday so we add 3 days to get to Thursday
+  const thursday = currentTime.add(3, "days");
+  return moment(thursday).startOf("isoWeek").day("thursday").hour(8).unix();
+}
+
+// returns the next Friday 8AM timestamp
+// e.g. Monday Week 0 -> Friday Week 0
+// e.g. Friday 7:59AM Week 0 -> Friday 8:00AM Week 0
+// e.g. Friday 8:01AM Week 0 -> Friday 8:00AM Week 1
+export async function getFriday8AM(timestamp: number) {
+  const currentTime = moment.unix(timestamp);
+
+  // The block we're hardcoded to is a Monday so we add 3 days to get to Thursday
+  const friday = currentTime.add(3, "days");
+  return moment(friday).startOf("isoWeek").day("friday").hour(8).unix();
 }
 
 /**
@@ -73,26 +100,10 @@ export function revertToSnapshotAfterEach(
 
   beforeEach(async function () {
     snapshotId = await takeSnapshot();
-
     await beforeEachCallback.bind(this)(); // eslint-disable-line no-invalid-this
   });
   afterEach(async () => {
     await afterEachCallback.bind(this)(); // eslint-disable-line no-invalid-this
-
     await revertToSnapShot(snapshotId);
   });
 }
-
-export const PERIOD = 43200; // 12 hours
-export const getTopOfPeriod = async () => {
-  const latestTimestamp = (await ethers.provider.getBlock("latest")).timestamp;
-  let topOfPeriod: number;
-
-  const rem = latestTimestamp % PERIOD;
-  if (rem < Math.floor(PERIOD / 2)) {
-    topOfPeriod = latestTimestamp - rem + PERIOD;
-  } else {
-    topOfPeriod = latestTimestamp + rem + PERIOD;
-  }
-  return topOfPeriod;
-};

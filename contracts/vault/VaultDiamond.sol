@@ -10,6 +10,8 @@ import "../access/AccessStorage.sol";
 
 import "../interfaces/IPremiaPool.sol";
 
+import "../libraries/Helpers.sol";
+
 import "./VaultStorage.sol";
 
 contract VaultDiamond is SolidStateDiamond {
@@ -49,6 +51,7 @@ contract VaultDiamond is SolidStateDiamond {
             l.delta64x64 = initProxy.delta64x64;
             l.deltaOffset64x64 = initProxy.deltaOffset64x64;
 
+            l.reserveRate = initProxy.reserveRate;
             l.performanceFee = initProxy.performanceFee;
             l.withdrawalFee =
                 (initProxy.withdrawalFee * VaultStorage.FEE_MULTIPLIER) /
@@ -58,6 +61,9 @@ contract VaultDiamond is SolidStateDiamond {
 
             l.startOffset = 2 hours;
             l.endOffset = 4 hours;
+
+            VaultStorage.Option storage option = l.options[l.epoch];
+            option.expiry = uint64(Helpers._getFriday(block.timestamp));
         }
 
         {

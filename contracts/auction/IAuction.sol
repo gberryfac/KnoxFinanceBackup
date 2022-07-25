@@ -68,11 +68,17 @@ interface IAuction is IERC1155Receiver {
 
     function isFinalized(uint64 epoch) external view returns (bool);
 
-    function status(uint64 epoch) external view returns (AuctionStorage.Status);
+    function getStatus(uint64 epoch)
+        external
+        view
+        returns (AuctionStorage.Status);
 
-    function totalContracts(uint64 epoch) external view returns (uint256);
+    function getTotalContracts(uint64 epoch) external view returns (uint256);
 
-    function totalContractsSold(uint64 epoch) external view returns (uint256);
+    function getTotalContractsSold(uint64 epoch)
+        external
+        view
+        returns (uint256);
 
     function claimsByBuyer(address buyer)
         external

@@ -1,200 +1,95 @@
-import { ethers, network } from "hardhat";
+import { ethers } from "hardhat";
 import { BigNumber } from "ethers";
 const { parseUnits } = ethers.utils;
 
-import {
-  IVault,
-  MockERC20,
-  Auction__factory,
-  AuctionProxy__factory,
-  Queue__factory,
-  QueueProxy__factory,
-  Pricer__factory,
-} from "../types";
+import { IVault } from "../types";
 
-import * as assets from "./utils/assets";
-import * as types from "./utils/types";
-import * as accounts from "./utils/accounts";
+import { accounts, assets, types, KnoxUtil } from "./utils";
 
-import { describeBehaviorOfAdmin } from "../spec/Admin.behavior";
-import { describeBehaviorOfBase } from "../spec/Base.behavior";
-
-import { VaultUtil } from "./utils/VaultUtil";
-
-import { PREMIA_VOLATILITY_SURFACE_ORACLE } from "../constants";
+import { describeBehaviorOfVaultAdmin } from "../spec/VaultAdmin.behavior";
+import { describeBehaviorOfVaultBase } from "../spec/VaultBase.behavior";
+import { describeBehaviorOfVaultView } from "../spec/VaultView.behavior";
 
 describe("Vault Tests", () => {
   behavesLikeVault({
-    name: `Knox ETH Delta Vault (Put)`,
+    name: "Put Options",
     tokenName: `Knox ETH Delta Vault`,
     tokenSymbol: `kETH-DELTA-P`,
     tokenDecimals: 18,
-    asset: assets.DAI,
+    underlying: assets.ETH,
+    base: assets.DAI,
+    collateral: assets.DAI,
     delta: 0.4,
     deltaOffset: 0.05,
-    pool: assets.PREMIA.WETH_DAI,
-    deposit: parseUnits("100000", assets.DAI.decimals),
-    maxTVL: parseUnits("5000000", assets.DAI.decimals),
+    maxTVL: parseUnits("1000000", assets.DAI.decimals),
     minSize: BigNumber.from("10").pow(assets.DAI.decimals - 1),
+    reserveRate: 0.001,
     performanceFee: BigNumber.from("20000000"),
     withdrawalFee: BigNumber.from("2000000"),
     isCall: false,
+    mint: parseUnits("1000000", assets.DAI.decimals),
+    deposit: parseUnits("10000", assets.ETH.decimals),
   });
 
   behavesLikeVault({
-    name: `Knox ETH Delta Vault (Call)`,
+    name: "Call Options",
     tokenName: `Knox ETH Delta Vault`,
     tokenSymbol: `kETH-DELTA-C`,
     tokenDecimals: 18,
-    asset: assets.ETH,
+    underlying: assets.ETH,
+    base: assets.DAI,
+    collateral: assets.ETH,
     delta: 0.4,
     deltaOffset: 0.05,
-    pool: assets.PREMIA.WETH_DAI,
-    deposit: parseUnits("10", assets.ETH.decimals),
-    maxTVL: parseUnits("1000", assets.ETH.decimals),
+    maxTVL: parseUnits("100", assets.ETH.decimals),
     minSize: BigNumber.from("10").pow(assets.ETH.decimals - 1),
+    reserveRate: 0.001,
     performanceFee: BigNumber.from("20000000"),
     withdrawalFee: BigNumber.from("2000000"),
     isCall: true,
-  });
-
-  behavesLikeVault({
-    name: `Knox BTC Delta Vault (Call)`,
-    tokenName: `Knox BTC Delta Vault`,
-    tokenSymbol: `kBTC-DELTA-C`,
-    tokenDecimals: 18,
-    asset: assets.BTC,
-    delta: 0.4,
-    deltaOffset: 0.05,
-    pool: assets.PREMIA.WBTC_DAI,
-    deposit: parseUnits("1", assets.BTC.decimals),
-    maxTVL: parseUnits("100", assets.BTC.decimals),
-    minSize: BigNumber.from("10").pow(assets.BTC.decimals - 1),
-    performanceFee: BigNumber.from("20000000"),
-    withdrawalFee: BigNumber.from("2000000"),
-    isCall: true,
-  });
-
-  behavesLikeVault({
-    name: `Knox LINK Delta Vault (Call)`,
-    tokenName: `Knox LINK Delta Vault`,
-    tokenSymbol: `kLINK-DELTA-C`,
-    tokenDecimals: 18,
-    asset: assets.LINK,
-    delta: 0.4,
-    deltaOffset: 0.05,
-    pool: assets.PREMIA.LINK_DAI,
-    deposit: parseUnits("100", assets.LINK.decimals),
-    maxTVL: parseUnits("100000", assets.LINK.decimals),
-    minSize: BigNumber.from("10").pow(assets.LINK.decimals - 1),
-    performanceFee: BigNumber.from("30000000"),
-    withdrawalFee: BigNumber.from("1000000"),
-    isCall: true,
+    mint: parseUnits("1000", assets.ETH.decimals),
+    deposit: parseUnits("10", assets.ETH.decimals),
   });
 });
 
-const chainId = network.config.chainId;
-
 function behavesLikeVault(params: types.VaultParams) {
   describe.only(params.name, () => {
-    let snapshotId: number;
-
-    let signers: types.Signers;
+    // Signers and Addresses
     let addresses: types.Addresses;
+    let signers: types.Signers;
 
-    let asset: MockERC20;
+    // Contract Utilities
+    let knoxUtil: KnoxUtil;
+    let vault: IVault;
 
-    let instance: IVault;
-    let v: VaultUtil;
-
-    before(async function () {
+    before(async () => {
       signers = await accounts.getSigners();
       addresses = await accounts.getAddresses(signers);
 
-      addresses.pool = params.pool.address;
-
-      v = await VaultUtil.deploy(params, signers, addresses);
-
-      let queue = await new Queue__factory(signers.deployer).deploy(
-        params.isCall,
-        addresses.pool,
-        addresses.vault
-      );
-
-      let queueProxy = await new QueueProxy__factory(signers.deployer).deploy(
-        params.maxTVL,
-        queue.address,
-        addresses.vault
-      );
-
-      queue = Queue__factory.connect(queueProxy.address, signers.lp1);
-
-      let auction = await new Auction__factory(signers.deployer).deploy(
-        params.isCall,
-        addresses.pool,
-        addresses.vault
-      );
-
-      let auctionProxy = await new AuctionProxy__factory(
-        signers.deployer
-      ).deploy(params.minSize, auction.address, addresses.vault);
-
-      auction = Auction__factory.connect(auctionProxy.address, signers.lp1);
-
-      let pricer = await new Pricer__factory(signers.deployer).deploy(
-        addresses.pool,
-        PREMIA_VOLATILITY_SURFACE_ORACLE[chainId]
-      );
-
-      addresses.queue = queue.address;
-      addresses.auction = auction.address;
-      addresses.pricer = pricer.address;
-
-      const initImpl = {
-        auction: addresses.auction,
-        queue: addresses.queue,
-        pricer: addresses.pricer,
-      };
-
-      await v.vault.connect(signers.deployer).initialize(initImpl);
-      instance = v.vault;
-
-      [signers, addresses, asset] = await accounts.impersonateWhale(
-        params.asset.buyer,
-        v.asset.address,
-        params.deposit,
-        signers,
-        addresses
-      );
-
-      // if true, the test is configured with the incorrect asset.
-      if (asset.address !== params.asset.address) throw Error;
+      knoxUtil = await KnoxUtil.deploy(params, signers, addresses);
+      vault = knoxUtil.vaultUtil.vault;
     });
 
-    beforeEach(async () => {
-      snapshotId = await ethers.provider.send("evm_snapshot", []);
+    describeBehaviorOfVaultAdmin({
+      getKnoxUtil: async () => knoxUtil,
+      getParams: () => params,
     });
 
-    afterEach(async () => {
-      await ethers.provider.send("evm_revert", [snapshotId]);
-    });
-
-    describeBehaviorOfAdmin({
-      deploy: async () => instance,
-      getVaultUtil: async () => v,
-    });
-
-    describeBehaviorOfBase(
+    describeBehaviorOfVaultBase(
       {
-        deploy: async () => instance,
-        getVaultUtil: async () => v,
-        getAsset: async () => asset,
-        mintERC20: undefined as any,
-        burnERC20: undefined as any,
+        getKnoxUtil: async () => knoxUtil,
+        getParams: () => params,
+        mintERC4626: undefined as any,
+        burnERC4626: undefined as any,
         mintAsset: undefined as any,
         supply: ethers.constants.Zero,
       },
       ["::ERC4626Base"]
     );
+
+    describeBehaviorOfVaultView({
+      getKnoxUtil: async () => knoxUtil,
+      getParams: () => params,
+    });
   });
 }

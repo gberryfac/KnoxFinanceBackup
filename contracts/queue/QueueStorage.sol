@@ -6,6 +6,8 @@ library QueueStorage {
      *  LAYOUT
      ***********************************************/
 
+    uint256 internal constant ONE_SHARE = 10**18;
+
     struct Layout {
         // @notice
         uint64 epoch;
@@ -39,19 +41,19 @@ library QueueStorage {
      *  VIEW
      ***********************************************/
 
-    function _epoch(Layout storage l) internal view returns (uint64) {
+    function _getEpoch(Layout storage l) internal view returns (uint64) {
         return l.epoch;
     }
 
-    function _maxTVL(Layout storage l) internal view returns (uint256) {
+    function _getMaxTVL(Layout storage l) internal view returns (uint256) {
         return l.maxTVL;
     }
 
-    function _pricePerShare(Layout storage l, uint64 epoch)
+    function _getPricePerShare(Layout storage l, uint256 tokenId)
         internal
         view
         returns (uint256)
     {
-        return l.pricePerShare[epoch];
+        return l.pricePerShare[tokenId];
     }
 }

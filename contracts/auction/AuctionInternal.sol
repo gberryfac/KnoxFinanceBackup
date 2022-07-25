@@ -185,15 +185,16 @@ contract AuctionInternal is IAuctionInternal {
         require(price64x64 > 0, "price <= 0");
         require(size > l.minSize, "size < minimum");
 
-        if (block.timestamp >= l.auctions[epoch].startTime) {
-            require(!_finalizeAuction(epoch), "auction finalized");
-        }
-
         uint256 cost = price64x64.mulu(size);
         ERC20.safeTransferFrom(msg.sender, address(this), cost);
         l.claimsByBuyer[msg.sender].add(epoch);
 
         uint256 id = l.orderbooks[epoch]._insert(price64x64, size, msg.sender);
+
+        if (block.timestamp >= l.auctions[epoch].startTime) {
+            _finalizeAuction(epoch);
+        }
+
         emit OrderAdded(id, msg.sender, price64x64, size, true);
     }
 
@@ -204,10 +205,6 @@ contract AuctionInternal is IAuctionInternal {
 
         require(id > 0, "invalid order id");
 
-        if (block.timestamp >= l.auctions[epoch].startTime) {
-            require(!_finalizeAuction(epoch), "auction finalized");
-        }
-
         OrderBook.Index storage orderbook = l.orderbooks[epoch];
         OrderBook.Data memory data = orderbook._getOrderById(id);
 
@@ -216,6 +213,10 @@ contract AuctionInternal is IAuctionInternal {
 
         orderbook._remove(id);
         l.claimsByBuyer[data.buyer].remove(epoch);
+
+        if (block.timestamp >= l.auctions[epoch].startTime) {
+            _finalizeAuction(epoch);
+        }
 
         uint256 cost = data.price64x64.mulu(data.size);
         ERC20.safeTransfer(msg.sender, cost);
@@ -233,8 +234,6 @@ contract AuctionInternal is IAuctionInternal {
 
         require(size >= l.minSize, "size < minimum");
 
-        require(!_finalizeAuction(epoch), "auction finalized");
-
         int128 price64x64 = _priceCurve64x64(epoch);
         uint256 cost = price64x64.mulu(size);
         ERC20.safeTransferFrom(msg.sender, address(this), cost);
@@ -243,6 +242,9 @@ contract AuctionInternal is IAuctionInternal {
         l.claimsByBuyer[msg.sender].add(epoch);
 
         uint256 id = l.orderbooks[epoch]._insert(price64x64, size, msg.sender);
+
+        _finalizeAuction(epoch);
+
         emit OrderAdded(id, msg.sender, price64x64, size, false);
     }
 
@@ -330,6 +332,7 @@ contract AuctionInternal is IAuctionInternal {
                     } else {
                         fill += data.size;
                     }
+
                     refund += paid - cost;
                 } else {
                     refund += data.price64x64.mulu(data.size);
@@ -340,6 +343,12 @@ contract AuctionInternal is IAuctionInternal {
 
             totalContractsSold += data.size;
             next = orderbook._getNextOrder(next);
+        }
+
+        // if auction is cancelled, last price is left unset
+        if (lastPrice64x64 <= 0) {
+            // only send refund
+            fill = 0;
         }
 
         return (refund, fill);
@@ -362,7 +371,7 @@ contract AuctionInternal is IAuctionInternal {
         uint256 next = orderbook._head();
         uint256 length = orderbook._length();
 
-        uint256 totalContracts = _totalContracts(epoch);
+        uint256 totalContracts = _getTotalContracts(epoch);
 
         if (
             auction.totalContracts <= 0 &&
@@ -410,7 +419,9 @@ contract AuctionInternal is IAuctionInternal {
         if (auction.maxPrice64x64 <= 0 || auction.minPrice64x64 <= 0) {
             auction.status = AuctionStorage.Status.CANCELLED;
             emit AuctionStatus(AuctionStorage.Status.CANCELLED);
-        } else if (_processOrders(epoch) || block.timestamp > auction.endTime) {
+        }
+
+        if (_processOrders(epoch) || block.timestamp > auction.endTime) {
             auction.status = AuctionStorage.Status.FINALIZED;
             emit AuctionStatus(AuctionStorage.Status.FINALIZED);
             return true;
@@ -469,21 +480,7 @@ contract AuctionInternal is IAuctionInternal {
      *  VIEW
      ***********************************************/
 
-    function _isFinalized(uint64 epoch) internal view returns (bool) {
-        AuctionStorage.Layout storage l = AuctionStorage.layout();
-        return l.auctions[epoch].status == AuctionStorage.Status.FINALIZED;
-    }
-
-    function _status(uint64 epoch)
-        internal
-        view
-        returns (AuctionStorage.Status)
-    {
-        AuctionStorage.Layout storage l = AuctionStorage.layout();
-        return l.auctions[epoch].status;
-    }
-
-    function _totalContracts(uint64 epoch) internal view returns (uint256) {
+    function _getTotalContracts(uint64 epoch) internal view returns (uint256) {
         AuctionStorage.Layout storage l = AuctionStorage.layout();
         AuctionStorage.Auction storage auction = l.auctions[epoch];
 
@@ -506,7 +503,11 @@ contract AuctionInternal is IAuctionInternal {
         return auction.totalContracts;
     }
 
-    function _totalContractsSold(uint64 epoch) internal view returns (uint256) {
+    function _getTotalContractsSold(uint64 epoch)
+        internal
+        view
+        returns (uint256)
+    {
         AuctionStorage.Layout storage l = AuctionStorage.layout();
         return l.auctions[epoch].totalContractsSold;
     }
@@ -528,23 +529,5 @@ contract AuctionInternal is IAuctionInternal {
         }
 
         return claims;
-    }
-
-    function _getAuction(uint64 epoch)
-        internal
-        view
-        returns (AuctionStorage.Auction memory)
-    {
-        return AuctionStorage.layout()._getAuction(epoch);
-    }
-
-    function _getOrderById(uint64 epoch, uint256 id)
-        internal
-        view
-        returns (OrderBook.Data memory)
-    {
-        AuctionStorage.Layout storage l = AuctionStorage.layout();
-        OrderBook.Index storage orderbook = l.orderbooks[epoch];
-        return orderbook._getOrderById(id);
     }
 }

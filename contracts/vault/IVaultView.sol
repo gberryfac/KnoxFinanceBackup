@@ -4,14 +4,14 @@ pragma solidity ^0.8.0;
 import "./VaultStorage.sol";
 
 interface IVaultView {
-    function epoch() external view returns (uint64);
+    function getEpoch() external view returns (uint64);
 
     function optionByEpoch(uint64 _epoch)
         external
         view
         returns (VaultStorage.Option memory);
 
-    function collateralAsset() external view returns (address);
+    function getCollateralAsset() external view returns (address);
 
     function totalCollateral() external view returns (uint256);
 

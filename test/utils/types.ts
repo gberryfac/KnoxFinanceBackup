@@ -5,13 +5,20 @@ export type Pool = {
   address: string;
   base: Asset;
   underlying: Asset;
+  volatility: string;
 };
 
 export type Asset = {
+  name: string;
   address: string;
   decimals: number;
-  spotOracle: string;
-  buyer: string;
+  oracle: Oracle;
+};
+
+export type Oracle = {
+  address: string;
+  decimals: number;
+  price: number;
 };
 
 export type Signers = {
@@ -24,6 +31,7 @@ export type Signers = {
   buyer1: SignerWithAddress;
   buyer2: SignerWithAddress;
   buyer3: SignerWithAddress;
+  vault?: SignerWithAddress;
 };
 
 export type Addresses = {
@@ -36,13 +44,13 @@ export type Addresses = {
   buyer1: string;
   buyer2: string;
   buyer3: string;
-  auction?: string;
+  auction: string;
   buyer?: string;
   pool?: string;
   helpers?: string;
   pricer?: string;
-  queue?: string;
-  vault?: string;
+  queue: string;
+  vault: string;
   spotOracle?: string;
   volatilityOracle?: string;
 };
@@ -52,14 +60,22 @@ export type VaultParams = {
   tokenName?: string;
   tokenSymbol?: string;
   tokenDecimals?: number;
-  asset?: Asset;
+  underlying?: Asset;
+  base?: Asset;
+  collateral?: Asset;
   delta?: number;
   deltaOffset?: number;
-  pool?: Pool;
-  deposit?: BigNumber;
   maxTVL?: BigNumber;
   minSize?: BigNumber;
+  reserveRate?: number;
   performanceFee?: BigNumber;
   withdrawalFee?: BigNumber;
   isCall?: boolean;
+  mint?: BigNumber;
+  size?: BigNumber;
+  deposit?: BigNumber;
+  price?: {
+    max: number;
+    min: number;
+  };
 };

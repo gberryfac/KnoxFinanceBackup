@@ -34,21 +34,21 @@ interface IQueue is IERC165, IERC1155, IERC1155Enumerable {
      *  REDEEM
      ***********************************************/
 
-    function redeemMaxShares() external;
+    function redeem(uint256 tokenId) external;
 
-    function redeemMaxShares(address receiver) external;
+    function redeem(uint256 tokenId, address receiver) external;
 
-    function redeemMaxShares(address receiver, address owner) external;
-
-    function redeemShares(uint256 claimTokenId) external;
-
-    function redeemShares(uint256 claimTokenId, address receiver) external;
-
-    function redeemShares(
-        uint256 claimTokenId,
+    function redeem(
+        uint256 tokenId,
         address receiver,
         address owner
     ) external;
+
+    function redeemMax() external;
+
+    function redeemMax(address receiver) external;
+
+    function redeemMax(address receiver, address owner) external;
 
     /************************************************
      *  PROCESS EPOCH
@@ -62,23 +62,20 @@ interface IQueue is IERC165, IERC1155, IERC1155Enumerable {
      *  VIEW
      ***********************************************/
 
-    function previewUnredeemedShares() external view returns (uint256);
+    function previewUnredeemed(uint256 tokenId) external view returns (uint256);
 
-    function previewUnredeemedShares(address account)
+    function previewUnredeemed(uint256 tokenId, address account)
         external
         view
         returns (uint256);
 
-    function previewUnredeemedShares(uint256 claimTokenId, address account)
-        external
-        view
-        returns (uint256);
+    function getEpoch() external view returns (uint64);
 
-    function epoch() external view returns (uint64);
+    function getMaxTVL() external view returns (uint256);
 
-    function maxTVL() external view returns (uint256);
+    function getCurrentTokenId() external view returns (uint256);
 
-    function pricePerShare(uint64 _epoch) external view returns (uint256);
+    function getPricePerShare(uint256 tokenId) external view returns (uint256);
 
     /************************************************
      * HELPERS
@@ -86,7 +83,7 @@ interface IQueue is IERC165, IERC1155, IERC1155Enumerable {
 
     function formatClaimTokenId(uint64 _epoch) external view returns (uint256);
 
-    function parseClaimTokenId(uint256 claimTokenId)
+    function parseClaimTokenId(uint256 tokenId)
         external
         pure
         returns (address, uint64);

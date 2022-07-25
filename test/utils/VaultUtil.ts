@@ -1,7 +1,7 @@
 import { ethers } from "hardhat";
 const { getContractAt } = ethers;
 
-import * as types from "./types";
+import { types } from "./";
 
 import { diamondCut } from "../../scripts/diamond";
 
@@ -50,6 +50,8 @@ export class VaultUtil {
       minSize: params.minSize,
       delta64x64: fixedFromFloat(params.delta),
       deltaOffset64x64: fixedFromFloat(params.deltaOffset),
+      reserveRate:
+        params.reserveRate > 0 ? fixedFromFloat(params.reserveRate) : 0,
       performanceFee: params.performanceFee,
       withdrawalFee: params.withdrawalFee,
       name: params.tokenName,
@@ -118,7 +120,7 @@ export class VaultUtil {
 
     addresses.vault = vaultDiamond.address;
     const vault = IVault__factory.connect(addresses.vault, signers.lp1);
-    const collateralAsset = await vault.collateralAsset();
+    const collateralAsset = await vault.getCollateralAsset();
 
     const asset = await getContractAt("MockERC20", collateralAsset);
 
