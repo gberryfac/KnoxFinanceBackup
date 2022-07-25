@@ -28,7 +28,7 @@ describe("Auction Tests", () => {
     isCall: false,
     mint: parseUnits("1000000", assets.DAI.decimals),
     size: parseUnits("10", assets.ETH.decimals),
-    price: { max: 0.1, min: 0.01 },
+    price: { max: 100, min: 10 },
   });
 
   behavesLikeAuction({
@@ -41,7 +41,7 @@ describe("Auction Tests", () => {
     collateral: assets.ETH,
     delta: 0.4,
     deltaOffset: 0.05,
-    maxTVL: parseUnits("100", assets.ETH.decimals),
+    maxTVL: parseUnits("1000", assets.ETH.decimals),
     minSize: BigNumber.from("10").pow(assets.ETH.decimals - 1),
     reserveRate: 0.001,
     performanceFee: BigNumber.from("20000000"),
