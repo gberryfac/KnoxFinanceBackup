@@ -3,7 +3,9 @@ pragma solidity ^0.8.0;
 
 import "./AuctionStorage.sol";
 
-interface IAuctionInternal {
+interface IAuctionEvents {
+    event AuctionStatus(AuctionStorage.Status status);
+
     event OrderAdded(
         uint256 id,
         address indexed buyer,
@@ -11,6 +13,4 @@ interface IAuctionInternal {
         uint256 size,
         bool isLimitOrder
     );
-
-    event AuctionStatus(AuctionStorage.Status status);
 }

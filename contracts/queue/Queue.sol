@@ -117,6 +117,22 @@ contract Queue is
      *  VIEW
      ***********************************************/
 
+    function getCurrentTokenId() external view returns (uint256) {
+        return _getCurrentTokenId();
+    }
+
+    function getEpoch() external view returns (uint64) {
+        return QueueStorage.layout()._getEpoch();
+    }
+
+    function getMaxTVL() external view returns (uint256) {
+        return QueueStorage.layout()._getMaxTVL();
+    }
+
+    function getPricePerShare(uint256 tokenId) external view returns (uint256) {
+        return QueueStorage.layout()._getPricePerShare(tokenId);
+    }
+
     function previewUnredeemed(uint256 tokenId)
         external
         view
@@ -133,28 +149,12 @@ contract Queue is
         return _previewUnredeemed(tokenId, account);
     }
 
-    function getEpoch() external view returns (uint64) {
-        return _getEpoch();
-    }
-
-    function getMaxTVL() external view returns (uint256) {
-        return _getMaxTVL();
-    }
-
-    function getCurrentTokenId() external view returns (uint256) {
-        return _getCurrentTokenId();
-    }
-
-    function getPricePerShare(uint256 tokenId) external view returns (uint256) {
-        return _getPricePerShare(tokenId);
-    }
-
     /************************************************
      * HELPERS
      ***********************************************/
 
     function formatClaimTokenId(uint64 _epoch) external view returns (uint256) {
-        return _formatTokenId(_epoch);
+        return QueueStorage._formatTokenId(_epoch);
     }
 
     function parseClaimTokenId(uint256 tokenId)
@@ -162,7 +162,7 @@ contract Queue is
         pure
         returns (address, uint64)
     {
-        return _parseTokenId(tokenId);
+        return QueueStorage._parseTokenId(tokenId);
     }
 
     /************************************************

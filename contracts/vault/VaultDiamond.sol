@@ -51,11 +51,9 @@ contract VaultDiamond is SolidStateDiamond {
             l.delta64x64 = initProxy.delta64x64;
             l.deltaOffset64x64 = initProxy.deltaOffset64x64;
 
-            l.reserveRate = initProxy.reserveRate;
-            l.performanceFee = initProxy.performanceFee;
-            l.withdrawalFee =
-                (initProxy.withdrawalFee * VaultStorage.FEE_MULTIPLIER) /
-                VaultStorage.WEEKS_PER_YEAR;
+            l.reserveRate64x64 = initProxy.reserveRate64x64;
+            l.performanceFee64x64 = initProxy.performanceFee64x64;
+            l.withdrawalFee64x64 = initProxy.withdrawalFee64x64;
 
             l.feeRecipient = initProxy.feeRecipient;
 

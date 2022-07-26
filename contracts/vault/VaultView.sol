@@ -8,16 +8,16 @@ contract VaultView is VaultInternal {
 
     constructor(bool isCall, address pool) VaultInternal(isCall, pool) {}
 
-    function getEpoch() external view returns (uint64) {
-        return VaultStorage.layout()._getEpoch();
-    }
-
-    function optionByEpoch(uint64 _epoch)
+    function accountsByOption(uint256 id)
         external
         view
-        returns (VaultStorage.Option memory)
+        returns (address[] memory)
     {
-        return VaultStorage.layout()._optionByEpoch(_epoch);
+        return Pool.accountsByToken(id);
+    }
+
+    function getEpoch() external view returns (uint64) {
+        return VaultStorage.layout()._getEpoch();
     }
 
     function getCollateralAsset() external view returns (address) {
@@ -28,19 +28,19 @@ contract VaultView is VaultInternal {
         return _totalCollateral();
     }
 
-    function accountsByOption(uint256 id)
-        external
-        view
-        returns (address[] memory)
-    {
-        return Pool.accountsByToken(id);
-    }
-
     function optionsByAccount(address account)
         external
         view
         returns (uint256[] memory)
     {
         return Pool.tokensByAccount(account);
+    }
+
+    function optionByEpoch(uint64 _epoch)
+        external
+        view
+        returns (VaultStorage.Option memory)
+    {
+        return VaultStorage.layout()._optionByEpoch(_epoch);
     }
 }

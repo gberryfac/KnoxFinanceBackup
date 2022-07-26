@@ -16,8 +16,15 @@ interface IVaultAdmin {
     function initialize(VaultStorage.InitImpl memory initImpl) external;
 
     /************************************************
-     *  SETTERS
+     *  ADMIN
      ***********************************************/
+
+    // /**
+    //  * @notice
+    //  * @param
+    //  * @param
+    //  */
+    function setAuctionWindowOffsets(uint16 start, uint16 end) external;
 
     /**
      * @notice Sets the new fee recipient
@@ -38,23 +45,16 @@ interface IVaultAdmin {
     function setPricer(address newPricer) external;
 
     /**
-     * @notice Sets the withdrawal fee for the vault
-     * @param newWithdrawalFee is the withdrawal fee (6 decimals). ex: 2 * 10 ** 6 = 2%
-     */
-    function setWithdrawalFee(uint256 newWithdrawalFee) external;
-
-    /**
      * @notice Sets the performance fee for the vault
      * @param newPerformanceFee is the performance fee (6 decimals). ex: 20 * 10 ** 6 = 20%
      */
     function setPerformanceFee(uint256 newPerformanceFee) external;
 
-    // /**
-    //  * @notice
-    //  * @param
-    //  * @param
-    //  */
-    function setAuctionWindowOffsets(uint16 start, uint16 end) external;
+    /**
+     * @notice Sets the withdrawal fee for the vault
+     * @param newWithdrawalFee is the withdrawal fee (6 decimals). ex: 2 * 10 ** 6 = 2%
+     */
+    function setWithdrawalFee(uint256 newWithdrawalFee) external;
 
     /************************************************
      *  INITIALIZE AUCTION
