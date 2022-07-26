@@ -24,6 +24,7 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal {
     using SafeERC20 for IERC20;
     using VaultStorage for VaultStorage.Layout;
 
+    int128 private constant ONE_64x64 = 0x10000000000000000;
     uint256 private constant UNDERLYING_RESERVED_LIQ_TOKEN_ID =
         0x0200000000000000000000000000000000000000000000000000000000000000;
     uint256 private constant BASE_RESERVED_LIQ_TOKEN_ID =
@@ -179,8 +180,7 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal {
              */
             uint256 netIncome = l.totalPremiums - exerciseAmount;
             uint256 performanceFeeInAsset =
-                (netIncome * l.performanceFee) /
-                    (100 * VaultStorage.FEE_MULTIPLIER);
+                l.performanceFee64x64.mulu(netIncome);
 
             ERC20.safeTransfer(l.feeRecipient, performanceFeeInAsset);
         }
@@ -299,7 +299,7 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal {
     function _totalReserves() internal view returns (uint256) {
         VaultStorage.Layout storage l = VaultStorage.layout();
         return
-            l.reserveRate.mulu(
+            l.reserveRate64x64.mulu(
                 ERC20.balanceOf(address(this)) - l.totalPremiums
             );
     }
@@ -486,14 +486,12 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal {
     ) private returns (uint256, uint256) {
         VaultStorage.Layout storage l = VaultStorage.layout();
 
-        uint256 multiplier = (100 * VaultStorage.FEE_MULTIPLIER);
-
         uint256 feesInCollateralAsset =
-            ((collateralAssetAmount + premiumAssetAmount) * l.withdrawalFee) /
-                multiplier;
+            l.withdrawalFee64x64.mulu(
+                collateralAssetAmount + premiumAssetAmount
+            );
 
-        uint256 feesInShortAsset =
-            (shortAssetAmount * l.withdrawalFee) / multiplier;
+        uint256 feesInShortAsset = l.withdrawalFee64x64.mulu(shortAssetAmount);
 
         _transferAssets(
             feesInCollateralAsset,

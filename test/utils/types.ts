@@ -67,9 +67,9 @@ export type VaultParams = {
   deltaOffset?: number;
   maxTVL?: BigNumber;
   minSize?: BigNumber;
-  reserveRate?: number;
-  performanceFee?: BigNumber;
-  withdrawalFee?: BigNumber;
+  reserveRate64x64?: number;
+  performanceFee64x64?: number;
+  withdrawalFee64x64?: number;
   isCall?: boolean;
   mint?: BigNumber;
   size?: BigNumber;

@@ -1,8 +1,5 @@
 import { ethers } from "hardhat";
-import { BigNumber } from "ethers";
 const { parseUnits } = ethers.utils;
-
-import { IVault } from "../types";
 
 import { accounts, assets, types, KnoxUtil } from "./utils";
 
@@ -22,10 +19,10 @@ describe("Vault Tests", () => {
     delta: 0.4,
     deltaOffset: 0.05,
     maxTVL: parseUnits("1000000", assets.DAI.decimals),
-    minSize: BigNumber.from("10").pow(assets.DAI.decimals - 1),
-    reserveRate: 0.001,
-    performanceFee: BigNumber.from("20000000"),
-    withdrawalFee: BigNumber.from("2000000"),
+    minSize: parseUnits("1", assets.DAI.decimals - 1),
+    reserveRate64x64: 0.001,
+    performanceFee64x64: 0.2,
+    withdrawalFee64x64: 0.02,
     isCall: false,
     mint: parseUnits("1000000", assets.DAI.decimals),
     deposit: parseUnits("10000", assets.ETH.decimals),
@@ -42,10 +39,10 @@ describe("Vault Tests", () => {
     delta: 0.4,
     deltaOffset: 0.05,
     maxTVL: parseUnits("100", assets.ETH.decimals),
-    minSize: BigNumber.from("10").pow(assets.ETH.decimals - 1),
-    reserveRate: 0.001,
-    performanceFee: BigNumber.from("20000000"),
-    withdrawalFee: BigNumber.from("2000000"),
+    minSize: parseUnits("1", assets.ETH.decimals - 1),
+    reserveRate64x64: 0.001,
+    performanceFee64x64: 0.2,
+    withdrawalFee64x64: 0.02,
     isCall: true,
     mint: parseUnits("1000", assets.ETH.decimals),
     deposit: parseUnits("10", assets.ETH.decimals),
@@ -60,14 +57,12 @@ function behavesLikeVault(params: types.VaultParams) {
 
     // Contract Utilities
     let knoxUtil: KnoxUtil;
-    let vault: IVault;
 
     before(async () => {
       signers = await accounts.getSigners();
       addresses = await accounts.getAddresses(signers);
 
       knoxUtil = await KnoxUtil.deploy(params, signers, addresses);
-      vault = knoxUtil.vaultUtil.vault;
     });
 
     describeBehaviorOfVaultAdmin({

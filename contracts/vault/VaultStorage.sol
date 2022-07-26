@@ -23,9 +23,9 @@ library VaultStorage {
         bool isCall;
         int128 delta64x64;
         int128 deltaOffset64x64;
-        int128 reserveRate;
-        uint256 performanceFee;
-        uint256 withdrawalFee;
+        int128 reserveRate64x64;
+        int128 performanceFee64x64;
+        int128 withdrawalFee64x64;
         string name;
         string symbol;
         address keeper;
@@ -99,11 +99,11 @@ library VaultStorage {
          * VAULT PROPERTIES
          ***********************************************/
         // @notice
-        int128 reserveRate;
+        int128 reserveRate64x64;
         // @notice
-        uint256 performanceFee;
+        int128 performanceFee64x64;
         // @notice
-        uint256 withdrawalFee;
+        int128 withdrawalFee64x64;
         // @notice
         address feeRecipient;
         /************************************************
