@@ -50,22 +50,6 @@ library AuctionStorage {
         }
     }
 
-    function _isFinalized(Layout storage l, uint64 epoch)
-        internal
-        view
-        returns (bool)
-    {
-        return l.auctions[epoch].status == Status.FINALIZED;
-    }
-
-    function _getStatus(Layout storage l, uint64 epoch)
-        internal
-        view
-        returns (AuctionStorage.Status)
-    {
-        return l.auctions[epoch].status;
-    }
-
     function _getAuction(Layout storage l, uint64 epoch)
         internal
         view
@@ -85,5 +69,29 @@ library AuctionStorage {
     ) internal view returns (OrderBook.Data memory) {
         OrderBook.Index storage orderbook = l.orderbooks[epoch];
         return orderbook._getOrderById(id);
+    }
+
+    function _getStatus(Layout storage l, uint64 epoch)
+        internal
+        view
+        returns (AuctionStorage.Status)
+    {
+        return l.auctions[epoch].status;
+    }
+
+    function _getTotalContractsSold(Layout storage l, uint64 epoch)
+        internal
+        view
+        returns (uint256)
+    {
+        return l.auctions[epoch].totalContractsSold;
+    }
+
+    function _isFinalized(Layout storage l, uint64 epoch)
+        internal
+        view
+        returns (bool)
+    {
+        return l.auctions[epoch].status == Status.FINALIZED;
     }
 }

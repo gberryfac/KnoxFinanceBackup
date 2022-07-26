@@ -5,7 +5,9 @@ import "@solidstate/contracts/introspection/IERC165.sol";
 import "@solidstate/contracts/token/ERC1155/IERC1155.sol";
 import "@solidstate/contracts/token/ERC1155/enumerable/IERC1155Enumerable.sol";
 
-interface IQueue is IERC165, IERC1155, IERC1155Enumerable {
+import "./IQueueEvents.sol";
+
+interface IQueue is IERC165, IERC1155, IERC1155Enumerable, IQueueEvents {
     /************************************************
      *  ADMIN
      ***********************************************/
@@ -69,11 +71,11 @@ interface IQueue is IERC165, IERC1155, IERC1155Enumerable {
         view
         returns (uint256);
 
+    function getCurrentTokenId() external view returns (uint256);
+
     function getEpoch() external view returns (uint64);
 
     function getMaxTVL() external view returns (uint256);
-
-    function getCurrentTokenId() external view returns (uint256);
 
     function getPricePerShare(uint256 tokenId) external view returns (uint256);
 

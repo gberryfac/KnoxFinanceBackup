@@ -4,8 +4,9 @@ pragma solidity ^0.8.0;
 import "@solidstate/contracts/token/ERC1155/IERC1155Receiver.sol";
 
 import "./AuctionStorage.sol";
+import "./IAuctionEvents.sol";
 
-interface IAuction is IERC1155Receiver {
+interface IAuction is IAuctionEvents, IERC1155Receiver {
     /************************************************
      *  INITIALIZATION
      ***********************************************/
@@ -66,7 +67,22 @@ interface IAuction is IERC1155Receiver {
      *  VIEW
      ***********************************************/
 
-    function isFinalized(uint64 epoch) external view returns (bool);
+    function claimsByBuyer(address buyer)
+        external
+        view
+        returns (uint64[] memory);
+
+    function getAuction(uint64 epoch)
+        external
+        view
+        returns (AuctionStorage.Auction memory);
+
+    function getMinSize() external view returns (uint256);
+
+    function getOrderById(uint64 epoch, uint256 id)
+        external
+        view
+        returns (OrderBook.Data memory);
 
     function getStatus(uint64 epoch)
         external
@@ -80,18 +96,5 @@ interface IAuction is IERC1155Receiver {
         view
         returns (uint256);
 
-    function claimsByBuyer(address buyer)
-        external
-        view
-        returns (uint64[] memory);
-
-    function getAuction(uint64 epoch)
-        external
-        view
-        returns (AuctionStorage.Auction memory);
-
-    function getOrderById(uint64 epoch, uint256 id)
-        external
-        view
-        returns (OrderBook.Data memory);
+    function isFinalized(uint64 epoch) external view returns (bool);
 }

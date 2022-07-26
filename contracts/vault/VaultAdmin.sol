@@ -32,36 +32,8 @@ contract VaultAdmin is Access, VaultInternal {
     }
 
     /************************************************
-     *  SETTERS
+     *  ADMIN
      ***********************************************/
-
-    /**
-     * @notice Sets the new fee recipient
-     * @param newFeeRecipient is the address of the new fee recipient
-     */
-    function setFeeRecipient(address newFeeRecipient) external onlyOwner {
-        VaultStorage.layout()._setFeeRecipient(newFeeRecipient);
-    }
-
-    function setPricer(address newPricer) external onlyOwner {
-        VaultStorage.layout()._setPricer(newPricer);
-    }
-
-    /**
-     * @notice Sets the performance fee for the vault
-     * @param newPerformanceFee is the performance fee (6 decimals). ex: 20 * 10 ** 6 = 20%
-     */
-    function setPerformanceFee(uint256 newPerformanceFee) external onlyOwner {
-        VaultStorage.layout()._setPerformanceFee(newPerformanceFee);
-    }
-
-    /**
-     * @notice Sets the withdrawal fee for the vault
-     * @param newWithdrawalFee is the withdrawal fee (6 decimals). ex: 2 * 10 ** 6 = 2%
-     */
-    function setWithdrawalFee(uint256 newWithdrawalFee) external onlyOwner {
-        VaultStorage.layout()._setWithdrawalFee(newWithdrawalFee);
-    }
 
     // /**
     //  * @notice
@@ -72,7 +44,39 @@ contract VaultAdmin is Access, VaultInternal {
         external
         onlyOwner
     {
-        VaultStorage.layout()._setAuctionWindowOffsets(start, end);
+        _setAuctionWindowOffsets(start, end);
+    }
+
+    /**
+     * @notice Sets the new fee recipient
+     * @param newFeeRecipient is the address of the new fee recipient
+     */
+    function setFeeRecipient(address newFeeRecipient) external onlyOwner {
+        _setFeeRecipient(newFeeRecipient);
+    }
+
+    function setPricer(address newPricer) external onlyOwner {
+        _setPricer(newPricer);
+    }
+
+    /**
+     * @notice Sets the performance fee for the vault
+     * @param newPerformanceFee64x64 is the performance fee as a 64x64 fixed point number
+     */
+    function setPerformanceFee(int128 newPerformanceFee64x64)
+        external
+        onlyOwner
+    {
+        _setPerformanceFee(newPerformanceFee64x64);
+    }
+
+    /**
+     * @notice Sets the withdrawal fee for the vault
+     * @param newWithdrawalFee64x64 is the withdrawal fee as a 64x64 fixed point number
+     * @dev withdrawal fee must be annualized by dividing by the number of weeks in the year. i.e. 2% / 52.142857
+     */
+    function setWithdrawalFee(int128 newWithdrawalFee64x64) external onlyOwner {
+        _setWithdrawalFee(newWithdrawalFee64x64);
     }
 
     /************************************************

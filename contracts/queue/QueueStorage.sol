@@ -5,16 +5,13 @@ library QueueStorage {
     /************************************************
      *  LAYOUT
      ***********************************************/
-
-    uint256 internal constant ONE_SHARE = 10**18;
-
     struct Layout {
         // @notice
         uint64 epoch;
-        // @notice maps claim token id to claim token price
-        mapping(uint256 => uint256) pricePerShare;
         // @notice
         uint256 maxTVL;
+        // @notice maps claim token id to claim token price
+        mapping(uint256 => uint256) pricePerShare;
     }
 
     bytes32 internal constant LAYOUT_SLOT =
@@ -28,18 +25,16 @@ library QueueStorage {
     }
 
     /************************************************
-     *  ADMIN
-     ***********************************************/
-
-    function _setMaxTVL(Layout storage l, uint256 newMaxTVL) internal {
-        require(newMaxTVL > 0, "value exceeds minimum");
-        l.maxTVL = newMaxTVL;
-        // emit MaxTVLSet(l.maxTVL, newMaxTVL);
-    }
-
-    /************************************************
      *  VIEW
      ***********************************************/
+
+    function _getCurrentTokenId(Layout storage l)
+        internal
+        view
+        returns (uint256)
+    {
+        return _formatTokenId(_getEpoch(l));
+    }
 
     function _getEpoch(Layout storage l) internal view returns (uint64) {
         return l.epoch;
@@ -55,5 +50,29 @@ library QueueStorage {
         returns (uint256)
     {
         return l.pricePerShare[tokenId];
+    }
+
+    /************************************************
+     * HELPERS
+     ***********************************************/
+
+    function _formatTokenId(uint64 epoch) internal view returns (uint256) {
+        return (uint256(uint160(address(this))) << 64) + uint256(epoch);
+    }
+
+    function _parseTokenId(uint256 tokenId)
+        internal
+        pure
+        returns (address, uint64)
+    {
+        address queue;
+        uint64 epoch;
+
+        assembly {
+            queue := shr(64, tokenId)
+            epoch := tokenId
+        }
+
+        return (queue, epoch);
     }
 }

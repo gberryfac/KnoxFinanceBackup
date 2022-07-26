@@ -117,18 +117,12 @@ contract Auction is Access, AuctionInternal, IAuction {
      *  VIEW
      ***********************************************/
 
-    function isFinalized(uint64 epoch) external view returns (bool) {
-        AuctionStorage.Layout storage l = AuctionStorage.layout();
-        return l._isFinalized(epoch);
-    }
-
-    function getStatus(uint64 epoch)
+    function claimsByBuyer(address buyer)
         external
         view
-        returns (AuctionStorage.Status)
+        returns (uint64[] memory)
     {
-        AuctionStorage.Layout storage l = AuctionStorage.layout();
-        return l._getStatus(epoch);
+        return _claimsByBuyer(buyer);
     }
 
     function getAuction(uint64 epoch)
@@ -136,13 +130,11 @@ contract Auction is Access, AuctionInternal, IAuction {
         view
         returns (AuctionStorage.Auction memory)
     {
-        AuctionStorage.Layout storage l = AuctionStorage.layout();
-        return l._getAuction(epoch);
+        return AuctionStorage.layout()._getAuction(epoch);
     }
 
     function getMinSize() external view returns (uint256) {
-        AuctionStorage.Layout storage l = AuctionStorage.layout();
-        return l._getMinSize();
+        return AuctionStorage.layout()._getMinSize();
     }
 
     function getOrderById(uint64 epoch, uint256 id)
@@ -150,8 +142,15 @@ contract Auction is Access, AuctionInternal, IAuction {
         view
         returns (OrderBook.Data memory)
     {
-        AuctionStorage.Layout storage l = AuctionStorage.layout();
-        return l._getOrderById(epoch, id);
+        return AuctionStorage.layout()._getOrderById(epoch, id);
+    }
+
+    function getStatus(uint64 epoch)
+        external
+        view
+        returns (AuctionStorage.Status)
+    {
+        return AuctionStorage.layout()._getStatus(epoch);
     }
 
     function getTotalContracts(uint64 epoch) external view returns (uint256) {
@@ -163,15 +162,12 @@ contract Auction is Access, AuctionInternal, IAuction {
         view
         returns (uint256)
     {
-        return _getTotalContractsSold(epoch);
+        return AuctionStorage.layout()._getTotalContractsSold(epoch);
     }
 
-    function claimsByBuyer(address buyer)
-        external
-        view
-        returns (uint64[] memory)
-    {
-        return _claimsByBuyer(buyer);
+    function isFinalized(uint64 epoch) external view returns (bool) {
+        AuctionStorage.Layout storage l = AuctionStorage.layout();
+        return l._isFinalized(epoch);
     }
 
     /************************************************

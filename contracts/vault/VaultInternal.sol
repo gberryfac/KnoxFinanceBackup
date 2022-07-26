@@ -12,11 +12,12 @@ import "../libraries/ABDKMath64x64Token.sol";
 import "../libraries/Helpers.sol";
 
 import "./IVault.sol";
+import "./IVaultEvents.sol";
 import "./VaultStorage.sol";
 
 import "hardhat/console.sol";
 
-contract VaultInternal is AccessInternal, ERC4626BaseInternal {
+contract VaultInternal is AccessInternal, ERC4626BaseInternal, IVaultEvents {
     using ABDKMath64x64 for int128;
     using ABDKMath64x64 for uint256;
     using ABDKMath64x64Token for int128;
@@ -41,6 +42,47 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal {
 
         ERC20 = IERC20(asset);
         Vault = IVault(address(this));
+    }
+
+    /************************************************
+     *  ADMIN
+     ***********************************************/
+
+    function _setAuctionWindowOffsets(uint16 start, uint16 end) internal {
+        VaultStorage.Layout storage l = VaultStorage.layout();
+        l.startOffset = start;
+        l.endOffset = end;
+        // emit AuctionWindowOffsetsSet();
+    }
+
+    function _setFeeRecipient(address newFeeRecipient) internal {
+        VaultStorage.Layout storage l = VaultStorage.layout();
+        require(newFeeRecipient != address(0), "address not provided");
+        require(newFeeRecipient != l.feeRecipient, "new address equals old");
+        l.feeRecipient = newFeeRecipient;
+        // emit FeeRecipientSet();
+    }
+
+    function _setPricer(address newPricer) internal {
+        VaultStorage.Layout storage l = VaultStorage.layout();
+        require(newPricer != address(0), "address not provided");
+        require(newPricer != address(l.Pricer), "new address equals old");
+        l.Pricer = IPricer(newPricer);
+        // emit PricerSet();
+    }
+
+    function _setPerformanceFee(int128 newPerformanceFee64x64) internal {
+        VaultStorage.Layout storage l = VaultStorage.layout();
+        require(newPerformanceFee64x64 < ONE_64x64, "invalid fee amount");
+        l.performanceFee64x64 = newPerformanceFee64x64;
+        // emit PerformanceFeeSet(l.performanceFee64x64, newPerformanceFee);
+    }
+
+    function _setWithdrawalFee(int128 newWithdrawalFee64x64) internal {
+        VaultStorage.Layout storage l = VaultStorage.layout();
+        require(newWithdrawalFee64x64 < ONE_64x64, "invalid fee amount");
+        l.withdrawalFee64x64 = newWithdrawalFee64x64;
+        // emit WithdrawalFeeSet(l.withdrawalFee64x64, newWithdrawalFee64x64);
     }
 
     /************************************************

@@ -10,13 +10,20 @@ import "../interfaces/IPremiaPool.sol";
 
 import "../vault/IVault.sol";
 
+import "./IQueueEvents.sol";
 import "./QueueStorage.sol";
 
 import "hardhat/console.sol";
 
-contract QueueInternal is ERC1155BaseInternal, ERC1155EnumerableInternal {
+contract QueueInternal is
+    ERC1155BaseInternal,
+    ERC1155EnumerableInternal,
+    IQueueEvents
+{
     using QueueStorage for QueueStorage.Layout;
     using SafeERC20 for IERC20;
+
+    uint256 internal constant ONE_SHARE = 10**18;
 
     IERC20 public immutable ERC20;
     IVault public immutable Vault;
@@ -39,7 +46,10 @@ contract QueueInternal is ERC1155BaseInternal, ERC1155EnumerableInternal {
      ***********************************************/
 
     function _setMaxTVL(uint256 newMaxTVL) internal {
-        return QueueStorage.layout()._setMaxTVL(newMaxTVL);
+        QueueStorage.Layout storage l = QueueStorage.layout();
+        require(newMaxTVL > 0, "value exceeds minimum");
+        l.maxTVL = newMaxTVL;
+        // emit MaxTVLSet(l.maxTVL, newMaxTVL);
     }
 
     /************************************************
@@ -136,7 +146,7 @@ contract QueueInternal is ERC1155BaseInternal, ERC1155EnumerableInternal {
 
         uint256 currentTokenId = _getCurrentTokenId();
         uint256 totalSupply = _totalSupply(currentTokenId);
-        uint256 pricePerShare = QueueStorage.ONE_SHARE;
+        uint256 pricePerShare = ONE_SHARE;
 
         if (shareAmount == 0) {
             pricePerShare = 0;
@@ -160,51 +170,11 @@ contract QueueInternal is ERC1155BaseInternal, ERC1155EnumerableInternal {
     {
         QueueStorage.Layout storage l = QueueStorage.layout();
         uint256 balance = _balanceOf(account, tokenId);
-        return (balance * l.pricePerShare[tokenId]) / QueueStorage.ONE_SHARE;
-    }
-
-    function _getEpoch() internal view returns (uint64) {
-        return QueueStorage.layout()._getEpoch();
-    }
-
-    function _getMaxTVL() internal view returns (uint256) {
-        return QueueStorage.layout()._getMaxTVL();
+        return (balance * l.pricePerShare[tokenId]) / ONE_SHARE;
     }
 
     function _getCurrentTokenId() internal view returns (uint256) {
-        return _formatTokenId(_getEpoch());
-    }
-
-    function _getPricePerShare(uint256 tokenId)
-        internal
-        view
-        returns (uint256)
-    {
-        return QueueStorage.layout()._getPricePerShare(tokenId);
-    }
-
-    /************************************************
-     * HELPERS
-     ***********************************************/
-
-    function _formatTokenId(uint64 epoch) internal view returns (uint256) {
-        return (uint256(uint160(address(this))) << 64) + uint256(epoch);
-    }
-
-    function _parseTokenId(uint256 tokenId)
-        internal
-        pure
-        returns (address, uint64)
-    {
-        address queue;
-        uint64 epoch;
-
-        assembly {
-            queue := shr(64, tokenId)
-            epoch := tokenId
-        }
-
-        return (queue, epoch);
+        return QueueStorage.layout()._getCurrentTokenId();
     }
 
     /************************************************

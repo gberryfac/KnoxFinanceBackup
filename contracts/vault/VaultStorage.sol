@@ -8,13 +8,6 @@ import "../pricer/IPricer.sol";
 import "../queue/IQueue.sol";
 
 library VaultStorage {
-    // @notice Fees are 6-decimal places. For example: 20 * 10**6 = 20%
-    uint256 internal constant FEE_MULTIPLIER = 10**6;
-
-    // @notice Number of weeks per year = 52.142857 weeks * FEE_MULTIPLIER = 52142857.
-    // Dividing by weeks per year requires doing num.mul(FEE_MULTIPLIER).div(WEEKS_PER_YEAR)
-    uint256 internal constant WEEKS_PER_YEAR = 52142857;
-
     /************************************************
      *  INITIALIZATION STRUCTS
      ***********************************************/
@@ -125,57 +118,6 @@ library VaultStorage {
         assembly {
             l.slot := slot
         }
-    }
-
-    /************************************************
-     *  SETTERS
-     ***********************************************/
-
-    function _setFeeRecipient(Layout storage l, address newFeeRecipient)
-        internal
-    {
-        require(newFeeRecipient != address(0), "address not provided");
-        require(newFeeRecipient != l.feeRecipient, "new address equals old");
-        l.feeRecipient = newFeeRecipient;
-    }
-
-    function _setPricer(Layout storage l, address newPricer) internal {
-        require(newPricer != address(0), "address not provided");
-        require(newPricer != address(l.Pricer), "new address equals old");
-        l.Pricer = IPricer(newPricer);
-    }
-
-    function _setPerformanceFee(Layout storage l, uint256 newPerformanceFee)
-        internal
-    {
-        require(newPerformanceFee < 100 * FEE_MULTIPLIER, "invalid fee amount");
-
-        // emit PerformanceFeeSet(l.performanceFee, newPerformanceFee);
-
-        l.performanceFee = newPerformanceFee;
-    }
-
-    function _setWithdrawalFee(Layout storage l, uint256 newWithdrawalFee)
-        internal
-    {
-        require(newWithdrawalFee < 100 * FEE_MULTIPLIER, "invalid fee amount");
-
-        // Divides annualized withdrawal fee by number of weeks in a year
-        uint256 tmpWithdrawalFee =
-            (newWithdrawalFee * FEE_MULTIPLIER) / WEEKS_PER_YEAR;
-
-        // emit WithdrawalFeeSet(l.withdrawalFee, newWithdrawalFee);
-
-        l.withdrawalFee = tmpWithdrawalFee;
-    }
-
-    function _setAuctionWindowOffsets(
-        Layout storage l,
-        uint16 start,
-        uint16 end
-    ) internal {
-        l.startOffset = start;
-        l.endOffset = end;
     }
 
     /************************************************

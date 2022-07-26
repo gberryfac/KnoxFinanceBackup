@@ -12,13 +12,13 @@ import "../libraries/ABDKMath64x64Token.sol";
 
 import "../vault/IVault.sol";
 
-import "./IAuctionInternal.sol";
 import "./AuctionStorage.sol";
+import "./IAuctionEvents.sol";
 
 import "hardhat/console.sol";
 
 // TODO: Switch to stage modifiers
-contract AuctionInternal is IAuctionInternal {
+contract AuctionInternal is IAuctionEvents {
     using ABDKMath64x64 for int128;
     using ABDKMath64x64 for uint256;
     using ABDKMath64x64Token for int128;
@@ -480,6 +480,25 @@ contract AuctionInternal is IAuctionInternal {
      *  VIEW
      ***********************************************/
 
+    function _claimsByBuyer(address buyer)
+        internal
+        view
+        returns (uint64[] memory)
+    {
+        AuctionStorage.Layout storage l = AuctionStorage.layout();
+        EnumerableSet.UintSet storage epochs = l.claimsByBuyer[buyer];
+
+        uint64[] memory claims = new uint64[](epochs.length());
+
+        unchecked {
+            for (uint256 i; i < epochs.length(); i++) {
+                claims[i] = uint64(epochs.at(i));
+            }
+        }
+
+        return claims;
+    }
+
     function _getTotalContracts(uint64 epoch) internal view returns (uint256) {
         AuctionStorage.Layout storage l = AuctionStorage.layout();
         AuctionStorage.Auction storage auction = l.auctions[epoch];
@@ -510,24 +529,5 @@ contract AuctionInternal is IAuctionInternal {
     {
         AuctionStorage.Layout storage l = AuctionStorage.layout();
         return l.auctions[epoch].totalContractsSold;
-    }
-
-    function _claimsByBuyer(address buyer)
-        internal
-        view
-        returns (uint64[] memory)
-    {
-        AuctionStorage.Layout storage l = AuctionStorage.layout();
-        EnumerableSet.UintSet storage epochs = l.claimsByBuyer[buyer];
-
-        uint64[] memory claims = new uint64[](epochs.length());
-
-        unchecked {
-            for (uint256 i; i < epochs.length(); i++) {
-                claims[i] = uint64(epochs.at(i));
-            }
-        }
-
-        return claims;
     }
 }
