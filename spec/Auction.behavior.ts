@@ -1636,9 +1636,9 @@ export function describeBehaviorOfAuction(
             fixedToNumber(simpleAuction.clearingPrice64x64)
           );
 
-          const [refund, fill] = await auction.callStatic.previewWithdraw(
-            epoch
-          );
+          const [refund, fill] = await auction
+            .connect(signers.buyer2)
+            .callStatic["previewWithdraw(uint64)"](epoch);
 
           expect(math.bnToNumber(refund)).to.almost(
             math.bnToNumber(estimatedRefund),
@@ -1653,9 +1653,9 @@ export function describeBehaviorOfAuction(
         it("should preview buyer3 with fill only", async () => {
           const estimatedRefund = 0;
 
-          const [refund, fill] = await auction.callStatic.previewWithdraw(
-            epoch
-          );
+          const [refund, fill] = await auction
+            .connect(signers.buyer3)
+            .callStatic["previewWithdraw(uint64)"](epoch);
 
           expect(math.bnToNumber(refund)).to.equal(estimatedRefund);
 
@@ -1686,7 +1686,9 @@ export function describeBehaviorOfAuction(
         });
 
         it("should not remove tx2 from order book", async () => {
-          await auction.connect(signers.buyer2).previewWithdraw(epoch);
+          await auction
+            .connect(signers.buyer2)
+            ["previewWithdraw(uint64)"](epoch);
 
           const args = await getEventArgs(simpleAuction.txs[1], "OrderAdded");
           const order = await auction.getOrderById(epoch, args.id);
@@ -1698,7 +1700,9 @@ export function describeBehaviorOfAuction(
         });
 
         it("should not remove tx3 from order book", async () => {
-          await auction.connect(signers.buyer3).previewWithdraw(epoch);
+          await auction
+            .connect(signers.buyer3)
+            ["previewWithdraw(uint64)"](epoch);
 
           const args = await getEventArgs(simpleAuction.txs[2], "OrderAdded");
           const order = await auction.getOrderById(epoch, args.id);
