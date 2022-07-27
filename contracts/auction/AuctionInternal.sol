@@ -305,7 +305,6 @@ contract AuctionInternal is IAuctionEvents {
         uint256 refund;
         uint256 fill;
 
-        // If auction is cancelled, buyers are refunded.
         int128 lastPrice64x64 = _clearingPrice64x64(epoch);
 
         uint256 totalContractsSold;
@@ -316,7 +315,11 @@ contract AuctionInternal is IAuctionEvents {
             OrderBook.Data memory data = orderbook._getOrderById(next);
 
             if (data.buyer == msg.sender) {
-                if (data.price64x64 >= lastPrice64x64) {
+                // if lastPrice64x64 > type(int128).max, auction is cancelled, only send refund
+                if (
+                    lastPrice64x64 < type(int128).max &&
+                    data.price64x64 >= lastPrice64x64
+                ) {
                     uint256 paid = data.price64x64.mulu(data.size);
                     uint256 cost = lastPrice64x64.mulu(data.size);
 
@@ -342,12 +345,6 @@ contract AuctionInternal is IAuctionEvents {
 
             totalContractsSold += data.size;
             next = orderbook._getNextOrder(next);
-        }
-
-        // if auction is cancelled, last price is left unset
-        if (lastPrice64x64 <= 0) {
-            // only send refund
-            fill = 0;
         }
 
         return (refund, fill);
