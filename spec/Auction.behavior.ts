@@ -301,7 +301,7 @@ export function describeBehaviorOfAuction(
             .connect(signers.vault)
             .setAuctionPrices(epoch, minPrice64x64, maxPrice64x64);
 
-          assert.equal(await auction.getStatus(epoch), 3);
+          assert.equal(await auction.getStatus(epoch), 1);
         });
 
         it("should cancel auction if maxPrice64x64 <= 0", async () => {
@@ -309,7 +309,7 @@ export function describeBehaviorOfAuction(
             .connect(signers.vault)
             .setAuctionPrices(epoch, 0, minPrice64x64);
 
-          assert.equal(await auction.getStatus(epoch), 3);
+          assert.equal(await auction.getStatus(epoch), 1);
         });
 
         it("should cancel auction if minPrice64x64 <= 0", async () => {
@@ -317,7 +317,7 @@ export function describeBehaviorOfAuction(
             .connect(signers.vault)
             .setAuctionPrices(epoch, maxPrice64x64, 0);
 
-          assert.equal(await auction.getStatus(epoch), 3);
+          assert.equal(await auction.getStatus(epoch), 1);
         });
 
         it("should set correct auction prices", async () => {
@@ -795,25 +795,33 @@ export function describeBehaviorOfAuction(
           await knoxUtil.initializeAuction(epoch);
         });
 
-        it("should return false if max price == 0", async () => {
+        it("should set last price to int128.max if auction is cancelled (max price == 0, min price == 0, max price < min price)", async () => {
           await auction
             .connect(signers.vault)
-            .setAuctionPrices(epoch, 0, fixedFromFloat("0.01"));
-          assert.isFalse(await auction.callStatic.finalizeAuction(epoch));
+            .setAuctionPrices(epoch, 0, fixedFromFloat(params.price.min));
+
+          assert.bnEqual(
+            await auction.lastPrice64x64(epoch),
+            BigNumber.from("170141183460469231731687303715884105727") // max int128
+          );
         });
 
-        it("should return false if min price == 0", async () => {
+        it("should return emit AuctionStatus if max price == 0", async () => {
           await auction
             .connect(signers.vault)
-            .setAuctionPrices(epoch, fixedFromFloat("0.1"), 0);
-          assert.isFalse(await auction.callStatic.finalizeAuction(epoch));
-        });
-
-        it("should emit AuctionStatus event when cancelled", async () => {
-          await auction.connect(signers.vault).setAuctionPrices(epoch, 0, 0);
+            .setAuctionPrices(epoch, 0, fixedFromFloat(params.price.min));
 
           const tx = await auction.finalizeAuction(epoch);
-          await expect(tx).to.emit(auction, "AuctionStatus").withArgs(3);
+          await expect(tx).to.emit(auction, "AuctionStatus").withArgs(1);
+        });
+
+        it("should return emit AuctionStatus if min price == 0", async () => {
+          await auction
+            .connect(signers.vault)
+            .setAuctionPrices(epoch, fixedFromFloat(params.price.max), 0);
+
+          const tx = await auction.finalizeAuction(epoch);
+          await expect(tx).to.emit(auction, "AuctionStatus").withArgs(1);
         });
       });
 
@@ -823,31 +831,31 @@ export function describeBehaviorOfAuction(
 
         time.revertToSnapshotAfterEach(async () => {
           [startTime, endTime] = await knoxUtil.initializeAuction(epoch);
-          await knoxUtil.processEpoch(epoch);
         });
 
         it.skip("should revert if auction has not started", async () => {});
 
         it.skip("should revert if auction is finalized", async () => {});
 
-        it.skip("should revert if auction is cancelled", async () => {});
-
-        it("should return false if auction is not finalized", async () => {
-          assert.isFalse(await auction.callStatic.finalizeAuction(epoch));
-        });
-
-        it("should return true if auction utilization == 100%", async () => {
+        it("should emit AuctionStatus event if utilization == %100", async () => {
+          await knoxUtil.processEpoch(epoch);
           await time.increaseTo(startTime.add(1));
+
+          await auction
+            .connect(signers.vault)
+            .setAuctionPrices(
+              epoch,
+              fixedFromFloat(params.price.max),
+              fixedFromFloat(params.price.min)
+            );
+
           await utilizeAllContractsMarketOrdersOnly(epoch);
-          assert.isTrue(await auction.callStatic.finalizeAuction(epoch));
+
+          const tx = await auction.finalizeAuction(epoch);
+          await expect(tx).to.emit(auction, "AuctionStatus").withArgs(1);
         });
 
-        it("should return true if auction timer has expired", async () => {
-          await time.increaseTo(endTime.add(1));
-          assert.isTrue(await auction.callStatic.finalizeAuction(epoch));
-        });
-
-        it("should emit AuctionStatus event when finalized", async () => {
+        it("should emit AuctionStatus event if auction time limit has expired", async () => {
           await time.increaseTo(endTime.add(1));
           const tx = await auction.finalizeAuction(epoch);
           await expect(tx).to.emit(auction, "AuctionStatus").withArgs(1);
