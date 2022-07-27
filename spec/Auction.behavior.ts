@@ -355,21 +355,14 @@ export function describeBehaviorOfAuction(
             await auction.priceCurve64x64(epoch)
           );
 
-          expect(priceBeforeAuctionStart).to.almost(
-            fixedToNumber(maxPrice64x64),
-            0.01
-          );
+          assert.equal(priceBeforeAuctionStart, fixedToNumber(maxPrice64x64));
 
-          await time.increaseTo(startTime.add(1));
-
+          await time.increaseTo(startTime);
           const priceAtAuctionStart = fixedToNumber(
             await auction.priceCurve64x64(epoch)
           );
 
-          expect(priceAtAuctionStart).to.almost(
-            fixedToNumber(maxPrice64x64),
-            0.01
-          );
+          assert.equal(priceAtAuctionStart, fixedToNumber(maxPrice64x64));
         });
 
         it("should return min price", async () => {
