@@ -55,6 +55,8 @@ interface IPremiaPool {
         view
         returns (uint256[] memory);
 
+    function update() external;
+
     function getPriceAfter64x64(uint256 timestamp)
         external
         view

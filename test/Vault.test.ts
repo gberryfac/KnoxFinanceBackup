@@ -1,7 +1,7 @@
 import { ethers } from "hardhat";
 const { parseUnits } = ethers.utils;
 
-import { accounts, assets, types, KnoxUtil } from "./utils";
+import { accounts, assets, time, types, KnoxUtil } from "./utils";
 
 import { describeBehaviorOfVaultAdmin } from "../spec/VaultAdmin.behavior";
 import { describeBehaviorOfVaultBase } from "../spec/VaultBase.behavior";
@@ -63,6 +63,12 @@ function behavesLikeVault(params: types.VaultParams) {
       addresses = await accounts.getAddresses(signers);
 
       knoxUtil = await KnoxUtil.deploy(params, signers, addresses);
+    });
+
+    describe("#constructor()", () => {
+      time.revertToSnapshotAfterEach(async () => {});
+
+      it("should initialize storage variables", async () => {});
     });
 
     describeBehaviorOfVaultAdmin({

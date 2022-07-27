@@ -10,7 +10,7 @@ moment.tz.setDefault("UTC");
 
 import { Auction, IPremiaPool, IVault, MockERC20 } from "../types";
 
-import { time, types, KnoxUtil, PoolUtil } from "../test/utils";
+import { assert, time, types, KnoxUtil, PoolUtil } from "../test/utils";
 
 interface ViewBehaviorArgs {
   getKnoxUtil: () => Promise<KnoxUtil>;
@@ -56,10 +56,35 @@ export function describeBehaviorOfVaultView(
       poolUtil = knoxUtil.poolUtil;
     });
 
-    describe.skip("#constructor", () => {
+    describe("#constructor()", () => {
       time.revertToSnapshotAfterEach(async () => {});
 
-      it("should initialize VaultView with correct state", async () => {});
+      it("should deploy with correct state", async () => {
+        assert.equal(await vault.ERC20(), asset.address);
+        assert.equal(await vault.Pool(), addresses.pool);
+      });
+    });
+
+    describe.skip("#getEpoch()", () => {
+      time.revertToSnapshotAfterEach(async () => {});
+
+      it("should return 0th epoch", async () => {});
+
+      it("should return 1st epoch", async () => {});
+    });
+
+    describe.skip("#getOption(uint64)", () => {
+      time.revertToSnapshotAfterEach(async () => {});
+
+      it("should return option from 0th epoch", async () => {});
+
+      it("should return option from 1st epoch", async () => {});
+    });
+
+    describe.skip("#totalCollateral()", () => {
+      time.revertToSnapshotAfterEach(async () => {});
+
+      it("should return vault total collateral", async () => {});
     });
   });
 }
