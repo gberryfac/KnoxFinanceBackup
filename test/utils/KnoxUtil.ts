@@ -197,7 +197,7 @@ export class KnoxUtil {
     const vault = this.vaultUtil.vault;
 
     // fast-forward to expiry of last sold option
-    const [expiry] = await vault.optionByEpoch(epoch - 1);
+    const [expiry] = await vault.getOption(epoch - 1);
     await time.increaseTo(expiry);
 
     await vault.connect(this.signers.keeper).depositQueuedToVault();

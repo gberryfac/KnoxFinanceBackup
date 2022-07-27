@@ -20,12 +20,12 @@ contract VaultView is VaultInternal {
         return VaultStorage.layout()._getEpoch();
     }
 
-    function getCollateralAsset() external view returns (address) {
-        return address(ERC20);
-    }
-
-    function totalCollateral() external view returns (uint256) {
-        return _totalCollateral();
+    function getOption(uint64 epoch)
+        external
+        view
+        returns (VaultStorage.Option memory)
+    {
+        return VaultStorage.layout()._getOption(epoch);
     }
 
     function optionsByAccount(address account)
@@ -36,11 +36,7 @@ contract VaultView is VaultInternal {
         return Pool.tokensByAccount(account);
     }
 
-    function optionByEpoch(uint64 _epoch)
-        external
-        view
-        returns (VaultStorage.Option memory)
-    {
-        return VaultStorage.layout()._optionByEpoch(_epoch);
+    function totalCollateral() external view returns (uint256) {
+        return _totalCollateral();
     }
 }

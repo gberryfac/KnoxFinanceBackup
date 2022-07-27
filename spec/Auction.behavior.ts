@@ -1029,7 +1029,7 @@ export function describeBehaviorOfAuction(
 
         time.revertToSnapshotAfterEach(async () => {
           [, endTime] = await knoxUtil.initializeAuction(epoch);
-          [, , longTokenId] = await vault.optionByEpoch(epoch);
+          [, , longTokenId] = await vault.getOption(epoch);
 
           await asset
             .connect(signers.buyer1)
@@ -1055,7 +1055,7 @@ export function describeBehaviorOfAuction(
             .addLimitOrder(epoch, maxPrice64x64, buyer3OrderSize);
 
           // fast-forward to expiry of last sold option
-          const [expiry] = await vault.optionByEpoch(epoch - 1);
+          const [expiry] = await vault.getOption(epoch - 1);
           await time.increaseTo(expiry);
 
           // process epoch
@@ -1117,7 +1117,7 @@ export function describeBehaviorOfAuction(
 
         time.revertToSnapshotAfterEach(async () => {
           advancedAuction = await setupAdvancedAuction(true);
-          [, , longTokenId] = await vault.optionByEpoch(epoch);
+          [, , longTokenId] = await vault.getOption(epoch);
         });
 
         it("should send buyer1 fill and refund", async () => {
@@ -1179,7 +1179,7 @@ export function describeBehaviorOfAuction(
         let longTokenId: BigNumber;
         time.revertToSnapshotAfterEach(async () => {
           simpleAuction = await setupSimpleAuction(true);
-          [, , longTokenId] = await vault.optionByEpoch(epoch);
+          [, , longTokenId] = await vault.getOption(epoch);
         });
 
         it("should send buyer1 fill and refund", async () => {
@@ -1255,7 +1255,7 @@ export function describeBehaviorOfAuction(
           );
 
           // fast-forward to maturity date
-          [expiry, , longTokenId] = await vault.optionByEpoch(epoch);
+          [expiry, , longTokenId] = await vault.getOption(epoch);
           await time.increaseTo(expiry.add(1));
           await vault.connect(signers.keeper).processExpired();
         });
@@ -1335,7 +1335,7 @@ export function describeBehaviorOfAuction(
           advancedAuction = await setupAdvancedAuction(true);
 
           // fast-forward to maturity date
-          [expiry, , longTokenId] = await vault.optionByEpoch(epoch);
+          [expiry, , longTokenId] = await vault.getOption(epoch);
           await time.increaseTo(expiry.add(1));
 
           await vault.connect(signers.keeper).processExpired();

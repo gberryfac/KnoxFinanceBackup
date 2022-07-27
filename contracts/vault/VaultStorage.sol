@@ -128,7 +128,7 @@ library VaultStorage {
         return l.epoch;
     }
 
-    function _optionByEpoch(Layout storage l, uint64 epoch)
+    function _getOption(Layout storage l, uint64 epoch)
         internal
         view
         returns (Option memory)

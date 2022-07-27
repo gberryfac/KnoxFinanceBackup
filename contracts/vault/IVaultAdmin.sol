@@ -46,15 +46,15 @@ interface IVaultAdmin {
 
     /**
      * @notice Sets the performance fee for the vault
-     * @param newPerformanceFee is the performance fee (6 decimals). ex: 20 * 10 ** 6 = 20%
+     * @param newPerformanceFee64x64 is the performance fee as a 64x64 fixed point number
      */
-    function setPerformanceFee(uint256 newPerformanceFee) external;
+    function setPerformanceFee64x64(int128 newPerformanceFee64x64) external;
 
     /**
      * @notice Sets the withdrawal fee for the vault
-     * @param newWithdrawalFee is the withdrawal fee (6 decimals). ex: 2 * 10 ** 6 = 2%
+     * @param newWithdrawalFee64x64 is the withdrawal fee as a 64x64 fixed point number
      */
-    function setWithdrawalFee(uint256 newWithdrawalFee) external;
+    function setWithdrawalFee64x64(int128 newWithdrawalFee64x64) external;
 
     /************************************************
      *  INITIALIZE AUCTION
@@ -99,7 +99,6 @@ interface IVaultAdmin {
      */
     function withdrawReservedLiquidity() external;
 
-    // /**
     // /**
     //  * @notice
     //  */

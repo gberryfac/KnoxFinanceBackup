@@ -450,7 +450,7 @@ export async function describeBehaviorOfQueue(
           await queue.connect(signers.lp3)["deposit(uint256)"](params.deposit);
 
           // fast forward to expiry of previously sold option
-          const [expiry] = await vault.optionByEpoch(epoch - 1);
+          const [expiry] = await vault.getOption(epoch - 1);
           await time.increaseTo(expiry);
         });
 
@@ -499,7 +499,7 @@ export async function describeBehaviorOfQueue(
           tokenId = await queue.getCurrentTokenId();
 
           // fast forward to expiry of previously sold option
-          const [expiry] = await vault.optionByEpoch(epoch - 1);
+          const [expiry] = await vault.getOption(epoch - 1);
           await time.increaseTo(expiry);
 
           await queue.connect(signers.vault).depositToVault();
@@ -539,7 +539,7 @@ export async function describeBehaviorOfQueue(
         tokenId = await queue.getCurrentTokenId();
 
         // fast forward to expiry of previously sold option
-        let [expiry] = await vault.optionByEpoch(epoch - 1);
+        let [expiry] = await vault.getOption(epoch - 1);
         await time.increaseTo(expiry);
 
         // totalAssets = 40,000
@@ -563,7 +563,7 @@ export async function describeBehaviorOfQueue(
         tokenId = await queue.getCurrentTokenId();
 
         // fast forward to expiry of previously sold option
-        [expiry] = await vault.optionByEpoch(epoch - 1);
+        [expiry] = await vault.getOption(epoch - 1);
         await time.increaseTo(expiry);
 
         // totalAssets = 50,000

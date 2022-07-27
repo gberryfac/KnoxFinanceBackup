@@ -33,7 +33,6 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal, IVaultEvents {
 
     IERC20 public immutable ERC20;
     IPremiaPool public immutable Pool;
-    IVault public immutable Vault;
 
     constructor(bool isCall, address pool) {
         Pool = IPremiaPool(pool);
@@ -41,7 +40,6 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal, IVaultEvents {
         address asset = isCall ? settings.underlying : settings.base;
 
         ERC20 = IERC20(asset);
-        Vault = IVault(address(this));
     }
 
     /************************************************
@@ -71,14 +69,14 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal, IVaultEvents {
         // emit PricerSet();
     }
 
-    function _setPerformanceFee(int128 newPerformanceFee64x64) internal {
+    function _setPerformanceFee64x64(int128 newPerformanceFee64x64) internal {
         VaultStorage.Layout storage l = VaultStorage.layout();
         require(newPerformanceFee64x64 < ONE_64x64, "invalid fee amount");
         l.performanceFee64x64 = newPerformanceFee64x64;
         // emit PerformanceFeeSet(l.performanceFee64x64, newPerformanceFee);
     }
 
-    function _setWithdrawalFee(int128 newWithdrawalFee64x64) internal {
+    function _setWithdrawalFee64x64(int128 newWithdrawalFee64x64) internal {
         VaultStorage.Layout storage l = VaultStorage.layout();
         require(newWithdrawalFee64x64 < ONE_64x64, "invalid fee amount");
         l.withdrawalFee64x64 = newWithdrawalFee64x64;

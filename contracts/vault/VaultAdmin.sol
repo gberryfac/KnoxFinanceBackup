@@ -63,11 +63,11 @@ contract VaultAdmin is Access, VaultInternal {
      * @notice Sets the performance fee for the vault
      * @param newPerformanceFee64x64 is the performance fee as a 64x64 fixed point number
      */
-    function setPerformanceFee(int128 newPerformanceFee64x64)
+    function setPerformanceFee64x64(int128 newPerformanceFee64x64)
         external
         onlyOwner
     {
-        _setPerformanceFee(newPerformanceFee64x64);
+        _setPerformanceFee64x64(newPerformanceFee64x64);
     }
 
     /**
@@ -75,8 +75,11 @@ contract VaultAdmin is Access, VaultInternal {
      * @param newWithdrawalFee64x64 is the withdrawal fee as a 64x64 fixed point number
      * @dev withdrawal fee must be annualized by dividing by the number of weeks in the year. i.e. 2% / 52.142857
      */
-    function setWithdrawalFee(int128 newWithdrawalFee64x64) external onlyOwner {
-        _setWithdrawalFee(newWithdrawalFee64x64);
+    function setWithdrawalFee64x64(int128 newWithdrawalFee64x64)
+        external
+        onlyOwner
+    {
+        _setWithdrawalFee64x64(newWithdrawalFee64x64);
     }
 
     /************************************************
