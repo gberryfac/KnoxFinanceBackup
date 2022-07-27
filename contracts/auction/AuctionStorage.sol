@@ -16,7 +16,7 @@ library AuctionStorage {
         uint256 endTime;
     }
 
-    enum Status {INITIALIZED, FINALIZED, PROCESSED, CANCELLED}
+    enum Status {INITIALIZED, FINALIZED, PROCESSED}
 
     struct Auction {
         Status status;

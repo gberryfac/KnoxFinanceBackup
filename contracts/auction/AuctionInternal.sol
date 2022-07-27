@@ -105,16 +105,17 @@ contract AuctionInternal is IAuctionEvents {
         AuctionStorage.Layout storage l = AuctionStorage.layout();
         AuctionStorage.Auction storage auction = l.auctions[epoch];
 
-        if (
-            maxPrice64x64 <= 0 ||
-            minPrice64x64 <= 0 ||
-            maxPrice64x64 <= minPrice64x64
-        ) {
-            auction.status = AuctionStorage.Status.CANCELLED;
-        }
-
         auction.maxPrice64x64 = maxPrice64x64;
         auction.minPrice64x64 = minPrice64x64;
+
+        if (
+            auction.maxPrice64x64 <= 0 ||
+            auction.minPrice64x64 <= 0 ||
+            auction.maxPrice64x64 <= auction.minPrice64x64
+        ) {
+            // cancel the auction if prices are invalid
+            _finalizeAuction(epoch);
+        }
     }
 
     /************************************************
@@ -161,8 +162,6 @@ contract AuctionInternal is IAuctionEvents {
             auction.status == AuctionStorage.Status.PROCESSED
         ) {
             return _lastPrice64x64(epoch);
-        } else if (auction.status == AuctionStorage.Status.CANCELLED) {
-            return type(int128).max;
         }
 
         return _priceCurve64x64(epoch);
@@ -306,7 +305,6 @@ contract AuctionInternal is IAuctionEvents {
         uint256 refund;
         uint256 fill;
 
-        // If auction is cancelled, buyers are refunded.
         int128 lastPrice64x64 = _clearingPrice64x64(epoch);
 
         uint256 totalContractsSold;
@@ -317,7 +315,11 @@ contract AuctionInternal is IAuctionEvents {
             OrderBook.Data memory data = orderbook._getOrderById(next);
 
             if (data.buyer == msg.sender) {
-                if (data.price64x64 >= lastPrice64x64) {
+                // if lastPrice64x64 > type(int128).max, auction is cancelled, only send refund
+                if (
+                    lastPrice64x64 < type(int128).max &&
+                    data.price64x64 >= lastPrice64x64
+                ) {
                     uint256 paid = data.price64x64.mulu(data.size);
                     uint256 cost = lastPrice64x64.mulu(data.size);
 
@@ -343,12 +345,6 @@ contract AuctionInternal is IAuctionEvents {
 
             totalContractsSold += data.size;
             next = orderbook._getNextOrder(next);
-        }
-
-        // if auction is cancelled, last price is left unset
-        if (lastPrice64x64 <= 0) {
-            // only send refund
-            fill = 0;
         }
 
         return (refund, fill);
@@ -408,7 +404,7 @@ contract AuctionInternal is IAuctionEvents {
         return false;
     }
 
-    function _finalizeAuction(uint64 epoch) internal returns (bool) {
+    function _finalizeAuction(uint64 epoch) internal {
         // modifier: reject if auction not initialized
         // modifier: reject if auction has not started
         // modifier: reject if auction is finalized
@@ -416,18 +412,18 @@ contract AuctionInternal is IAuctionEvents {
         AuctionStorage.Layout storage l = AuctionStorage.layout();
         AuctionStorage.Auction storage auction = l.auctions[epoch];
 
-        if (auction.maxPrice64x64 <= 0 || auction.minPrice64x64 <= 0) {
-            auction.status = AuctionStorage.Status.CANCELLED;
-            emit AuctionStatus(AuctionStorage.Status.CANCELLED);
-        }
-
-        if (_processOrders(epoch) || block.timestamp > auction.endTime) {
+        if (
+            auction.maxPrice64x64 <= 0 ||
+            auction.minPrice64x64 <= 0 ||
+            auction.maxPrice64x64 <= auction.minPrice64x64
+        ) {
+            l.auctions[epoch].lastPrice64x64 = type(int128).max;
             auction.status = AuctionStorage.Status.FINALIZED;
             emit AuctionStatus(AuctionStorage.Status.FINALIZED);
-            return true;
+        } else if (_processOrders(epoch) || block.timestamp > auction.endTime) {
+            auction.status = AuctionStorage.Status.FINALIZED;
+            emit AuctionStatus(AuctionStorage.Status.FINALIZED);
         }
-
-        return false;
     }
 
     function _transferPremium(uint64 epoch) internal {
