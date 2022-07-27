@@ -163,7 +163,6 @@ contract AuctionInternal is IAuctionEvents {
         ) {
             return _lastPrice64x64(epoch);
         }
-
         return _priceCurve64x64(epoch);
     }
 
@@ -255,7 +254,8 @@ contract AuctionInternal is IAuctionEvents {
         // modifier: reject if auction is not processed
         AuctionStorage.Layout storage l = AuctionStorage.layout();
 
-        (uint256 refund, uint256 fill) = _previewWithdraw(l, epoch, false);
+        (uint256 refund, uint256 fill) =
+            _previewWithdraw(l, false, epoch, msg.sender);
 
         l.claimsByBuyer[msg.sender].remove(epoch);
 
@@ -285,18 +285,19 @@ contract AuctionInternal is IAuctionEvents {
         // emit Withdrawn()
     }
 
-    function _previewWithdraw(uint64 epoch)
+    function _previewWithdraw(uint64 epoch, address buyer)
         internal
         returns (uint256, uint256)
     {
         AuctionStorage.Layout storage l = AuctionStorage.layout();
-        return _previewWithdraw(l, epoch, true);
+        return _previewWithdraw(l, true, epoch, buyer);
     }
 
     function _previewWithdraw(
         AuctionStorage.Layout storage l,
+        bool isPreview,
         uint64 epoch,
-        bool isPreview
+        address buyer
     ) private returns (uint256, uint256) {
         // modifier: reject if auction is not processed
         OrderBook.Index storage orderbook = l.orderbooks[epoch];
@@ -314,7 +315,7 @@ contract AuctionInternal is IAuctionEvents {
         for (uint256 i = 1; i <= length; i++) {
             OrderBook.Data memory data = orderbook._getOrderById(next);
 
-            if (data.buyer == msg.sender) {
+            if (data.buyer == buyer) {
                 // if lastPrice64x64 > type(int128).max, auction is cancelled, only send refund
                 if (
                     lastPrice64x64 < type(int128).max &&
