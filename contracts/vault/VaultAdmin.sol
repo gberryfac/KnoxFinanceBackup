@@ -142,8 +142,8 @@ contract VaultAdmin is Access, VaultInternal {
     /**
      * @notice
      */
-    function collectVaultFees() external onlyKeeper {
-        _collectVaultFees();
+    function collectPerformanceFee() external onlyKeeper {
+        _collectPerformanceFee();
     }
 
     /**

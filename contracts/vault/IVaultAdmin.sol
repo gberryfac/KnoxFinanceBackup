@@ -102,7 +102,7 @@ interface IVaultAdmin {
     // /**
     //  * @notice
     //  */
-    function collectVaultFees() external;
+    function collectPerformanceFee() external;
 
     //  * @notice
     //  */

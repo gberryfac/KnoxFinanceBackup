@@ -296,7 +296,7 @@ export function describeBehaviorOfVaultAdmin(
       time.revertToSnapshotAfterEach(async () => {});
     });
 
-    describe.skip("#collectVaultFees()", () => {
+    describe.skip("#collectPerformanceFee()", () => {
       let epoch = 1;
 
       time.revertToSnapshotAfterEach(async () => {
@@ -305,7 +305,9 @@ export function describeBehaviorOfVaultAdmin(
       });
 
       it("should revert if !keeper", async () => {
-        await expect(vault.collectVaultFees()).to.be.revertedWith("!keeper");
+        await expect(vault.collectPerformanceFee()).to.be.revertedWith(
+          "!keeper"
+        );
       });
 
       it("should not collect performance fees if vault books neutral net income", async () => {});
