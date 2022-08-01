@@ -22,6 +22,7 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal, IVaultEvents {
     using ABDKMath64x64 for uint256;
     using ABDKMath64x64Token for int128;
     using ABDKMath64x64Token for uint256;
+    using Helpers for uint256;
     using SafeERC20 for IERC20;
     using VaultStorage for VaultStorage.Layout;
 
@@ -288,6 +289,7 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal, IVaultEvents {
             );
 
         if (l.isCall) {
+            // denominates price in collateral asset
             maxPrice64x64.div(spot64x64);
             minPrice64x64.div(spot64x64);
         }
@@ -311,13 +313,12 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal, IVaultEvents {
         uint256 totalContractsSold = l.Auction.getTotalContractsSold(l.epoch);
 
         uint256 totalCollateralUsed =
-            l.isCall
-                ? totalContractsSold
-                : ABDKMath64x64Token.toBaseTokenAmount(
-                    l.underlyingDecimals,
-                    l.baseDecimals,
-                    option.strike64x64.mulu(totalContractsSold)
-                );
+            totalContractsSold._fromContractsToCollateral(
+                l.isCall,
+                l.underlyingDecimals,
+                l.baseDecimals,
+                option.strike64x64
+            );
 
         ERC20.approve(address(Pool), totalCollateralUsed + _totalReserves());
 
@@ -367,6 +368,16 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal, IVaultEvents {
         returns (uint256)
     {
         VaultStorage.Layout storage l = VaultStorage.layout();
+        VaultStorage.Option memory option = l.options[l.epoch];
+
+        uint256 shortPositionValue =
+            l.totalShortContracts._fromContractsToCollateral(
+                l.isCall,
+                l.underlyingDecimals,
+                l.baseDecimals,
+                option.strike64x64
+            );
+
         return _totalCollateral() + shortPositionValue + l.totalPremiums;
     }
 
@@ -509,16 +520,52 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal, IVaultEvents {
     {
         VaultStorage.Layout storage l = VaultStorage.layout();
         uint256 totalAssets = _totalAssets();
+        uint256 scale =
+            l.isCall ? 10**l.underlyingDecimals : 10**l.baseDecimals;
 
-        uint256 collateralAssetRatio = l.totalCollateral / totalAssets;
-        uint256 premiumRatio = l.totalPremiums / totalAssets;
-        uint256 shortAssetRatio = l.totalShort / totalAssets;
+        // TODO: move math logic to function
+        uint256 collateralAssetRatio =
+            l.totalCollateral > 0
+                ? (scale * l.totalCollateral) / totalAssets
+                : 0;
 
-        uint256 collateralAssetAmount = assetAmount * collateralAssetRatio;
-        uint256 premiumAssetAmount = assetAmount * premiumRatio;
-        uint256 shortAssetAmount = assetAmount * shortAssetRatio;
+        uint256 premiumRatio =
+            l.totalPremiums > 0 ? (scale * l.totalPremiums) / totalAssets : 0;
 
-        return (collateralAssetAmount, premiumAssetAmount, shortAssetAmount);
+        uint256 shortPositionValue =
+            l.totalShortContracts._fromContractsToCollateral(
+                l.isCall,
+                l.underlyingDecimals,
+                l.baseDecimals,
+                l.options[l.epoch].strike64x64
+            );
+
+        // calculate the short asset ratio based on the short position value
+        uint256 shortAssetRatio =
+            shortPositionValue > 0
+                ? (scale * shortPositionValue) / totalAssets
+                : 0;
+
+        // TODO: move math logic to function
+        uint256 collateralAssetAmount =
+            collateralAssetRatio > 0
+                ? (assetAmount * collateralAssetRatio) / scale
+                : 0;
+
+        uint256 premiumAssetAmount =
+            premiumRatio > 0 ? (assetAmount * premiumRatio) / scale : 0;
+
+        uint256 shortContracts =
+            shortAssetRatio > 0 ? (assetAmount * shortAssetRatio) / scale : 0;
+
+        // calculate the number of contracts that will be sent to the LP
+        shortContracts = shortContracts._fromCollateralToContracts(
+            l.isCall,
+            l.baseDecimals,
+            l.options[l.epoch].strike64x64
+        );
+
+        return (collateralAssetAmount, premiumAssetAmount, shortContracts);
     }
 
     function _collectWithdrawalFee(

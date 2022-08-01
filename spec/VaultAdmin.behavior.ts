@@ -22,7 +22,7 @@ import {
   VaultDiamond__factory,
 } from "../types";
 
-import { assert, math, time, types, KnoxUtil, PoolUtil } from "../test/utils";
+import { assert, time, types, KnoxUtil, PoolUtil } from "../test/utils";
 
 import { diamondCut } from "../scripts/diamond";
 import { parseUnits } from "ethers/lib/utils";
@@ -70,9 +70,6 @@ export function describeBehaviorOfVaultAdmin(
 
       poolUtil = knoxUtil.poolUtil;
 
-      asset.connect(signers.deployer).mint(addresses.buyer1, params.mint);
-      asset.connect(signers.deployer).mint(addresses.buyer2, params.mint);
-      asset.connect(signers.deployer).mint(addresses.buyer3, params.mint);
       asset.connect(signers.deployer).mint(addresses.vault, params.mint);
 
       block = await provider.getBlock(await provider.getBlockNumber());
