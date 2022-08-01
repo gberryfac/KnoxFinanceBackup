@@ -20,7 +20,7 @@ describe("Auction Tests", () => {
     delta: 0.4,
     deltaOffset: 0.05,
     maxTVL: parseUnits("1000000", assets.DAI.decimals),
-    minSize: parseUnits("1", assets.DAI.decimals - 1),
+    minSize: parseUnits("1", assets.ETH.decimals - 1),
     reserveRate64x64: 0.001,
     performanceFee64x64: 0.2,
     withdrawalFee64x64: 0.02,
