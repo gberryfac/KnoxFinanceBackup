@@ -28,7 +28,6 @@ contract QueueProxy is UpgradeableProxyOwnable {
         {
             QueueStorage.Layout storage l = QueueStorage.layout();
             l.maxTVL = maxTVL;
-            l.epoch = IVault(vault).getEpoch();
         }
 
         {

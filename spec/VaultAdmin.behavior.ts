@@ -1,5 +1,6 @@
 import { ethers } from "hardhat";
 import { BigNumber } from "ethers";
+import { parseUnits } from "ethers/lib/utils";
 const { provider } = ethers;
 import { Block } from "@ethersproject/abstract-provider";
 import { fixedFromFloat, formatTokenId, TokenType } from "@premia/utils";
@@ -17,6 +18,7 @@ import {
   IPremiaPool,
   IVault,
   MockERC20,
+  Queue,
   IVault__factory,
   VaultAdmin__factory,
   VaultDiamond__factory,
@@ -25,7 +27,6 @@ import {
 import { assert, time, types, KnoxUtil, PoolUtil } from "../test/utils";
 
 import { diamondCut } from "../scripts/diamond";
-import { parseUnits } from "ethers/lib/utils";
 
 interface VaultAdminBehaviorArgs {
   getKnoxUtil: () => Promise<KnoxUtil>;
@@ -43,6 +44,7 @@ export function describeBehaviorOfVaultAdmin(
 
     // Contract Instances and Proxies
     let asset: MockERC20;
+    let queue: Queue;
     let auction: Auction;
     let vault: IVault;
     let pool: IPremiaPool;
@@ -53,7 +55,6 @@ export function describeBehaviorOfVaultAdmin(
 
     // Test Suite Globals
     let block: Block;
-    let epoch = 1;
 
     const params = getParams();
 
@@ -66,11 +67,13 @@ export function describeBehaviorOfVaultAdmin(
       asset = knoxUtil.asset;
       vault = knoxUtil.vaultUtil.vault;
       pool = knoxUtil.poolUtil.pool;
+      queue = knoxUtil.queue;
       auction = knoxUtil.auction;
 
       poolUtil = knoxUtil.poolUtil;
 
-      asset.connect(signers.deployer).mint(addresses.vault, params.mint);
+      asset.connect(signers.deployer).mint(addresses.deployer, params.mint);
+      asset.connect(signers.lp1).mint(addresses.lp1, params.mint);
 
       block = await provider.getBlock(await provider.getBlockNumber());
     });
@@ -223,7 +226,8 @@ export function describeBehaviorOfVaultAdmin(
 
       it("should set parameters for next option", async () => {
         await vault.connect(signers.keeper).setOptionParameters();
-        const epoch = (await vault.getEpoch()).add(1);
+
+        const epoch = await vault.getEpoch();
         const option = await vault.getOption(epoch);
 
         const nextWeek = block.timestamp + 604800;
@@ -289,15 +293,13 @@ export function describeBehaviorOfVaultAdmin(
       });
     });
 
-    describe.skip("#processEpoch(bool)", () => {
+    describe.skip("#processLastEpoch(bool)", () => {
       time.revertToSnapshotAfterEach(async () => {});
     });
 
     describe.skip("#collectPerformanceFee()", () => {
-      let epoch = 1;
-
       time.revertToSnapshotAfterEach(async () => {
-        const [startTime, endTime] = await knoxUtil.initializeAuction(epoch);
+        const [startTime, endTime] = await knoxUtil.initializeAuction();
         await time.increaseTo(startTime);
       });
 
@@ -315,8 +317,10 @@ export function describeBehaviorOfVaultAdmin(
     describe("#depositQueuedToVault()", () => {
       time.revertToSnapshotAfterEach(async () => {
         await asset
-          .connect(signers.deployer)
-          .transfer(addresses.queue, params.deposit);
+          .connect(signers.lp1)
+          .approve(addresses.queue, params.deposit);
+
+        await queue.connect(signers.lp1)["deposit(uint256)"](params.deposit);
       });
 
       it("should revert if !keeper", async () => {
@@ -363,17 +367,14 @@ export function describeBehaviorOfVaultAdmin(
       });
 
       it("should return 0 if option has not expired", async () => {
-        const epoch = (await vault.getEpoch()).add(1);
-
+        const epoch = await vault.getEpoch();
         const size = parseUnits("1", params.collateral.decimals);
-
         const exerciseAmount = await vault.getExerciseAmount(epoch, size);
-
         assert.isTrue(exerciseAmount[1].isZero());
       });
 
       it("should return amount == 0 if option has expired ATM", async () => {
-        const epoch = (await vault.getEpoch()).add(1);
+        const epoch = await vault.getEpoch();
         const option = await vault.getOption(epoch);
 
         await time.increaseTo(option.expiry.add(1));
@@ -385,7 +386,7 @@ export function describeBehaviorOfVaultAdmin(
       });
 
       it("should return amount > 0 if option has expired ITM", async () => {
-        const epoch = (await vault.getEpoch()).add(1);
+        const epoch = await vault.getEpoch();
         const option = await vault.getOption(epoch);
 
         const underlyingPrice = params.underlying.oracle.price;
