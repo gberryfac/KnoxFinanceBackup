@@ -54,8 +54,14 @@ export class VaultUtil {
         params.reserveRate64x64 > 0
           ? fixedFromFloat(params.reserveRate64x64)
           : 0,
-      performanceFee64x64: fixedFromFloat(params.performanceFee64x64),
-      withdrawalFee64x64: fixedFromFloat(params.withdrawalFee64x64),
+      performanceFee64x64:
+        params.performanceFee64x64 > 0
+          ? fixedFromFloat(params.performanceFee64x64)
+          : 0,
+      withdrawalFee64x64:
+        params.withdrawalFee64x64 > 0
+          ? fixedFromFloat(params.withdrawalFee64x64)
+          : 0,
       name: params.tokenName,
       symbol: params.tokenSymbol,
       keeper: addresses.keeper,

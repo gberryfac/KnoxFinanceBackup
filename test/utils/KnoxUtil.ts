@@ -197,7 +197,7 @@ export class KnoxUtil {
 
   async initializeNextEpoch() {
     const vault = this.vaultUtil.vault;
-    const bnEpoch = await vault.getEpoch();
+    const epoch = await vault.getEpoch();
 
     await vault.connect(this.signers.keeper).depositQueuedToVault();
 
@@ -206,7 +206,7 @@ export class KnoxUtil {
 
     await this.auction
       .connect(this.signers.vault)
-      .setAuctionPrices(bnEpoch, maxPrice64x64, minPrice64x64);
+      .setAuctionPrices(epoch, maxPrice64x64, minPrice64x64);
 
     await vault.connect(this.signers.keeper).setNextEpoch();
   }
