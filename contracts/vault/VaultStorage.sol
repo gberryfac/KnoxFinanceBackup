@@ -83,8 +83,6 @@ library VaultStorage {
         // @notice
         uint64 epoch;
         // @notice
-        uint256 totalCollateral;
-        // @notice
         uint256 totalShortContracts;
         // @notice
         uint256 totalPremiums;

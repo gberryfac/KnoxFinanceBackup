@@ -348,6 +348,9 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal, IVaultEvents {
             l.isCall
         );
 
+        uint64 divestmentTimestamp = uint64(block.timestamp + 24 hours);
+        Pool.setDivestmentTimestamp(divestmentTimestamp, l.isCall);
+
         l.totalShortContracts = totalContractsSold;
         l.Auction.processAuction(lastEpoch);
     }
@@ -356,18 +359,15 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal, IVaultEvents {
      *  VIEW
      ***********************************************/
 
-    function _totalReserves() internal view returns (uint256) {
-        VaultStorage.Layout storage l = VaultStorage.layout();
-        return
-            l.reserveRate64x64.mulu(
-                ERC20.balanceOf(address(this)) - l.totalPremiums
-            );
-    }
-
     function _totalCollateral() internal view returns (uint256) {
         VaultStorage.Layout storage l = VaultStorage.layout();
         return
             ERC20.balanceOf(address(this)) - l.totalPremiums - _totalReserves();
+    }
+
+    function _totalReserves() internal view returns (uint256) {
+        VaultStorage.Layout storage l = VaultStorage.layout();
+        return l.reserveRate64x64.mulu(ERC20.balanceOf(address(this)));
     }
 
     /************************************************
@@ -474,6 +474,10 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal, IVaultEvents {
         uint256 assetAmount,
         uint256 shareAmount
     ) private {
+        VaultStorage.Layout storage l = VaultStorage.layout();
+
+        require(l.epoch > 0, "cannot withdraw on epoch 0");
+
         if (caller != owner) {
             uint256 allowance = _allowance(owner, caller);
 
@@ -495,8 +499,6 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal, IVaultEvents {
             uint256 shortContracts
         ) = _calculateDistribution(assetAmount);
 
-        VaultStorage.Layout storage l = VaultStorage.layout();
-
         l.totalPremiums -= premiumAssetAmount;
         l.totalShortContracts -= shortContracts;
 
@@ -516,13 +518,13 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal, IVaultEvents {
             receiver
         );
 
-        emit Withdraw(
-            caller,
-            receiver,
-            owner,
-            collateralAssetAmountSansFee + shortAssetAmountSansFee,
-            shareAmount
-        );
+        // emit Withdraw(
+        //     caller,
+        //     receiver,
+        //     owner,
+        //     collateralAssetAmountSansFee + shortAssetAmountSansFee,
+        //     shareAmount
+        // );
     }
 
     /************************************************
@@ -545,8 +547,8 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal, IVaultEvents {
 
         // TODO: move math logic to function
         uint256 collateralAssetRatio =
-            l.totalCollateral > 0
-                ? (scale * l.totalCollateral) / totalAssets
+            _totalCollateral() > 0
+                ? (scale * _totalCollateral()) / totalAssets
                 : 0;
 
         uint256 premiumRatio =
@@ -557,7 +559,7 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal, IVaultEvents {
                 l.isCall,
                 l.underlyingDecimals,
                 l.baseDecimals,
-                l.options[l.epoch].strike64x64
+                l.options[l.epoch - 1].strike64x64
             );
 
         // calculate the short asset ratio based on the short position value
@@ -582,7 +584,7 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal, IVaultEvents {
         shortContracts = shortContracts._fromCollateralToContracts(
             l.isCall,
             l.baseDecimals,
-            l.options[l.epoch].strike64x64
+            l.options[l.epoch - 1].strike64x64
         );
 
         return (collateralAssetAmount, premiumAssetAmount, shortContracts);
@@ -623,20 +625,21 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal, IVaultEvents {
         address receiver
     ) private {
         VaultStorage.Layout storage l = VaultStorage.layout();
-        VaultStorage.Option memory option = l.options[l.epoch];
-        IERC1155 ERC1155 = IERC1155(address(this));
+        uint64 lastEpoch = l.epoch - 1;
 
         if (collateralAmount > 0) {
             ERC20.safeTransfer(receiver, collateralAmount);
         }
 
-        ERC1155.safeTransferFrom(
-            address(this),
-            receiver,
-            option.shortTokenId,
-            shortAmount,
-            ""
-        );
+        if (shortAmount > 0) {
+            Pool.safeTransferFrom(
+                address(this),
+                receiver,
+                l.options[lastEpoch].shortTokenId,
+                shortAmount,
+                ""
+            );
+        }
     }
 
     function _getNextFriday() private view returns (uint64) {

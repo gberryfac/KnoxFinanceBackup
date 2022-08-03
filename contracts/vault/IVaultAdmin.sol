@@ -84,10 +84,20 @@ interface IVaultAdmin {
      *  PROCESS EPOCH
      ***********************************************/
 
+    // /**
+    //  * @notice
+    //  */
+    function initializeAndProcessEpochs(bool _processExpired) external;
+
     /**
      * @notice Prepares the strategy and initiates the next round of option sales
      */
     function processLastEpoch(bool _processExpired) external;
+
+    // /**
+    //  * @notice
+    //  */
+    function initalizeNextEpoch() external;
 
     /**
      * @notice Processes expired options

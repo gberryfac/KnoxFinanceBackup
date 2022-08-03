@@ -39,4 +39,8 @@ contract VaultView is VaultInternal {
     function totalCollateral() external view returns (uint256) {
         return _totalCollateral();
     }
+
+    function totalReserves() external view returns (uint256) {
+        return _totalReserves();
+    }
 }

@@ -3,8 +3,6 @@ import { BigNumber, ContractTransaction } from "ethers";
 
 import { describeBehaviorOfERC4626Base } from "@solidstate/spec";
 
-import { Block } from "@ethersproject/abstract-provider";
-
 import chai, { expect } from "chai";
 import chaiAlmost from "chai-almost";
 
@@ -15,15 +13,7 @@ moment.tz.setDefault("UTC");
 
 import { Auction, IPremiaPool, IVault, MockERC20, Queue } from "../types";
 
-import {
-  assert,
-  math,
-  time,
-  types,
-  KnoxUtil,
-  PoolUtil,
-  formatClaimTokenId,
-} from "../test/utils";
+import { assert, math, time, types, KnoxUtil, PoolUtil } from "../test/utils";
 
 interface VaultBaseBehaviorArgs {
   getKnoxUtil: () => Promise<KnoxUtil>;
@@ -70,10 +60,6 @@ export function describeBehaviorOfVaultBase(
     let knoxUtil: KnoxUtil;
     let poolUtil: PoolUtil;
 
-    // Test Suite Globals
-    let block: Block;
-    let epoch = 1;
-
     const params = getParams();
 
     before(async () => {
@@ -119,31 +105,45 @@ export function describeBehaviorOfVaultBase(
     describe("#asset()", () => {
       time.revertToSnapshotAfterEach(async () => {});
 
-      it("", async () => {});
+      it("should return the collateral asset address", async () => {
+        assert.equal(await vault.ERC20(), asset.address);
+      });
     });
 
-    describe("#totalReserves()", () => {
+    describe.skip("#totalReserves()", () => {
       time.revertToSnapshotAfterEach(async () => {});
-
-      it("", async () => {});
     });
 
-    describe("#totalCollateral()", () => {
+    describe.skip("#totalCollateral()", () => {
       time.revertToSnapshotAfterEach(async () => {});
-
-      it("", async () => {});
     });
 
-    describe("#totalAssets()", () => {
+    describe.skip("#totalAssets()", () => {
+      time.revertToSnapshotAfterEach(async () => {});
+    });
+
+    describe("#deposit(uint256,address)", () => {
       time.revertToSnapshotAfterEach(async () => {});
 
-      it("", async () => {});
+      it("should revert if !queue", async () => {
+        await expect(
+          vault.connect(signers.lp1).deposit(0, addresses.lp1)
+        ).to.be.revertedWith("!queue");
+      });
+    });
+
+    describe("#mint(uint256,address)", () => {
+      time.revertToSnapshotAfterEach(async () => {});
+
+      it("should revert if !queue", async () => {
+        await expect(
+          vault.connect(signers.lp1).mint(0, addresses.lp1)
+        ).to.be.revertedWith("!queue");
+      });
     });
 
     describe("#withdraw(uint256,address,address)", () => {
-      time.revertToSnapshotAfterEach(async () => {});
-
-      it.only("", async () => {
+      time.revertToSnapshotAfterEach(async () => {
         // lp1 deposits into queue
         await asset
           .connect(signers.lp1)
@@ -151,13 +151,14 @@ export function describeBehaviorOfVaultBase(
 
         await queue.connect(signers.lp1)["deposit(uint256)"](params.deposit);
 
-        // init epoch 1 auction
-        const [startTime] = await knoxUtil.initializeAuction(epoch);
+        // init epoch 0 auction
+        let [startTime, , epoch] = await knoxUtil.initializeAuction();
 
-        // process epoch
-        await knoxUtil.processEpoch(epoch);
+        // init epoch 1
+        await knoxUtil.fastForwardToFriday8AM();
+        await knoxUtil.initializeNextEpoch();
 
-        // auction starts
+        // auction 0 starts
         await time.increaseTo(startTime);
 
         // buyer1 purchases all available options
@@ -165,78 +166,156 @@ export function describeBehaviorOfVaultBase(
           .connect(signers.buyer1)
           .approve(addresses.auction, ethers.constants.MaxUint256);
 
-        console.log(
-          "total contracts available",
-          math.bnToNumber(await auction.getTotalContracts(epoch))
-        );
-
         await auction
           .connect(signers.buyer1)
           .addMarketOrder(epoch, await auction.getTotalContracts(epoch));
 
-        console.log(
-          "total ERC20 vault balance",
-          math.bnToNumber(await asset.balanceOf(addresses.vault))
-        );
-
-        // process auction
+        // process auction 0
         await vault.connect(signers.keeper).processAuction();
+      });
 
-        console.log(
-          "total ERC20 vault balance",
-          math.bnToNumber(await asset.balanceOf(addresses.vault))
+      it.skip("should revert if auction is in progress", async () => {});
+
+      it.skip("should distribute withdrawal fees to fee recipient", async () => {});
+
+      it("should redeem max vault shares from queue", async () => {
+        const lpVaultSharesBefore = await vault.balanceOf(addresses.lp1);
+
+        await queue
+          .connect(signers.lp1)
+          .setApprovalForAll(addresses.vault, true);
+
+        await vault
+          .connect(signers.lp1)
+          .withdraw(0, addresses.lp1, addresses.lp1);
+
+        const lpVaultSharesAfter = await vault.balanceOf(addresses.lp1);
+
+        assert.bnEqual(lpVaultSharesBefore, BigNumber.from(0));
+        assert.bnEqual(lpVaultSharesAfter, params.deposit);
+      });
+
+      it("should distribute collateral tokens only to LP between epoch end and auction start", async () => {
+        const shortTokenId = await pool["tokensByAccount(address)"](
+          addresses.vault
         );
 
-        console.log(
-          "total vault collateral",
-          math.bnToNumber(await vault.totalCollateral())
+        // init auction 1
+        await knoxUtil.initializeAuction();
+        await knoxUtil.fastForwardToFriday8AM();
+        await time.increase(100);
+
+        // process epoch 0
+        await vault.processLastEpoch(true);
+
+        // init epoch 2
+        await knoxUtil.initializeNextEpoch();
+
+        await queue.connect(signers.lp1)["redeemMax()"]();
+
+        const lpCollateralBalanceBefore = await asset.balanceOf(addresses.lp1);
+        const totalCollateral = await vault.totalCollateral();
+
+        // lp1 withdraws from vault
+        await queue
+          .connect(signers.lp1)
+          .setApprovalForAll(addresses.vault, true);
+
+        const assetAmount = await vault
+          .connect(signers.lp1)
+          .maxWithdraw(addresses.lp1);
+
+        await vault
+          .connect(signers.lp1)
+          .withdraw(assetAmount, addresses.lp1, addresses.lp1);
+
+        const lpVaultSharesAfter = await vault.balanceOf(addresses.lp1);
+
+        const lpCollateralBalanceAfter = await asset.balanceOf(addresses.lp1);
+
+        const vaultShortBalanceAfter = await pool.balanceOf(
+          addresses.vault,
+          shortTokenId[0]
         );
 
-        console.log(
-          "total vault assets",
-          math.bnToNumber(await vault.totalAssets())
+        const lpShortBalanceAfter = await pool.balanceOf(
+          addresses.lp1,
+          shortTokenId[0]
         );
 
-        console.log(
-          "LP1 ERC1155 balance",
-          await queue.connect(signers.lp1).balanceOf(
-            addresses.lp1,
-            formatClaimTokenId({
-              address: queue.address,
-              epoch: BigNumber.from(0),
-            })
-          )
+        assert.bnEqual(lpVaultSharesAfter, BigNumber.from(0));
+        expect(vaultShortBalanceAfter).to.almost(0);
+        expect(lpShortBalanceAfter).to.almost(0);
+
+        expect(
+          math.bnToNumber(lpCollateralBalanceBefore.add(totalCollateral))
+        ).to.almost(math.bnToNumber(lpCollateralBalanceAfter), 1);
+      });
+
+      it("should distribute collateral and short tokens to LP after auction ends", async () => {
+        await queue.connect(signers.lp1)["redeemMax()"]();
+
+        const shortTokenId = await pool["tokensByAccount(address)"](
+          addresses.vault
         );
 
-        console.log(
-          "claim token id",
-          formatClaimTokenId({
-            address: queue.address,
-            epoch: BigNumber.from(0),
-          })
+        const lpCollateralBalanceBefore = await asset.balanceOf(addresses.lp1);
+
+        // TODO: Check totalCollateral instead
+        const vaultCollateralBalanceBefore = await asset.balanceOf(
+          addresses.vault
         );
 
-        await queue.connect(signers.lp1)["redeemMax()"];
-
-        console.log(
-          "LP1 ERC4626 balance",
-          await vault.connect(signers.lp1).balanceOf(addresses.lp1)
+        const vaultShortBalanceBefore = await pool.balanceOf(
+          addresses.vault,
+          shortTokenId[0]
         );
 
         // lp1 withdraws from vault
-        console.log(
-          "max withdraw",
-          await vault.connect(signers.lp1).maxWithdraw(addresses.lp1)
+        await queue
+          .connect(signers.lp1)
+          .setApprovalForAll(addresses.vault, true);
+
+        const assetAmount = await vault
+          .connect(signers.lp1)
+          .maxWithdraw(addresses.lp1);
+
+        await vault
+          .connect(signers.lp1)
+          .withdraw(assetAmount, addresses.lp1, addresses.lp1);
+
+        const lpVaultSharesAfter = await vault.balanceOf(addresses.lp1);
+
+        const lpCollateralBalanceAfter = await asset.balanceOf(addresses.lp1);
+
+        const lpShortBalanceAfter = await pool.balanceOf(
+          addresses.lp1,
+          shortTokenId[0]
         );
 
-        // await vault.connect(signers.lp1)["withdraw(uint256,address,address)"]();
+        assert.bnEqual(lpVaultSharesAfter, BigNumber.from(0));
+
+        expect(math.bnToNumber(lpShortBalanceAfter)).to.almost(
+          math.bnToNumber(vaultShortBalanceBefore),
+          1
+        );
+
+        expect(
+          math.bnToNumber(
+            lpCollateralBalanceBefore.add(vaultCollateralBalanceBefore)
+          )
+        ).to.almost(math.bnToNumber(lpCollateralBalanceAfter), 1);
       });
     });
 
-    describe("#redeem(uint256,address,address)", () => {
+    describe.skip("#redeem(uint256,address,address)", () => {
       time.revertToSnapshotAfterEach(async () => {});
 
-      it("", async () => {});
+      it.skip("should revert if auction is in progress", async () => {});
+      it.skip("should distribute withdrawal fees to fee recipient", async () => {});
+      it.skip("should redeem max vault shares from queue", async () => {});
+      it.skip("should distribute collateral tokens only to LP between epoch end and auction start", async () => {});
+      it.skip("should distribute collateral and short tokens to LP after auction ends", async () => {});
     });
   });
 }
