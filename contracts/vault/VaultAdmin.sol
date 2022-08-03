@@ -121,8 +121,22 @@ contract VaultAdmin is Access, VaultInternal {
     /**
      * @notice Prepares the strategy and initiates the next round of option sales
      */
-    function processEpoch(bool _processExpired) external {
-        _processEpoch(_processExpired);
+    function initializeAndProcessEpochs(bool _processExpired) external {
+        _initializeAndProcessEpochs(_processExpired);
+    }
+
+    /**
+     * @notice Prepares the strategy and initiates the next round of option sales
+     */
+    function processLastEpoch(bool _processExpired) external {
+        _processLastEpoch(_processExpired);
+    }
+
+    /**
+     * @notice
+     */
+    function initalizeNextEpoch() external {
+        _initalizeNextEpoch();
     }
 
     /**
@@ -142,8 +156,8 @@ contract VaultAdmin is Access, VaultInternal {
     /**
      * @notice
      */
-    function collectVaultFees() external onlyKeeper {
-        _collectVaultFees();
+    function collectPerformanceFee() external onlyKeeper {
+        _collectPerformanceFee();
     }
 
     /**
@@ -156,15 +170,15 @@ contract VaultAdmin is Access, VaultInternal {
     /**
      * @notice
      */
-    function setNextEpoch() external onlyKeeper {
-        _setNextEpoch();
+    function setAuctionPrices() external onlyKeeper {
+        _setAuctionPrices();
     }
 
     /**
      * @notice
      */
-    function setAuctionPrices() external onlyKeeper {
-        _setAuctionPrices();
+    function setNextEpoch() external onlyKeeper {
+        _setNextEpoch();
     }
 
     /************************************************

@@ -38,7 +38,6 @@ export function describeBehaviorOfVaultView(
 
     // Test Suite Globals
     let block: Block;
-    let epoch = 1;
 
     const params = getParams();
 

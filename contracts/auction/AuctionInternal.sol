@@ -9,6 +9,7 @@ import "@solidstate/contracts/utils/SafeERC20.sol";
 import "../interfaces/IPremiaPool.sol";
 
 import "../libraries/ABDKMath64x64Token.sol";
+import "../libraries/Helpers.sol";
 
 import "../vault/IVault.sol";
 
@@ -25,6 +26,7 @@ contract AuctionInternal is IAuctionEvents {
     using ABDKMath64x64Token for uint256;
     using AuctionStorage for AuctionStorage.Layout;
     using EnumerableSet for EnumerableSet.UintSet;
+    using Helpers for uint256;
     using OrderBook for OrderBook.Index;
     using SafeERC20 for IERC20;
 
@@ -427,7 +429,7 @@ contract AuctionInternal is IAuctionEvents {
         }
     }
 
-    function _transferPremium(uint64 epoch) internal {
+    function _transferPremium(uint64 epoch) internal returns (uint256) {
         // modifier: reject if auction is not finalized
         // modifier: reject if auction is processed
         // modifier: reject if auction is cancelled
@@ -444,6 +446,8 @@ contract AuctionInternal is IAuctionEvents {
         ERC20.safeTransfer(address(Vault), totalPremiums);
 
         // emit PremiumTransferred()
+
+        return auction.totalPremiums;
     }
 
     function _processAuction(uint64 epoch) internal {
@@ -501,19 +505,15 @@ contract AuctionInternal is IAuctionEvents {
         AuctionStorage.Auction storage auction = l.auctions[epoch];
 
         if (auction.totalContracts <= 0) {
-            uint256 totalContracts = Vault.totalCollateral();
+            uint256 totalCollateral = Vault.totalCollateral();
             int128 strike64x64 = auction.strike64x64;
 
-            if (!isCall) {
-                int128 totalCollateral64x64 =
-                    totalContracts.fromDecimals(baseDecimals);
-
-                totalContracts = totalCollateral64x64
-                    .div(strike64x64)
-                    .toDecimals(baseDecimals);
-            }
-
-            return totalContracts;
+            return
+                totalCollateral._fromCollateralToContracts(
+                    isCall,
+                    baseDecimals,
+                    strike64x64
+                );
         }
 
         return auction.totalContracts;

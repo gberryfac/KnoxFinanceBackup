@@ -112,8 +112,8 @@ contract Auction is Access, AuctionInternal, IAuction {
         _finalizeAuction(epoch);
     }
 
-    function transferPremium(uint64 epoch) external {
-        _transferPremium(epoch);
+    function transferPremium(uint64 epoch) external returns (uint256) {
+        return _transferPremium(epoch);
     }
 
     function processAuction(uint64 epoch) external {

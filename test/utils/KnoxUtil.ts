@@ -182,26 +182,24 @@ export class KnoxUtil {
     });
   }
 
-  async initializeAuction(epoch: number): Promise<[BigNumber, BigNumber]> {
+  async initializeAuction(): Promise<[BigNumber, BigNumber, BigNumber]> {
     const block = await provider.getBlock(await provider.getBlockNumber());
     await time.increaseTo(await time.getThursday8AM(block.timestamp));
 
     const vault = this.vaultUtil.vault;
     await vault.connect(this.signers.keeper).setAndInitializeAuction();
 
+    const epoch = await vault.getEpoch();
     const auction = await this.auction.getAuction(epoch);
-    return [auction.startTime, auction.endTime];
+
+    return [auction.startTime, auction.endTime, epoch];
   }
 
-  async processEpoch(epoch: number) {
+  async initializeNextEpoch() {
     const vault = this.vaultUtil.vault;
-
-    // fast-forward to expiry of last sold option
-    const [expiry] = await vault.getOption(epoch - 1);
-    await time.increaseTo(expiry);
+    const epoch = await vault.getEpoch();
 
     await vault.connect(this.signers.keeper).depositQueuedToVault();
-    await vault.connect(this.signers.keeper).setNextEpoch();
 
     const maxPrice64x64 = fixedFromFloat(this.params.price.max);
     const minPrice64x64 = fixedFromFloat(this.params.price.min);
@@ -209,5 +207,13 @@ export class KnoxUtil {
     await this.auction
       .connect(this.signers.vault)
       .setAuctionPrices(epoch, maxPrice64x64, minPrice64x64);
+
+    await vault.connect(this.signers.keeper).setNextEpoch();
+  }
+
+  async fastForwardToFriday8AM() {
+    // fast-forward to friday
+    const block = await provider.getBlock(await provider.getBlockNumber());
+    await time.increaseTo(await time.getFriday8AM(block.timestamp));
   }
 }

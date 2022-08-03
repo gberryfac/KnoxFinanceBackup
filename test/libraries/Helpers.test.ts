@@ -1,7 +1,13 @@
 import { ethers } from "hardhat";
 const { provider } = ethers;
-
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
+import { fixedFromFloat } from "@premia/utils";
+import { parseUnits } from "ethers/lib/utils";
+
+import chai, { expect } from "chai";
+import chaiAlmost from "chai-almost";
+
+chai.use(chaiAlmost());
 
 import { TestHelpers, TestHelpers__factory } from "../../types";
 
@@ -22,30 +28,30 @@ describe.only("Helpers", () => {
     instance = await new TestHelpers__factory(signer).deploy();
   });
 
-  time.revertToSnapshotAfterEach(async () => {
-    const { timestamp } = await provider.getBlock("latest");
-
-    // The block we're hardcoded to is a Monday
-    const currentTime = moment.unix(timestamp);
-
-    const monday = moment(currentTime)
-      .startOf("isoWeek")
-      .add(1, "week")
-      .day("monday")
-      .hour(9);
-
-    await time.increaseTo(monday.unix());
-
-    thisFriday = moment(monday).startOf("isoWeek").day("friday").hour(8);
-
-    nextFriday = moment(monday)
-      .startOf("isoWeek")
-      .add(1, "week")
-      .day("friday")
-      .hour(8);
-  });
-
   describe("#getFriday(uint256)", () => {
+    time.revertToSnapshotAfterEach(async () => {
+      const { timestamp } = await provider.getBlock("latest");
+
+      // The block we're hardcoded to is a Monday
+      const currentTime = moment.unix(timestamp);
+
+      const monday = moment(currentTime)
+        .startOf("isoWeek")
+        .add(1, "week")
+        .day("monday")
+        .hour(9);
+
+      await time.increaseTo(monday.unix());
+
+      thisFriday = moment(monday).startOf("isoWeek").day("friday").hour(8);
+
+      nextFriday = moment(monday)
+        .startOf("isoWeek")
+        .add(1, "week")
+        .day("friday")
+        .hour(8);
+    });
+
     it("should return this Friday, given the day of week is Monday", async () => {
       const { timestamp } = await provider.getBlock("latest");
       const currentTime = moment.unix(timestamp);
@@ -174,6 +180,29 @@ describe.only("Helpers", () => {
   });
 
   describe("#getNextFriday(uint256)", () => {
+    time.revertToSnapshotAfterEach(async () => {
+      const { timestamp } = await provider.getBlock("latest");
+
+      // The block we're hardcoded to is a Monday
+      const currentTime = moment.unix(timestamp);
+
+      const monday = moment(currentTime)
+        .startOf("isoWeek")
+        .add(1, "week")
+        .day("monday")
+        .hour(9);
+
+      await time.increaseTo(monday.unix());
+
+      thisFriday = moment(monday).startOf("isoWeek").day("friday").hour(8);
+
+      nextFriday = moment(monday)
+        .startOf("isoWeek")
+        .add(1, "week")
+        .day("friday")
+        .hour(8);
+    });
+
     it("should return next Friday, given the day of week is Monday", async () => {
       const { timestamp } = await provider.getBlock("latest");
       const currentTime = moment.unix(timestamp);
@@ -298,6 +327,106 @@ describe.only("Helpers", () => {
 
       assert.equal(fridayDate.weekday(), 5);
       assert.isTrue(fridayDate.isSame(nextFriday));
+    });
+  });
+
+  describe("#fromContractsToCollateral(bool,uint8,uint8,int128,uint256)", () => {
+    time.revertToSnapshotAfterEach(async () => {});
+
+    it("should return contract size for call option", async () => {
+      const size = parseUnits("10", 18);
+      const expectedSize = size;
+
+      assert.bnEqual(
+        await instance.fromContractsToCollateral(
+          size,
+          true,
+          18,
+          18,
+          fixedFromFloat(2000)
+        ),
+        expectedSize
+      );
+    });
+
+    it("should return contract size for put option", async () => {
+      const size = parseUnits("10", 18);
+      const expectedSize = parseUnits("2", 22);
+
+      assert.bnEqual(
+        await instance.fromContractsToCollateral(
+          size,
+          false,
+          18,
+          18,
+          fixedFromFloat(2000)
+        ),
+        expectedSize
+      );
+    });
+
+    it("should return contract size in base decimals for put option", async () => {
+      const size = parseUnits("10", 8);
+      const expectedSize = parseUnits("2", 22);
+
+      assert.bnEqual(
+        await instance.fromContractsToCollateral(
+          size,
+          false,
+          8,
+          18,
+          fixedFromFloat(2000)
+        ),
+        expectedSize
+      );
+    });
+  });
+
+  describe("#fromCollateralToContracts(bool,uint8,uint8,int128,uint256)", () => {
+    time.revertToSnapshotAfterEach(async () => {});
+
+    it("should return collateral for call option", async () => {
+      const amount = parseUnits("100", 18);
+      const expectedCollateral = amount;
+
+      assert.bnEqual(
+        await instance.fromCollateralToContracts(
+          amount,
+          true,
+          18,
+          fixedFromFloat(2000)
+        ),
+        expectedCollateral
+      );
+    });
+
+    it("should return collateral for put option", async () => {
+      const amount = parseUnits("100000", 18);
+      const expectedCollateral = parseUnits("5", 19);
+
+      assert.bnEqual(
+        await instance.fromCollateralToContracts(
+          amount,
+          false,
+          18,
+          fixedFromFloat(2000)
+        ),
+        expectedCollateral
+      );
+    });
+
+    it("should return collateral in underlying decimals for put option", async () => {
+      const amount = parseUnits("100000", 8);
+      const expectedCollateral = parseUnits("5", 9);
+
+      const collateral = await instance.fromCollateralToContracts(
+        amount,
+        false,
+        18,
+        fixedFromFloat(2000)
+      );
+
+      expect(collateral.toNumber()).to.almost(expectedCollateral.toNumber(), 1);
     });
   });
 });

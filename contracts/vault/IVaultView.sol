@@ -22,4 +22,12 @@ interface IVaultView {
         returns (uint256[] memory);
 
     function totalCollateral() external view returns (uint256);
+
+    function totalPremiums() external view returns (uint256);
+
+    function totalShortAsCollateral() external view returns (uint256);
+
+    function totalShortAsContracts() external view returns (uint256);
+
+    function totalReserves() external view returns (uint256);
 }

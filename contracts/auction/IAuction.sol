@@ -63,7 +63,7 @@ interface IAuction is IAuctionEvents, IERC1155Receiver {
 
     function finalizeAuction(uint64 epoch) external;
 
-    function transferPremium(uint64 epoch) external;
+    function transferPremium(uint64 epoch) external returns (uint256);
 
     function processAuction(uint64 epoch) external;
 

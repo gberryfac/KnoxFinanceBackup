@@ -126,11 +126,7 @@ export async function describeBehaviorOfQueue(
     });
 
     describe("#deposit(uint256)", () => {
-      let epoch: number;
-
-      time.revertToSnapshotAfterEach(async () => {
-        epoch = 1;
-      });
+      time.revertToSnapshotAfterEach(async () => {});
 
       it("should revert if Queue is paused", async () => {
         await queue.connect(signers.deployer).pause();
@@ -196,7 +192,7 @@ export async function describeBehaviorOfQueue(
       });
 
       it("should redeem vault shares if LP deposited in past epoch", async () => {
-        await knoxUtil.initializeAuction(epoch);
+        await knoxUtil.initializeAuction();
 
         await asset
           .connect(signers.lp1)
@@ -212,10 +208,9 @@ export async function describeBehaviorOfQueue(
         let lpBalance = await vault.balanceOf(addresses.lp1);
         assert.isTrue(lpBalance.isZero());
 
-        await knoxUtil.processEpoch(epoch);
-
-        epoch++;
-        await knoxUtil.initializeAuction(epoch);
+        await knoxUtil.fastForwardToFriday8AM();
+        await knoxUtil.initializeNextEpoch();
+        await knoxUtil.initializeAuction();
 
         await asset
           .connect(signers.lp1)
@@ -282,13 +277,10 @@ export async function describeBehaviorOfQueue(
       });
 
       describe("else", () => {
-        let epoch: number;
         let tokenId: BigNumber;
 
         time.revertToSnapshotAfterEach(async () => {
-          epoch = 1;
-
-          await knoxUtil.initializeAuction(epoch);
+          await knoxUtil.initializeAuction();
 
           await asset
             .connect(signers.lp1)
@@ -298,7 +290,8 @@ export async function describeBehaviorOfQueue(
 
           tokenId = await queue.getCurrentTokenId();
 
-          await knoxUtil.processEpoch(epoch);
+          await knoxUtil.fastForwardToFriday8AM();
+          await knoxUtil.initializeNextEpoch();
         });
 
         it("should burn claim tokens when shares are redeemed", async () => {
@@ -320,14 +313,12 @@ export async function describeBehaviorOfQueue(
     });
 
     describe("#redeemMax()", () => {
-      let epoch: number;
       let tokenId1: BigNumber;
       let tokenId2: BigNumber;
       let tokenId3: BigNumber;
 
       time.revertToSnapshotAfterEach(async () => {
-        epoch = 1;
-        await knoxUtil.initializeAuction(epoch);
+        await knoxUtil.initializeAuction();
 
         await asset
           .connect(signers.lp1)
@@ -337,10 +328,10 @@ export async function describeBehaviorOfQueue(
         await queue["deposit(uint256)"](params.deposit);
         tokenId1 = await queue.getCurrentTokenId();
 
-        await knoxUtil.processEpoch(epoch);
+        await knoxUtil.fastForwardToFriday8AM();
+        await knoxUtil.initializeNextEpoch();
 
-        epoch++;
-        await knoxUtil.initializeAuction(epoch);
+        await knoxUtil.initializeAuction();
 
         await asset
           .connect(signers.lp1)
@@ -350,10 +341,10 @@ export async function describeBehaviorOfQueue(
         await queue["deposit(uint256)"](params.deposit);
         tokenId2 = await queue.getCurrentTokenId();
 
-        await knoxUtil.processEpoch(epoch);
+        await knoxUtil.fastForwardToFriday8AM();
+        await knoxUtil.initializeNextEpoch();
 
-        epoch++;
-        await knoxUtil.initializeAuction(epoch);
+        await knoxUtil.initializeAuction();
 
         await asset
           .connect(signers.lp1)
@@ -363,7 +354,8 @@ export async function describeBehaviorOfQueue(
         await queue["deposit(uint256)"](params.deposit);
         tokenId3 = await queue.getCurrentTokenId();
 
-        await knoxUtil.processEpoch(epoch);
+        await knoxUtil.fastForwardToFriday8AM();
+        await knoxUtil.initializeNextEpoch();
       });
 
       it("should burn all claim tokens when shares are redeemed", async () => {
@@ -422,11 +414,8 @@ export async function describeBehaviorOfQueue(
       });
 
       describe("else", () => {
-        let epoch: number;
-
         time.revertToSnapshotAfterEach(async () => {
-          epoch = 1;
-          await knoxUtil.initializeAuction(epoch);
+          await knoxUtil.initializeAuction();
 
           await asset
             .connect(signers.lp1)
@@ -449,9 +438,7 @@ export async function describeBehaviorOfQueue(
           // deposits in epoch 0
           await queue.connect(signers.lp3)["deposit(uint256)"](params.deposit);
 
-          // fast forward to expiry of previously sold option
-          const [expiry] = await vault.getOption(epoch - 1);
-          await time.increaseTo(expiry);
+          await knoxUtil.fastForwardToFriday8AM();
         });
 
         it("should deposit all of queued ERC20 tokens into vault", async () => {
@@ -474,8 +461,7 @@ export async function describeBehaviorOfQueue(
 
           assert.bnEqual(pricePerShare, parseUnits("1", 18));
 
-          epoch++;
-          await knoxUtil.initializeAuction(epoch);
+          await knoxUtil.initializeAuction();
 
           // simluate vault profits, dilute shares by half
           await asset
@@ -498,9 +484,7 @@ export async function describeBehaviorOfQueue(
 
           tokenId = await queue.getCurrentTokenId();
 
-          // fast forward to expiry of previously sold option
-          const [expiry] = await vault.getOption(epoch - 1);
-          await time.increaseTo(expiry);
+          await knoxUtil.fastForwardToFriday8AM();
 
           await queue.connect(signers.vault).depositToVault();
           await vault.connect(signers.keeper).setNextEpoch();
@@ -526,8 +510,7 @@ export async function describeBehaviorOfQueue(
           .connect(signers.deployer)
           .transfer(addresses.vault, params.deposit.mul(4));
 
-        let epoch = 1;
-        await knoxUtil.initializeAuction(epoch);
+        await knoxUtil.initializeAuction();
 
         await asset
           .connect(signers.lp1)
@@ -538,9 +521,7 @@ export async function describeBehaviorOfQueue(
 
         tokenId = await queue.getCurrentTokenId();
 
-        // fast forward to expiry of previously sold option
-        let [expiry] = await vault.getOption(epoch - 1);
-        await time.increaseTo(expiry);
+        await knoxUtil.fastForwardToFriday8AM();
 
         // totalAssets = 40,000
         // totalSupply = 0
@@ -550,8 +531,7 @@ export async function describeBehaviorOfQueue(
         shares = await queue["previewUnredeemed(uint256)"](tokenId);
         assert.bnEqual(shares, params.deposit);
 
-        epoch++;
-        await knoxUtil.initializeAuction(epoch);
+        await knoxUtil.initializeAuction();
 
         await asset
           .connect(signers.lp1)
@@ -562,9 +542,7 @@ export async function describeBehaviorOfQueue(
 
         tokenId = await queue.getCurrentTokenId();
 
-        // fast forward to expiry of previously sold option
-        [expiry] = await vault.getOption(epoch - 1);
-        await time.increaseTo(expiry);
+        await knoxUtil.fastForwardToFriday8AM();
 
         // totalAssets = 50,000
         // totalSupply = 10,000

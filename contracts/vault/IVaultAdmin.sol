@@ -84,10 +84,20 @@ interface IVaultAdmin {
      *  PROCESS EPOCH
      ***********************************************/
 
+    // /**
+    //  * @notice
+    //  */
+    function initializeAndProcessEpochs(bool _processExpired) external;
+
     /**
      * @notice Prepares the strategy and initiates the next round of option sales
      */
-    function processEpoch(bool _processExpired) external;
+    function processLastEpoch(bool _processExpired) external;
+
+    // /**
+    //  * @notice
+    //  */
+    function initalizeNextEpoch() external;
 
     /**
      * @notice Processes expired options
@@ -102,21 +112,21 @@ interface IVaultAdmin {
     // /**
     //  * @notice
     //  */
-    function collectVaultFees() external;
+    function collectPerformanceFee() external;
 
     //  * @notice
     //  */
     function depositQueuedToVault() external;
 
-    // /**
-    //  * @notice
-    //  */
-    function setNextEpoch() external;
-
     /**
      * @notice Sets the start and end time of the auction.
      */
     function setAuctionPrices() external;
+
+    // /**
+    //  * @notice
+    //  */
+    function setNextEpoch() external;
 
     /************************************************
      *  PROCESS AUCTION
