@@ -511,24 +511,24 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal, IVaultEvents {
         _burn(owner, shareAmount);
 
         (
-            uint256 collateralAssetAmount,
-            uint256 premiumAssetAmount,
+            uint256 collateralAmount,
+            uint256 premiumAmount,
             uint256 shortContracts
         ) = _calculateDistributions(l, assetAmount);
 
-        l.totalPremiums -= premiumAssetAmount;
+        l.totalPremiums -= premiumAmount;
         l.totalShortContracts -= shortContracts;
 
-        (uint256 collateralAssetAmountSansFee, uint256 shortContractsSansFee) =
+        (uint256 collateralAmountSansFee, uint256 shortContractsSansFee) =
             _collectWithdrawalFee(
                 l,
-                collateralAssetAmount,
-                premiumAssetAmount,
+                collateralAmount,
+                premiumAmount,
                 shortContracts
             );
 
         _transferCollateralAndShortAssets(
-            collateralAssetAmountSansFee,
+            collateralAmountSansFee,
             shortContractsSansFee,
             l.options[_lastEpoch(l)].shortTokenId,
             receiver
@@ -538,7 +538,7 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal, IVaultEvents {
         //     caller,
         //     receiver,
         //     owner,
-        //     collateralAssetAmountSansFee + shortContractsSansFee,
+        //     collateralAmountSansFee + shortContractsSansFee,
         //     shareAmount
         // );
     }
@@ -561,14 +561,14 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal, IVaultEvents {
     {
         uint256 totalAssets = _totalAssets();
 
-        uint256 collateralAssetAmount =
+        uint256 collateralAmount =
             _calculateDistributionAmount(
                 distribution,
                 _totalCollateral(),
                 totalAssets
             );
 
-        uint256 premiumAssetAmount =
+        uint256 premiumAmount =
             _calculateDistributionAmount(
                 distribution,
                 l.totalPremiums,
@@ -600,7 +600,7 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal, IVaultEvents {
             l.options[lastEpoch].strike64x64
         );
 
-        return (collateralAssetAmount, premiumAssetAmount, shortContracts);
+        return (collateralAmount, premiumAmount, shortContracts);
     }
 
     function _calculateDistributionAmount(
@@ -616,16 +616,14 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal, IVaultEvents {
 
     function _collectWithdrawalFee(
         VaultStorage.Layout storage l,
-        uint256 collateralAssetAmount,
-        uint256 premiumAssetAmount,
+        uint256 collateralAmount,
+        uint256 premiumAmount,
         uint256 shortContracts
     ) private returns (uint256, uint256) {
-        uint64 lastEpoch = l.epoch - 1;
+        uint256 collateralAndPremiumAmount = collateralAmount + premiumAmount;
 
         uint256 feesInCollateralAsset =
-            l.withdrawalFee64x64.mulu(
-                collateralAssetAmount + premiumAssetAmount
-            );
+            l.withdrawalFee64x64.mulu(collateralAndPremiumAmount);
 
         uint256 feesInShortContracts =
             l.withdrawalFee64x64.mulu(shortContracts);
@@ -641,7 +639,7 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal, IVaultEvents {
         // emit CollectWithdrawalFee(msg.sender, feesInCollateralAsset, feesInShortAsset)
 
         return (
-            collateralAssetAmount + premiumAssetAmount - feesInCollateralAsset,
+            collateralAndPremiumAmount - feesInCollateralAsset,
             shortContracts - feesInShortContracts
         );
     }
