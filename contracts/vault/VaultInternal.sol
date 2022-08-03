@@ -183,9 +183,7 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal, IVaultEvents {
     // processes expired options underwritten in previous epoch
     function _processExpired() internal {
         VaultStorage.Layout storage l = VaultStorage.layout();
-
-        uint64 lastEpoch = l.epoch - 1;
-        VaultStorage.Option storage option = l.options[lastEpoch];
+        VaultStorage.Option storage option = l.options[_lastEpoch(l)];
 
         address[] memory accounts = Pool.accountsByToken(option.longTokenId);
         uint256 balances;
@@ -218,9 +216,8 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal, IVaultEvents {
     function _collectPerformanceFee() internal {
         VaultStorage.Layout storage l = VaultStorage.layout();
 
-        uint64 lastEpoch = l.epoch - 1;
         (, uint256 exerciseAmount) =
-            _getExerciseAmount(lastEpoch, l.totalShortContracts);
+            _getExerciseAmount(_lastEpoch(l), l.totalShortContracts);
 
         if (l.totalPremiums > exerciseAmount) {
             /**
@@ -320,7 +317,7 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal, IVaultEvents {
     function _processAuction() internal {
         VaultStorage.Layout storage l = VaultStorage.layout();
 
-        uint64 lastEpoch = l.epoch - 1;
+        uint64 lastEpoch = _lastEpoch(l);
         VaultStorage.Option memory option = l.options[lastEpoch];
 
         if (!l.Auction.isFinalized(lastEpoch))
@@ -376,7 +373,8 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal, IVaultEvents {
         VaultStorage.Layout storage l = VaultStorage.layout();
 
         // references the last option underwritten by the vault
-        uint64 lastEpoch = l.epoch > 0 ? l.epoch - 1 : 0;
+        uint64 lastEpoch = _lastEpoch(l);
+        if (lastEpoch == 0) return 0;
 
         VaultStorage.Option memory option = l.options[lastEpoch];
 
@@ -529,13 +527,10 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal, IVaultEvents {
                 shortContracts
             );
 
-        // TODO: move lastEpoch to storage variable
-        uint64 lastEpoch = l.epoch - 1;
-
         _transferCollateralAndShortAssets(
             collateralAssetAmountSansFee,
             shortContractsSansFee,
-            l.options[lastEpoch].shortTokenId,
+            l.options[_lastEpoch(l)].shortTokenId,
             receiver
         );
 
@@ -580,7 +575,7 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal, IVaultEvents {
                 totalAssets
             );
 
-        uint64 lastEpoch = l.epoch - 1;
+        uint64 lastEpoch = _lastEpoch(l);
 
         // calculates the short position value denominated in the collateral asset
         uint256 shortPositionValue =
@@ -638,7 +633,7 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal, IVaultEvents {
         _transferCollateralAndShortAssets(
             feesInCollateralAsset,
             feesInShortContracts,
-            l.options[lastEpoch].shortTokenId,
+            l.options[_lastEpoch(l)].shortTokenId,
             l.feeRecipient
         );
 
@@ -722,5 +717,13 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal, IVaultEvents {
             (uint256(tokenType) << 248) +
             (uint256(maturity) << 128) +
             uint256(int256(strike64x64));
+    }
+
+    function _lastEpoch(VaultStorage.Layout storage l)
+        private
+        view
+        returns (uint64)
+    {
+        return l.epoch > 0 ? l.epoch - 1 : 0;
     }
 }
