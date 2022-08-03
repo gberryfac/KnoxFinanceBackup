@@ -429,7 +429,7 @@ contract AuctionInternal is IAuctionEvents {
         }
     }
 
-    function _transferPremium(uint64 epoch) internal {
+    function _transferPremium(uint64 epoch) internal returns (uint256) {
         // modifier: reject if auction is not finalized
         // modifier: reject if auction is processed
         // modifier: reject if auction is cancelled
@@ -446,6 +446,8 @@ contract AuctionInternal is IAuctionEvents {
         ERC20.safeTransfer(address(Vault), totalPremiums);
 
         // emit PremiumTransferred()
+
+        return auction.totalPremiums;
     }
 
     function _processAuction(uint64 epoch) internal {
