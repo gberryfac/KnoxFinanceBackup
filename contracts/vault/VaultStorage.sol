@@ -73,10 +73,6 @@ library VaultStorage {
         uint64 startOffset;
         // @notice
         uint64 endOffset;
-        // @notice
-        uint256 startTime;
-        // @notice
-        uint256 endTime;
         /************************************************
          * VAULT STATE
          ***********************************************/

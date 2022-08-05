@@ -1,8 +1,6 @@
 import { ethers } from "hardhat";
 import { BigNumber } from "ethers";
 import { parseUnits } from "ethers/lib/utils";
-const { provider } = ethers;
-import { Block } from "@ethersproject/abstract-provider";
 import { fixedFromFloat, formatTokenId, TokenType } from "@premia/utils";
 
 import chai, { expect } from "chai";
@@ -12,6 +10,11 @@ chai.use(chaiAlmost());
 
 import moment from "moment-timezone";
 moment.tz.setDefault("UTC");
+
+import {
+  UNDERLYING_RESERVED_LIQ_TOKEN_ID,
+  BASE_RESERVED_LIQ_TOKEN_ID,
+} from "../constants";
 
 import {
   Auction,
@@ -24,7 +27,7 @@ import {
   VaultDiamond__factory,
 } from "../types";
 
-import { assert, time, types, KnoxUtil, PoolUtil } from "../test/utils";
+import { assert, math, time, types, KnoxUtil, PoolUtil } from "../test/utils";
 
 import { diamondCut } from "../scripts/diamond";
 
@@ -53,9 +56,6 @@ export function describeBehaviorOfVaultAdmin(
     let knoxUtil: KnoxUtil;
     let poolUtil: PoolUtil;
 
-    // Test Suite Globals
-    let block: Block;
-
     const params = getParams();
 
     before(async () => {
@@ -72,10 +72,11 @@ export function describeBehaviorOfVaultAdmin(
 
       poolUtil = knoxUtil.poolUtil;
 
-      asset.connect(signers.deployer).mint(addresses.deployer, params.mint);
-      asset.connect(signers.lp1).mint(addresses.lp1, params.mint);
-
-      block = await provider.getBlock(await provider.getBlockNumber());
+      await asset
+        .connect(signers.deployer)
+        .mint(addresses.deployer, params.mint);
+      await asset.connect(signers.buyer1).mint(addresses.buyer1, params.mint);
+      await asset.connect(signers.lp1).mint(addresses.lp1, params.mint);
     });
 
     describe("#constructor()", () => {
@@ -230,7 +231,7 @@ export function describeBehaviorOfVaultAdmin(
         const epoch = await vault.getEpoch();
         const option = await vault.getOption(epoch);
 
-        const nextWeek = block.timestamp + 604800;
+        const nextWeek = (await time.now()) + 604800;
         const expectedExpiry = BigNumber.from(
           await time.getFriday8AM(nextWeek)
         );
@@ -277,19 +278,68 @@ export function describeBehaviorOfVaultAdmin(
       });
     });
 
-    describe("#setAuctionWindow()", () => {
-      time.revertToSnapshotAfterEach(async () => {});
-
-      it("should revert if !keeper", async () => {
-        await expect(vault.setAuctionWindow()).to.be.revertedWith("!keeper");
-      });
-    });
-
     describe("#initializeAuction()", () => {
-      time.revertToSnapshotAfterEach(async () => {});
+      let epoch;
+      let option;
+
+      time.revertToSnapshotAfterEach(async () => {
+        // init auction 0
+        await time.fastForwardToThursday8AM();
+        await vault.connect(signers.keeper).setOptionParameters();
+        await vault.connect(signers.keeper).initializeAuction();
+
+        epoch = await vault.getEpoch();
+        option = await vault.getOption(epoch);
+      });
 
       it("should revert if !keeper", async () => {
         await expect(vault.initializeAuction()).to.be.revertedWith("!keeper");
+      });
+
+      it("should set auction start to friday of current week if epoch == 0", async () => {
+        const friday = await time.getFriday8AM(await time.now());
+
+        // two hours after friday 8am
+        const expectedStartTime = BigNumber.from(friday + 7200);
+        // four hours after friday 8am
+        const expectedEndTime = BigNumber.from(friday + 14400);
+
+        const data = await auction.getAuction(epoch);
+
+        assert.bnEqual(epoch, BigNumber.from(0));
+        assert.bnEqual(data.strike64x64, option.strike64x64);
+        assert.bnEqual(data.longTokenId, option.longTokenId);
+        assert.bnEqual(data.startTime, expectedStartTime);
+        assert.bnEqual(data.endTime, expectedEndTime);
+      });
+
+      it("should set auction start to option expiry if epoch > 0", async () => {
+        // init epoch 1
+        await time.fastForwardToFriday8AM();
+        await knoxUtil.initializeNextEpoch();
+
+        // init auction 1
+        await time.fastForwardToThursday8AM();
+        await vault.connect(signers.keeper).setOptionParameters();
+        await vault.connect(signers.keeper).initializeAuction();
+
+        epoch = await vault.getEpoch();
+        option = await vault.getOption(epoch);
+
+        const friday = await time.getFriday8AM(await time.now());
+
+        // two hours after friday 8am
+        const expectedStartTime = BigNumber.from(friday + 7200);
+        // four hours after friday 8am
+        const expectedEndTime = BigNumber.from(friday + 14400);
+
+        const data = await auction.getAuction(epoch);
+
+        assert.bnEqual(epoch, BigNumber.from(1));
+        assert.bnEqual(data.strike64x64, option.strike64x64);
+        assert.bnEqual(data.longTokenId, option.longTokenId);
+        assert.bnEqual(data.startTime, expectedStartTime);
+        assert.bnEqual(data.endTime, expectedEndTime);
       });
     });
 
@@ -297,10 +347,140 @@ export function describeBehaviorOfVaultAdmin(
       time.revertToSnapshotAfterEach(async () => {});
     });
 
-    describe.skip("#collectPerformanceFee()", () => {
+    describe("#withdrawReservedLiquidity()", () => {
       time.revertToSnapshotAfterEach(async () => {
-        const [startTime, endTime] = await knoxUtil.initializeAuction();
+        await vault
+          .connect(signers.deployer)
+          .setPerformanceFee64x64(fixedFromFloat(0.2));
+
+        // lp1 deposits into queue
+        await asset
+          .connect(signers.lp1)
+          .approve(addresses.queue, params.deposit);
+
+        await queue.connect(signers.lp1)["deposit(uint256)"](params.deposit);
+
+        // init epoch 0 auction
+        let [startTime, , epoch] = await knoxUtil.setAndInitializeAuction();
+
+        // init epoch 1
+        await time.fastForwardToFriday8AM();
+        await knoxUtil.initializeNextEpoch();
+
+        // auction 0 starts
         await time.increaseTo(startTime);
+
+        // buyer1 purchases all available options
+        await asset
+          .connect(signers.buyer1)
+          .approve(addresses.auction, ethers.constants.MaxUint256);
+
+        await auction
+          .connect(signers.buyer1)
+          .addMarketOrder(epoch, await auction.getTotalContracts(epoch));
+
+        // process auction 0
+        await vault.connect(signers.keeper).processAuction();
+
+        // init auction 1
+        await knoxUtil.setAndInitializeAuction();
+
+        await time.fastForwardToFriday8AM();
+        await time.increase(100);
+      });
+
+      it("should revert if !keeper", async () => {
+        await expect(vault.withdrawReservedLiquidity()).to.be.revertedWith(
+          "!keeper"
+        );
+      });
+
+      it("should withdraw reserved liquidity from pool", async () => {
+        // process epoch 0
+        await knoxUtil.processExpiredOptions();
+
+        const reservedLiquidityTokenId = params.isCall
+          ? UNDERLYING_RESERVED_LIQ_TOKEN_ID
+          : BASE_RESERVED_LIQ_TOKEN_ID;
+
+        const reservedLiquidityBefore = await pool.balanceOf(
+          addresses.vault,
+          reservedLiquidityTokenId
+        );
+
+        const totalCollateralInShortPosition =
+          await vault.totalShortAsCollateral();
+
+        assert.bnEqual(reservedLiquidityBefore, totalCollateralInShortPosition);
+
+        const vaultCollateralBalanceBefore = await asset.balanceOf(
+          addresses.vault
+        );
+
+        await vault.connect(signers.keeper).withdrawReservedLiquidity();
+
+        const reservedLiquidityAfter = await pool.balanceOf(
+          addresses.vault,
+          reservedLiquidityTokenId
+        );
+
+        const vaultCollateralBalanceAfter = await asset.balanceOf(
+          addresses.vault
+        );
+
+        assert.bnEqual(reservedLiquidityAfter, BigNumber.from(0));
+
+        assert.bnEqual(
+          reservedLiquidityBefore.add(vaultCollateralBalanceBefore),
+          vaultCollateralBalanceAfter
+        );
+      });
+    });
+
+    describe("#collectPerformanceFee()", () => {
+      let totalPremiums: BigNumber;
+
+      time.revertToSnapshotAfterEach(async () => {
+        await vault
+          .connect(signers.deployer)
+          .setPerformanceFee64x64(fixedFromFloat(0.2));
+
+        // lp1 deposits into queue
+        await asset
+          .connect(signers.lp1)
+          .approve(addresses.queue, params.deposit);
+
+        await queue.connect(signers.lp1)["deposit(uint256)"](params.deposit);
+
+        // init epoch 0 auction
+        let [startTime, , epoch] = await knoxUtil.setAndInitializeAuction();
+
+        // init epoch 1
+        await time.fastForwardToFriday8AM();
+        await knoxUtil.initializeNextEpoch();
+
+        // auction 0 starts
+        await time.increaseTo(startTime);
+
+        // buyer1 purchases all available options
+        await asset
+          .connect(signers.buyer1)
+          .approve(addresses.auction, ethers.constants.MaxUint256);
+
+        await auction
+          .connect(signers.buyer1)
+          .addMarketOrder(epoch, await auction.getTotalContracts(epoch));
+
+        // process auction 0
+        await vault.connect(signers.keeper).processAuction();
+
+        totalPremiums = await vault.totalPremiums();
+
+        // init auction 1
+        await knoxUtil.setAndInitializeAuction();
+
+        await time.fastForwardToFriday8AM();
+        await time.increase(100);
       });
 
       it("should revert if !keeper", async () => {
@@ -309,9 +489,71 @@ export function describeBehaviorOfVaultAdmin(
         );
       });
 
-      it("should not collect performance fees if vault books neutral net income", async () => {});
+      it("should set totalPremiums to 0", async () => {
+        // process epoch 0
+        await knoxUtil.processExpiredOptions();
+        await vault.connect(signers.keeper).withdrawReservedLiquidity();
+        await vault.connect(signers.keeper).collectPerformanceFee();
+        assert.bnEqual(await vault.totalPremiums(), BigNumber.from(0));
+      });
 
-      it("should collect performance fees if vault books positive net income", async () => {});
+      it("should not collect performance fees if option expires far-ITM", async () => {
+        let underlyingPrice = params.underlying.oracle.price;
+        let intrinsicValue = underlyingPrice * 0.5;
+
+        // Make sure options expire ITM
+        let spot = params.isCall
+          ? underlyingPrice + intrinsicValue
+          : underlyingPrice - intrinsicValue;
+
+        await poolUtil.underlyingSpotPriceOracle.mock.latestAnswer.returns(
+          spot
+        );
+
+        // process epoch 0
+        await knoxUtil.processExpiredOptions();
+        await vault.connect(signers.keeper).withdrawReservedLiquidity();
+
+        const feeRecipientBalanceBefore = await asset.balanceOf(
+          addresses.feeRecipient
+        );
+
+        await vault.connect(signers.keeper).collectPerformanceFee();
+
+        const feeRecipientBalanceAfter = await asset.balanceOf(
+          addresses.feeRecipient
+        );
+
+        assert.equal(
+          math.bnToNumber(
+            feeRecipientBalanceAfter.sub(feeRecipientBalanceBefore)
+          ),
+          0
+        );
+      });
+
+      it("should collect performance fees if option expires ATM", async () => {
+        // process epoch 0
+        await knoxUtil.processExpiredOptions();
+        await vault.connect(signers.keeper).withdrawReservedLiquidity();
+
+        const feeRecipientBalanceBefore = await asset.balanceOf(
+          addresses.feeRecipient
+        );
+
+        await vault.connect(signers.keeper).collectPerformanceFee();
+
+        const feeRecipientBalanceAfter = await asset.balanceOf(
+          addresses.feeRecipient
+        );
+
+        assert.equal(
+          math.bnToNumber(
+            feeRecipientBalanceAfter.sub(feeRecipientBalanceBefore)
+          ),
+          math.bnToNumber(totalPremiums.div(5))
+        );
+      });
     });
 
     describe("#depositQueuedToVault()", () => {
@@ -331,8 +573,13 @@ export function describeBehaviorOfVaultAdmin(
 
       it("should transfer balance of queue to vault", async () => {
         const vaultBalanceBefore = await asset.balanceOf(addresses.vault);
+
         await vault.connect(signers.keeper).depositQueuedToVault();
+
+        const queueBalanceAfter = await asset.balanceOf(addresses.queue);
         const vaultBalanceAfter = await asset.balanceOf(addresses.vault);
+
+        assert.bnEqual(queueBalanceAfter, BigNumber.from(0));
 
         assert.bnEqual(
           vaultBalanceAfter.sub(vaultBalanceBefore),
@@ -342,10 +589,74 @@ export function describeBehaviorOfVaultAdmin(
     });
 
     describe("#setNextEpoch()", () => {
-      time.revertToSnapshotAfterEach(async () => {});
+      let epoch: BigNumber;
+      let startTime: BigNumber;
+
+      time.revertToSnapshotAfterEach(async () => {
+        await vault
+          .connect(signers.deployer)
+          .setPerformanceFee64x64(fixedFromFloat(0.2));
+
+        // lp1 deposits into queue
+        await asset
+          .connect(signers.lp1)
+          .approve(addresses.queue, params.deposit);
+
+        await queue.connect(signers.lp1)["deposit(uint256)"](params.deposit);
+
+        // init epoch 0 auction
+        [startTime, , epoch] = await knoxUtil.setAndInitializeAuction();
+
+        // init epoch 1
+        await time.fastForwardToFriday8AM();
+        await knoxUtil.initializeNextEpoch();
+
+        // auction 0 starts
+        await time.increaseTo(startTime);
+
+        // buyer1 purchases all available options
+        await asset
+          .connect(signers.buyer1)
+          .approve(addresses.auction, ethers.constants.MaxUint256);
+
+        await auction
+          .connect(signers.buyer1)
+          .addMarketOrder(epoch, await auction.getTotalContracts(epoch));
+
+        // process auction 0
+        await vault.connect(signers.keeper).processAuction();
+
+        // init auction 1
+        [, , epoch] = await knoxUtil.setAndInitializeAuction();
+
+        await time.fastForwardToFriday8AM();
+        await time.increase(100);
+      });
 
       it("should revert if !keeper", async () => {
         await expect(vault.setNextEpoch()).to.be.revertedWith("!keeper");
+      });
+
+      it("should set state parameters and increment epoch", async () => {
+        const queueEpochBefore = await queue.getEpoch();
+        const vaultEpochBefore = await vault.getEpoch();
+        const totalShortContractsBefore = await vault.totalShortAsContracts();
+
+        assert.bnEqual(queueEpochBefore, BigNumber.from(epoch));
+        assert.bnEqual(vaultEpochBefore, BigNumber.from(epoch));
+        assert.bnGt(totalShortContractsBefore, BigNumber.from(0));
+
+        await vault.connect(signers.keeper).setNextEpoch();
+
+        const queueEpochAfter = await queue.getEpoch();
+        const vaultEpochAfter = await vault.getEpoch();
+        const totalShortContractsAfter = await vault.totalShortAsContracts();
+
+        epoch = epoch.add(1);
+
+        assert.bnEqual(queueEpochAfter, BigNumber.from(epoch));
+        assert.bnEqual(vaultEpochAfter, BigNumber.from(epoch));
+        assert.bnEqual(totalShortContractsAfter, BigNumber.from(0));
       });
     });
 
@@ -390,7 +701,7 @@ export function describeBehaviorOfVaultAdmin(
         const option = await vault.getOption(epoch);
 
         const underlyingPrice = params.underlying.oracle.price;
-        const intrinsicValue = underlyingPrice / 2;
+        const intrinsicValue = underlyingPrice * 0.5;
 
         let spot = params.isCall
           ? underlyingPrice + intrinsicValue

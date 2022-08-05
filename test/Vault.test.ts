@@ -63,7 +63,6 @@ function behavesLikeVault(params: types.VaultParams) {
     before(async () => {
       signers = await accounts.getSigners();
       addresses = await accounts.getAddresses(signers);
-
       knoxUtil = await KnoxUtil.deploy(params, signers, addresses);
     });
 

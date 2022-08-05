@@ -102,7 +102,7 @@ contract Queue is
     }
 
     /************************************************
-     *  PROCESS EPOCH
+     *  PROCESS LAST EPOCH
      ***********************************************/
 
     function syncEpoch(uint64 epoch) external onlyVault {

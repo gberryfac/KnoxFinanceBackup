@@ -71,38 +71,23 @@ interface IVaultAdmin {
     function setOptionParameters() external;
 
     /**
-     * @notice Sets the start and end time of the auction.
-     */
-    function setAuctionWindow() external;
-
-    /**
      * @notice
      */
     function initializeAuction() external;
 
     /************************************************
-     *  PROCESS EPOCH
+     *  PROCESS LAST EPOCH
      ***********************************************/
 
     // /**
     //  * @notice
     //  */
-    function initializeAndProcessEpochs(bool _processExpired) external;
+    function initializeAndProcessEpochs() external;
 
     /**
      * @notice Prepares the strategy and initiates the next round of option sales
      */
-    function processLastEpoch(bool _processExpired) external;
-
-    // /**
-    //  * @notice
-    //  */
-    function initalizeNextEpoch() external;
-
-    /**
-     * @notice Processes expired options
-     */
-    function processExpired() external;
+    function processLastEpoch() external;
 
     /**
      * @notice Transfers reserved liquidity from Premia pool to Vault.
@@ -113,6 +98,15 @@ interface IVaultAdmin {
     //  * @notice
     //  */
     function collectPerformanceFee() external;
+
+    /************************************************
+     *  INITIALIZE NEXT EPOCH
+     ***********************************************/
+
+    // /**
+    //  * @notice
+    //  */
+    function initalizeNextEpoch() external;
 
     //  * @notice
     //  */

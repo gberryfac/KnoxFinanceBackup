@@ -20,7 +20,9 @@ export async function increase(duration: number | BigNumber) {
 
 // returns the current timestamp
 export async function now() {
-  return BigNumber.from((await ethers.provider.getBlock("latest")).timestamp);
+  return BigNumber.from(
+    (await ethers.provider.getBlock("latest")).timestamp
+  ).toNumber();
 }
 
 // returns the next Thursday 8AM timestamp
@@ -45,6 +47,16 @@ export async function getFriday8AM(timestamp: number) {
   // The block we're hardcoded to is a Monday so we add 3 days to get to Thursday
   const friday = currentTime.add(3, "days");
   return moment(friday).startOf("isoWeek").day("friday").hour(8).unix();
+}
+
+// fast-forward to thursday
+export async function fastForwardToThursday8AM() {
+  await increaseTo(await getThursday8AM(await now()));
+}
+
+// fast-forward to friday
+export async function fastForwardToFriday8AM() {
+  await increaseTo(await getFriday8AM(await now()));
 }
 
 /**

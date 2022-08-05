@@ -76,10 +76,12 @@ export async function describeBehaviorOfQueue(
       vault = knoxUtil.vaultUtil.vault;
       queue = knoxUtil.queue;
 
-      asset.connect(signers.deployer).mint(addresses.deployer, params.mint);
-      asset.connect(signers.lp1).mint(addresses.lp1, params.mint);
-      asset.connect(signers.lp2).mint(addresses.lp2, params.mint);
-      asset.connect(signers.lp3).mint(addresses.lp3, params.mint);
+      await asset
+        .connect(signers.deployer)
+        .mint(addresses.deployer, params.mint);
+      await asset.connect(signers.lp1).mint(addresses.lp1, params.mint);
+      await asset.connect(signers.lp2).mint(addresses.lp2, params.mint);
+      await asset.connect(signers.lp3).mint(addresses.lp3, params.mint);
     });
 
     describeBehaviorOfERC1155Enumerable(
@@ -192,7 +194,7 @@ export async function describeBehaviorOfQueue(
       });
 
       it("should redeem vault shares if LP deposited in past epoch", async () => {
-        await knoxUtil.initializeAuction();
+        await knoxUtil.setAndInitializeAuction();
 
         await asset
           .connect(signers.lp1)
@@ -208,9 +210,9 @@ export async function describeBehaviorOfQueue(
         let lpBalance = await vault.balanceOf(addresses.lp1);
         assert.isTrue(lpBalance.isZero());
 
-        await knoxUtil.fastForwardToFriday8AM();
+        await time.fastForwardToFriday8AM();
         await knoxUtil.initializeNextEpoch();
-        await knoxUtil.initializeAuction();
+        await knoxUtil.setAndInitializeAuction();
 
         await asset
           .connect(signers.lp1)
@@ -280,7 +282,7 @@ export async function describeBehaviorOfQueue(
         let tokenId: BigNumber;
 
         time.revertToSnapshotAfterEach(async () => {
-          await knoxUtil.initializeAuction();
+          await knoxUtil.setAndInitializeAuction();
 
           await asset
             .connect(signers.lp1)
@@ -290,7 +292,7 @@ export async function describeBehaviorOfQueue(
 
           tokenId = await queue.getCurrentTokenId();
 
-          await knoxUtil.fastForwardToFriday8AM();
+          await time.fastForwardToFriday8AM();
           await knoxUtil.initializeNextEpoch();
         });
 
@@ -318,7 +320,7 @@ export async function describeBehaviorOfQueue(
       let tokenId3: BigNumber;
 
       time.revertToSnapshotAfterEach(async () => {
-        await knoxUtil.initializeAuction();
+        await knoxUtil.setAndInitializeAuction();
 
         await asset
           .connect(signers.lp1)
@@ -328,10 +330,10 @@ export async function describeBehaviorOfQueue(
         await queue["deposit(uint256)"](params.deposit);
         tokenId1 = await queue.getCurrentTokenId();
 
-        await knoxUtil.fastForwardToFriday8AM();
+        await time.fastForwardToFriday8AM();
         await knoxUtil.initializeNextEpoch();
 
-        await knoxUtil.initializeAuction();
+        await knoxUtil.setAndInitializeAuction();
 
         await asset
           .connect(signers.lp1)
@@ -341,10 +343,10 @@ export async function describeBehaviorOfQueue(
         await queue["deposit(uint256)"](params.deposit);
         tokenId2 = await queue.getCurrentTokenId();
 
-        await knoxUtil.fastForwardToFriday8AM();
+        await time.fastForwardToFriday8AM();
         await knoxUtil.initializeNextEpoch();
 
-        await knoxUtil.initializeAuction();
+        await knoxUtil.setAndInitializeAuction();
 
         await asset
           .connect(signers.lp1)
@@ -354,7 +356,7 @@ export async function describeBehaviorOfQueue(
         await queue["deposit(uint256)"](params.deposit);
         tokenId3 = await queue.getCurrentTokenId();
 
-        await knoxUtil.fastForwardToFriday8AM();
+        await time.fastForwardToFriday8AM();
         await knoxUtil.initializeNextEpoch();
       });
 
@@ -415,7 +417,7 @@ export async function describeBehaviorOfQueue(
 
       describe("else", () => {
         time.revertToSnapshotAfterEach(async () => {
-          await knoxUtil.initializeAuction();
+          await knoxUtil.setAndInitializeAuction();
 
           await asset
             .connect(signers.lp1)
@@ -438,7 +440,7 @@ export async function describeBehaviorOfQueue(
           // deposits in epoch 0
           await queue.connect(signers.lp3)["deposit(uint256)"](params.deposit);
 
-          await knoxUtil.fastForwardToFriday8AM();
+          await time.fastForwardToFriday8AM();
         });
 
         it("should deposit all of queued ERC20 tokens into vault", async () => {
@@ -461,7 +463,7 @@ export async function describeBehaviorOfQueue(
 
           assert.bnEqual(pricePerShare, parseUnits("1", 18));
 
-          await knoxUtil.initializeAuction();
+          await knoxUtil.setAndInitializeAuction();
 
           // simluate vault profits, dilute shares by half
           await asset
@@ -484,7 +486,7 @@ export async function describeBehaviorOfQueue(
 
           tokenId = await queue.getCurrentTokenId();
 
-          await knoxUtil.fastForwardToFriday8AM();
+          await time.fastForwardToFriday8AM();
 
           await queue.connect(signers.vault).depositToVault();
           await vault.connect(signers.keeper).setNextEpoch();
@@ -510,7 +512,7 @@ export async function describeBehaviorOfQueue(
           .connect(signers.deployer)
           .transfer(addresses.vault, params.deposit.mul(4));
 
-        await knoxUtil.initializeAuction();
+        await knoxUtil.setAndInitializeAuction();
 
         await asset
           .connect(signers.lp1)
@@ -521,7 +523,7 @@ export async function describeBehaviorOfQueue(
 
         tokenId = await queue.getCurrentTokenId();
 
-        await knoxUtil.fastForwardToFriday8AM();
+        await time.fastForwardToFriday8AM();
 
         // totalAssets = 40,000
         // totalSupply = 0
@@ -531,7 +533,7 @@ export async function describeBehaviorOfQueue(
         shares = await queue["previewUnredeemed(uint256)"](tokenId);
         assert.bnEqual(shares, params.deposit);
 
-        await knoxUtil.initializeAuction();
+        await knoxUtil.setAndInitializeAuction();
 
         await asset
           .connect(signers.lp1)
@@ -542,7 +544,7 @@ export async function describeBehaviorOfQueue(
 
         tokenId = await queue.getCurrentTokenId();
 
-        await knoxUtil.fastForwardToFriday8AM();
+        await time.fastForwardToFriday8AM();
 
         // totalAssets = 50,000
         // totalSupply = 10,000

@@ -85,5 +85,21 @@ export function describeBehaviorOfVaultView(
 
       it("should return vault total collateral", async () => {});
     });
+
+    describe.skip("#totalPremiums()", () => {
+      time.revertToSnapshotAfterEach(async () => {});
+    });
+
+    describe.skip("#totalShortAsCollateral()", () => {
+      time.revertToSnapshotAfterEach(async () => {});
+    });
+
+    describe.skip("#totalShortAsContracts()", () => {
+      time.revertToSnapshotAfterEach(async () => {});
+    });
+
+    describe.skip("#totalReserves()", () => {
+      time.revertToSnapshotAfterEach(async () => {});
+    });
   });
 }

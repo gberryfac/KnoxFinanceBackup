@@ -1,6 +1,5 @@
 import { ethers } from "hardhat";
 import { BigNumber } from "ethers";
-const { provider } = ethers;
 
 import { fixedFromFloat, fixedToNumber } from "@premia/utils";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
@@ -45,7 +44,6 @@ type Params = {
 
 function behavesLikePricer(params: Params) {
   describe.only(params.name, () => {
-    let block;
     let underlyingSpotPriceOracle: MockContract;
     let baseSpotPriceOracle: MockContract;
     let underlyingAsset: MockERC20;
@@ -107,8 +105,6 @@ function behavesLikePricer(params: Params) {
         mockPool.address,
         mockVolatilityOracle.address
       );
-
-      block = await provider.getBlock(await provider.getBlockNumber());
     });
 
     describe("#constructor()", () => {
@@ -196,15 +192,16 @@ function behavesLikePricer(params: Params) {
 
       it("should revert if block timestamp >= expiry", async () => {
         assert.bnEqual(
-          await pricer.getTimeToMaturity64x64(block.timestamp),
+          await pricer.getTimeToMaturity64x64(await time.now()),
           BigNumber.from("0")
         );
       });
 
       it("should convert time to maurity correctly", async () => {
-        let expiry = await time.getFriday8AM(block.timestamp);
+        const timestamp = await time.now();
+        let expiry = await time.getFriday8AM(timestamp);
 
-        const expected = (expiry - block.timestamp) / 31536000;
+        const expected = (expiry - timestamp) / 31536000;
         const actual = fixedToNumber(
           await pricer.getTimeToMaturity64x64(expiry)
         );
@@ -228,7 +225,7 @@ function behavesLikePricer(params: Params) {
           mockVolatilityOracle.address
         );
 
-        let expiry = await time.getFriday8AM(block.timestamp);
+        let expiry = await time.getFriday8AM(await time.now());
 
         await expect(
           testPricer.getDeltaStrikePrice64x64(
@@ -243,14 +240,14 @@ function behavesLikePricer(params: Params) {
         await expect(
           pricer.getDeltaStrikePrice64x64(
             params.isCall,
-            block.timestamp,
+            await time.now(),
             params.delta64x64
           )
         ).to.be.revertedWith("tau <= 0");
       });
 
       it("should calculate delta strike price for call option", async () => {
-        let expiry = await time.getFriday8AM(block.timestamp);
+        let expiry = await time.getFriday8AM(await time.now());
 
         const strike = await pricer.getDeltaStrikePrice64x64(
           params.isCall,
@@ -262,7 +259,7 @@ function behavesLikePricer(params: Params) {
       });
 
       it("should calculate delta strike price for put option", async () => {
-        let expiry = await time.getFriday8AM(block.timestamp);
+        let expiry = await time.getFriday8AM(await time.now());
 
         const strike = await pricer.getDeltaStrikePrice64x64(
           !params.isCall,

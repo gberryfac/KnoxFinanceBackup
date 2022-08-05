@@ -182,7 +182,7 @@ export class KnoxUtil {
     });
   }
 
-  async initializeAuction(): Promise<[BigNumber, BigNumber, BigNumber]> {
+  async setAndInitializeAuction(): Promise<[BigNumber, BigNumber, BigNumber]> {
     const block = await provider.getBlock(await provider.getBlockNumber());
     await time.increaseTo(await time.getThursday8AM(block.timestamp));
 
@@ -193,6 +193,23 @@ export class KnoxUtil {
     const auction = await this.auction.getAuction(epoch);
 
     return [auction.startTime, auction.endTime, epoch];
+  }
+
+  async processExpiredOptions() {
+    const vault = this.vaultUtil.vault;
+    const lastEpoch = (await vault.getEpoch()).sub(1);
+    const expiredOption = await vault.getOption(lastEpoch);
+
+    const pool = this.poolUtil.pool;
+    const accounts = await pool.accountsByToken(expiredOption.longTokenId);
+    let balances = BigNumber.from(0);
+
+    for (const account of accounts) {
+      const balance = await pool.balanceOf(account, expiredOption.longTokenId);
+      balances = balances.add(balance);
+    }
+
+    await pool.processExpired(expiredOption.longTokenId, balances);
   }
 
   async initializeNextEpoch() {
@@ -209,11 +226,5 @@ export class KnoxUtil {
       .setAuctionPrices(epoch, maxPrice64x64, minPrice64x64);
 
     await vault.connect(this.signers.keeper).setNextEpoch();
-  }
-
-  async fastForwardToFriday8AM() {
-    // fast-forward to friday
-    const block = await provider.getBlock(await provider.getBlockNumber());
-    await time.increaseTo(await time.getFriday8AM(block.timestamp));
   }
 }
