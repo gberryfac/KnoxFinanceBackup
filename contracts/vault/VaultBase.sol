@@ -5,7 +5,7 @@ import "@solidstate/contracts/token/ERC4626/base/ERC4626Base.sol";
 
 import "./VaultInternal.sol";
 
-contract VaultBase is VaultInternal, ERC4626Base {
+contract VaultBase is ERC4626Base, VaultInternal {
     using SafeERC20 for IERC20;
     using VaultStorage for VaultStorage.Layout;
 
@@ -37,7 +37,7 @@ contract VaultBase is VaultInternal, ERC4626Base {
         uint256 assetAmount,
         address receiver,
         address owner
-    ) internal override(VaultInternal, ERC4626BaseInternal) returns (uint256) {
+    ) internal override(ERC4626BaseInternal, VaultInternal) returns (uint256) {
         return super._withdraw(assetAmount, receiver, owner);
     }
 
@@ -45,7 +45,7 @@ contract VaultBase is VaultInternal, ERC4626Base {
         uint256 shareAmount,
         address receiver,
         address owner
-    ) internal override(VaultInternal, ERC4626BaseInternal) returns (uint256) {
+    ) internal override(ERC4626BaseInternal, VaultInternal) returns (uint256) {
         return super._redeem(shareAmount, receiver, owner);
     }
 }

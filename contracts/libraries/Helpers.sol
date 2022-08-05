@@ -4,7 +4,13 @@ pragma solidity ^0.8.0;
 import "@solidstate/contracts/token/ERC20/IERC20.sol";
 import "@solidstate/contracts/utils/SafeERC20.sol";
 
+import "./ABDKMath64x64Token.sol";
+
 library Helpers {
+    using ABDKMath64x64 for int128;
+    using ABDKMath64x64Token for int128;
+    using ABDKMath64x64Token for uint256;
+
     /**
      * @notice returns the next Friday 8AM timestamp
      * @param timestamp is the current timestamp
@@ -49,5 +55,38 @@ library Helpers {
             friday8am += 7 days;
         }
         return friday8am;
+    }
+
+    function _fromContractsToCollateral(
+        uint256 contracts,
+        bool isCall,
+        uint8 underlyingDecimals,
+        uint8 baseDecimals,
+        int128 strike64x64
+    ) internal pure returns (uint256) {
+        if (isCall) {
+            return contracts;
+        }
+
+        return
+            ABDKMath64x64Token.toBaseTokenAmount(
+                underlyingDecimals,
+                baseDecimals,
+                strike64x64.mulu(contracts)
+            );
+    }
+
+    function _fromCollateralToContracts(
+        uint256 collateral,
+        bool isCall,
+        uint8 baseDecimals,
+        int128 strike64x64
+    ) internal pure returns (uint256) {
+        if (isCall) {
+            return collateral;
+        }
+
+        int128 collateral64x64 = collateral.fromDecimals(baseDecimals);
+        return collateral64x64.div(strike64x64).toDecimals(baseDecimals);
     }
 }

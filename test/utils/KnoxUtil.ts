@@ -182,26 +182,41 @@ export class KnoxUtil {
     });
   }
 
-  async initializeAuction(epoch: number): Promise<[BigNumber, BigNumber]> {
+  async setAndInitializeAuction(): Promise<[BigNumber, BigNumber, BigNumber]> {
     const block = await provider.getBlock(await provider.getBlockNumber());
     await time.increaseTo(await time.getThursday8AM(block.timestamp));
 
     const vault = this.vaultUtil.vault;
     await vault.connect(this.signers.keeper).setAndInitializeAuction();
 
+    const epoch = await vault.getEpoch();
     const auction = await this.auction.getAuction(epoch);
-    return [auction.startTime, auction.endTime];
+
+    return [auction.startTime, auction.endTime, epoch];
   }
 
-  async processEpoch(epoch: number) {
+  async processExpiredOptions() {
     const vault = this.vaultUtil.vault;
+    const lastEpoch = (await vault.getEpoch()).sub(1);
+    const expiredOption = await vault.getOption(lastEpoch);
 
-    // fast-forward to expiry of last sold option
-    const [expiry] = await vault.optionByEpoch(epoch - 1);
-    await time.increaseTo(expiry);
+    const pool = this.poolUtil.pool;
+    const accounts = await pool.accountsByToken(expiredOption.longTokenId);
+    let balances = BigNumber.from(0);
+
+    for (const account of accounts) {
+      const balance = await pool.balanceOf(account, expiredOption.longTokenId);
+      balances = balances.add(balance);
+    }
+
+    await pool.processExpired(expiredOption.longTokenId, balances);
+  }
+
+  async initializeNextEpoch() {
+    const vault = this.vaultUtil.vault;
+    const epoch = await vault.getEpoch();
 
     await vault.connect(this.signers.keeper).depositQueuedToVault();
-    await vault.connect(this.signers.keeper).setNextEpoch();
 
     const maxPrice64x64 = fixedFromFloat(this.params.price.max);
     const minPrice64x64 = fixedFromFloat(this.params.price.min);
@@ -209,5 +224,7 @@ export class KnoxUtil {
     await this.auction
       .connect(this.signers.vault)
       .setAuctionPrices(epoch, maxPrice64x64, minPrice64x64);
+
+    await vault.connect(this.signers.keeper).setNextEpoch();
   }
 }

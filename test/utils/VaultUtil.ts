@@ -54,8 +54,14 @@ export class VaultUtil {
         params.reserveRate64x64 > 0
           ? fixedFromFloat(params.reserveRate64x64)
           : 0,
-      performanceFee64x64: fixedFromFloat(params.performanceFee64x64),
-      withdrawalFee64x64: fixedFromFloat(params.withdrawalFee64x64),
+      performanceFee64x64:
+        params.performanceFee64x64 > 0
+          ? fixedFromFloat(params.performanceFee64x64)
+          : 0,
+      withdrawalFee64x64:
+        params.withdrawalFee64x64 > 0
+          ? fixedFromFloat(params.withdrawalFee64x64)
+          : 0,
       name: params.tokenName,
       symbol: params.tokenSymbol,
       keeper: addresses.keeper,
@@ -122,7 +128,7 @@ export class VaultUtil {
 
     addresses.vault = vaultDiamond.address;
     const vault = IVault__factory.connect(addresses.vault, signers.lp1);
-    const collateralAsset = await vault.getCollateralAsset();
+    const collateralAsset = await vault.ERC20();
 
     const asset = await getContractAt("MockERC20", collateralAsset);
 

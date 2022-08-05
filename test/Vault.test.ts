@@ -1,7 +1,7 @@
 import { ethers } from "hardhat";
 const { parseUnits } = ethers.utils;
 
-import { accounts, assets, types, KnoxUtil } from "./utils";
+import { accounts, assets, time, types, KnoxUtil } from "./utils";
 
 import { describeBehaviorOfVaultAdmin } from "../spec/VaultAdmin.behavior";
 import { describeBehaviorOfVaultBase } from "../spec/VaultBase.behavior";
@@ -19,13 +19,14 @@ describe("Vault Tests", () => {
     delta: 0.4,
     deltaOffset: 0.05,
     maxTVL: parseUnits("1000000", assets.DAI.decimals),
-    minSize: parseUnits("1", assets.DAI.decimals - 1),
+    minSize: parseUnits("1", assets.ETH.decimals - 1),
     reserveRate64x64: 0.001,
-    performanceFee64x64: 0.2,
-    withdrawalFee64x64: 0.02,
+    performanceFee64x64: 0,
+    withdrawalFee64x64: 0,
     isCall: false,
     mint: parseUnits("1000000", assets.DAI.decimals),
-    deposit: parseUnits("10000", assets.ETH.decimals),
+    deposit: parseUnits("10000", assets.DAI.decimals),
+    price: { max: 100, min: 10 },
   });
 
   behavesLikeVault({
@@ -41,11 +42,12 @@ describe("Vault Tests", () => {
     maxTVL: parseUnits("100", assets.ETH.decimals),
     minSize: parseUnits("1", assets.ETH.decimals - 1),
     reserveRate64x64: 0.001,
-    performanceFee64x64: 0.2,
-    withdrawalFee64x64: 0.02,
+    performanceFee64x64: 0,
+    withdrawalFee64x64: 0,
     isCall: true,
     mint: parseUnits("1000", assets.ETH.decimals),
     deposit: parseUnits("10", assets.ETH.decimals),
+    price: { max: 0.1, min: 0.01 },
   });
 });
 
@@ -61,8 +63,13 @@ function behavesLikeVault(params: types.VaultParams) {
     before(async () => {
       signers = await accounts.getSigners();
       addresses = await accounts.getAddresses(signers);
-
       knoxUtil = await KnoxUtil.deploy(params, signers, addresses);
+    });
+
+    describe("#constructor()", () => {
+      time.revertToSnapshotAfterEach(async () => {});
+
+      it("should initialize storage variables", async () => {});
     });
 
     describeBehaviorOfVaultAdmin({

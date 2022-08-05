@@ -102,11 +102,11 @@ contract Queue is
     }
 
     /************************************************
-     *  PROCESS EPOCH
+     *  PROCESS LAST EPOCH
      ***********************************************/
 
-    function syncEpoch(uint64 _epoch) external onlyVault {
-        _syncEpoch(_epoch);
+    function syncEpoch(uint64 epoch) external onlyVault {
+        _syncEpoch(epoch);
     }
 
     function depositToVault() external onlyVault {
@@ -153,8 +153,8 @@ contract Queue is
      * HELPERS
      ***********************************************/
 
-    function formatClaimTokenId(uint64 _epoch) external view returns (uint256) {
-        return QueueStorage._formatTokenId(_epoch);
+    function formatClaimTokenId(uint64 epoch) external view returns (uint256) {
+        return QueueStorage._formatTokenId(epoch);
     }
 
     function parseClaimTokenId(uint256 tokenId)

@@ -8,39 +8,35 @@ contract VaultView is VaultInternal {
 
     constructor(bool isCall, address pool) VaultInternal(isCall, pool) {}
 
-    function accountsByOption(uint256 id)
-        external
-        view
-        returns (address[] memory)
-    {
-        return Pool.accountsByToken(id);
-    }
-
     function getEpoch() external view returns (uint64) {
         return VaultStorage.layout()._getEpoch();
     }
 
-    function getCollateralAsset() external view returns (address) {
-        return address(ERC20);
+    function getOption(uint64 epoch)
+        external
+        view
+        returns (VaultStorage.Option memory)
+    {
+        return VaultStorage.layout()._getOption(epoch);
     }
 
     function totalCollateral() external view returns (uint256) {
         return _totalCollateral();
     }
 
-    function optionsByAccount(address account)
-        external
-        view
-        returns (uint256[] memory)
-    {
-        return Pool.tokensByAccount(account);
+    function totalPremiums() external view returns (uint256) {
+        return _totalPremiums();
     }
 
-    function optionByEpoch(uint64 _epoch)
-        external
-        view
-        returns (VaultStorage.Option memory)
-    {
-        return VaultStorage.layout()._optionByEpoch(_epoch);
+    function totalShortAsCollateral() external view returns (uint256) {
+        return _totalShortAsCollateral();
+    }
+
+    function totalShortAsContracts() external view returns (uint256) {
+        return _totalShortAsContracts();
+    }
+
+    function totalReserves() external view returns (uint256) {
+        return _totalReserves();
     }
 }

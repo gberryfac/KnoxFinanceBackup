@@ -46,15 +46,15 @@ interface IVaultAdmin {
 
     /**
      * @notice Sets the performance fee for the vault
-     * @param newPerformanceFee is the performance fee (6 decimals). ex: 20 * 10 ** 6 = 20%
+     * @param newPerformanceFee64x64 is the performance fee as a 64x64 fixed point number
      */
-    function setPerformanceFee(uint256 newPerformanceFee) external;
+    function setPerformanceFee64x64(int128 newPerformanceFee64x64) external;
 
     /**
      * @notice Sets the withdrawal fee for the vault
-     * @param newWithdrawalFee is the withdrawal fee (6 decimals). ex: 2 * 10 ** 6 = 2%
+     * @param newWithdrawalFee64x64 is the withdrawal fee as a 64x64 fixed point number
      */
-    function setWithdrawalFee(uint256 newWithdrawalFee) external;
+    function setWithdrawalFee64x64(int128 newWithdrawalFee64x64) external;
 
     /************************************************
      *  INITIALIZE AUCTION
@@ -71,28 +71,23 @@ interface IVaultAdmin {
     function setOptionParameters() external;
 
     /**
-     * @notice Sets the start and end time of the auction.
-     */
-    function setAuctionWindow() external;
-
-    /**
      * @notice
      */
     function initializeAuction() external;
 
     /************************************************
-     *  PROCESS EPOCH
+     *  PROCESS LAST EPOCH
      ***********************************************/
+
+    // /**
+    //  * @notice
+    //  */
+    function initializeAndProcessEpochs() external;
 
     /**
      * @notice Prepares the strategy and initiates the next round of option sales
      */
-    function processEpoch(bool _processExpired) external;
-
-    /**
-     * @notice Processes expired options
-     */
-    function processExpired() external;
+    function processLastEpoch() external;
 
     /**
      * @notice Transfers reserved liquidity from Premia pool to Vault.
@@ -100,24 +95,32 @@ interface IVaultAdmin {
     function withdrawReservedLiquidity() external;
 
     // /**
+    //  * @notice
+    //  */
+    function collectPerformanceFee() external;
+
+    /************************************************
+     *  INITIALIZE NEXT EPOCH
+     ***********************************************/
+
     // /**
     //  * @notice
     //  */
-    function collectVaultFees() external;
+    function initalizeNextEpoch() external;
 
     //  * @notice
     //  */
     function depositQueuedToVault() external;
 
-    // /**
-    //  * @notice
-    //  */
-    function setNextEpoch() external;
-
     /**
      * @notice Sets the start and end time of the auction.
      */
     function setAuctionPrices() external;
+
+    // /**
+    //  * @notice
+    //  */
+    function setNextEpoch() external;
 
     /************************************************
      *  PROCESS AUCTION

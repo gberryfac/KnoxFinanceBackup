@@ -90,7 +90,14 @@ contract Auction is Access, AuctionInternal, IAuction {
     }
 
     function previewWithdraw(uint64 epoch) external returns (uint256, uint256) {
-        return _previewWithdraw(epoch);
+        return _previewWithdraw(epoch, msg.sender);
+    }
+
+    function previewWithdraw(uint64 epoch, address buyer)
+        external
+        returns (uint256, uint256)
+    {
+        return _previewWithdraw(epoch, buyer);
     }
 
     /************************************************
@@ -101,12 +108,12 @@ contract Auction is Access, AuctionInternal, IAuction {
         return _processOrders(epoch);
     }
 
-    function finalizeAuction(uint64 epoch) external returns (bool) {
-        return _finalizeAuction(epoch);
+    function finalizeAuction(uint64 epoch) external {
+        _finalizeAuction(epoch);
     }
 
-    function transferPremium(uint64 epoch) external {
-        _transferPremium(epoch);
+    function transferPremium(uint64 epoch) external returns (uint256) {
+        return _transferPremium(epoch);
     }
 
     function processAuction(uint64 epoch) external {

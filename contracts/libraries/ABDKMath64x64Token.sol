@@ -213,6 +213,13 @@ library ABDKMath64x64Token {
         value64x64 = fromDecimals(value, 18);
     }
 
+    /**
+     * @notice converts the value to a token amount denominated in the base asset.
+     * @param underlyingDecimals decimal precision of the underlying asset
+     * @param baseDecimals decimal precision of the base asset
+     * @param value amount to convert
+     * @return decimal representation of base token amount
+     */
     function toBaseTokenAmount(
         uint8 underlyingDecimals,
         uint8 baseDecimals,

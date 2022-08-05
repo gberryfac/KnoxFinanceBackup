@@ -73,19 +73,13 @@ library VaultStorage {
         uint64 startOffset;
         // @notice
         uint64 endOffset;
-        // @notice
-        uint256 startTime;
-        // @notice
-        uint256 endTime;
         /************************************************
          * VAULT STATE
          ***********************************************/
         // @notice
         uint64 epoch;
         // @notice
-        uint256 totalCollateral;
-        // @notice
-        uint256 totalShort;
+        uint256 totalShortContracts;
         // @notice
         uint256 totalPremiums;
         /************************************************
@@ -128,7 +122,7 @@ library VaultStorage {
         return l.epoch;
     }
 
-    function _optionByEpoch(Layout storage l, uint64 epoch)
+    function _getOption(Layout storage l, uint64 epoch)
         internal
         view
         returns (Option memory)

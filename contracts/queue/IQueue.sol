@@ -53,7 +53,7 @@ interface IQueue is IERC165, IERC1155, IERC1155Enumerable, IQueueEvents {
     function redeemMax(address receiver, address owner) external;
 
     /************************************************
-     *  PROCESS EPOCH
+     *  PROCESS LAST EPOCH
      ***********************************************/
 
     function syncEpoch(uint64 epoch) external;
@@ -83,7 +83,7 @@ interface IQueue is IERC165, IERC1155, IERC1155Enumerable, IQueueEvents {
      * HELPERS
      ***********************************************/
 
-    function formatClaimTokenId(uint64 _epoch) external view returns (uint256);
+    function formatClaimTokenId(uint64 epoch) external view returns (uint256);
 
     function parseClaimTokenId(uint256 tokenId)
         external

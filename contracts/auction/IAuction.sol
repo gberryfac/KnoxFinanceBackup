@@ -51,15 +51,19 @@ interface IAuction is IAuctionEvents, IERC1155Receiver {
 
     function previewWithdraw(uint64 epoch) external returns (uint256, uint256);
 
+    function previewWithdraw(uint64 epoch, address buyer)
+        external
+        returns (uint256, uint256);
+
     /************************************************
      *  MAINTENANCE
      ***********************************************/
 
     function processOrders(uint64 epoch) external returns (bool);
 
-    function finalizeAuction(uint64 epoch) external returns (bool);
+    function finalizeAuction(uint64 epoch) external;
 
-    function transferPremium(uint64 epoch) external;
+    function transferPremium(uint64 epoch) external returns (uint256);
 
     function processAuction(uint64 epoch) external;
 

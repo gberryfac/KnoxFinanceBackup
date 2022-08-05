@@ -128,7 +128,7 @@ contract QueueInternal is
     }
 
     /************************************************
-     *  PROCESS EPOCH
+     *  PROCESS LAST EPOCH
      ***********************************************/
 
     function _syncEpoch(uint64 epoch) internal {

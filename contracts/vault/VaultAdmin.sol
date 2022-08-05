@@ -63,11 +63,11 @@ contract VaultAdmin is Access, VaultInternal {
      * @notice Sets the performance fee for the vault
      * @param newPerformanceFee64x64 is the performance fee as a 64x64 fixed point number
      */
-    function setPerformanceFee(int128 newPerformanceFee64x64)
+    function setPerformanceFee64x64(int128 newPerformanceFee64x64)
         external
         onlyOwner
     {
-        _setPerformanceFee(newPerformanceFee64x64);
+        _setPerformanceFee64x64(newPerformanceFee64x64);
     }
 
     /**
@@ -75,8 +75,11 @@ contract VaultAdmin is Access, VaultInternal {
      * @param newWithdrawalFee64x64 is the withdrawal fee as a 64x64 fixed point number
      * @dev withdrawal fee must be annualized by dividing by the number of weeks in the year. i.e. 2% / 52.142857
      */
-    function setWithdrawalFee(int128 newWithdrawalFee64x64) external onlyOwner {
-        _setWithdrawalFee(newWithdrawalFee64x64);
+    function setWithdrawalFee64x64(int128 newWithdrawalFee64x64)
+        external
+        onlyOwner
+    {
+        _setWithdrawalFee64x64(newWithdrawalFee64x64);
     }
 
     /************************************************
@@ -86,7 +89,7 @@ contract VaultAdmin is Access, VaultInternal {
     /**
      * @notice
      */
-    function setAndInitializeAuction() external {
+    function setAndInitializeAuction() external onlyKeeper {
         _setAndInitializeAuction();
     }
 
@@ -98,13 +101,6 @@ contract VaultAdmin is Access, VaultInternal {
     }
 
     /**
-     * @notice Sets the start and end time of the auction.
-     */
-    function setAuctionWindow() external onlyKeeper {
-        _setAuctionWindow();
-    }
-
-    /**
      * @notice
      */
     function initializeAuction() external onlyKeeper {
@@ -112,21 +108,21 @@ contract VaultAdmin is Access, VaultInternal {
     }
 
     /************************************************
-     *  PROCESS EPOCH
+     *  PROCESS LAST EPOCH
      ***********************************************/
 
     /**
      * @notice Prepares the strategy and initiates the next round of option sales
      */
-    function processEpoch(bool _processExpired) external {
-        _processEpoch(_processExpired);
+    function initializeAndProcessEpochs() external onlyKeeper {
+        _initializeAndProcessEpochs();
     }
 
     /**
-     * @notice Processes expired options
+     * @notice Prepares the strategy and initiates the next round of option sales
      */
-    function processExpired() external onlyKeeper {
-        _processExpired();
+    function processLastEpoch() external onlyKeeper {
+        _processLastEpoch();
     }
 
     /**
@@ -139,8 +135,19 @@ contract VaultAdmin is Access, VaultInternal {
     /**
      * @notice
      */
-    function collectVaultFees() external onlyKeeper {
-        _collectVaultFees();
+    function collectPerformanceFee() external onlyKeeper {
+        _collectPerformanceFee();
+    }
+
+    /************************************************
+     *  INITIALIZE NEXT EPOCH
+     ***********************************************/
+
+    /**
+     * @notice
+     */
+    function initalizeNextEpoch() external onlyKeeper {
+        _initalizeNextEpoch();
     }
 
     /**
@@ -153,15 +160,15 @@ contract VaultAdmin is Access, VaultInternal {
     /**
      * @notice
      */
-    function setNextEpoch() external onlyKeeper {
-        _setNextEpoch();
+    function setAuctionPrices() external onlyKeeper {
+        _setAuctionPrices();
     }
 
     /**
      * @notice
      */
-    function setAuctionPrices() external onlyKeeper {
-        _setAuctionPrices();
+    function setNextEpoch() external onlyKeeper {
+        _setNextEpoch();
     }
 
     /************************************************
@@ -171,7 +178,7 @@ contract VaultAdmin is Access, VaultInternal {
     /**
      * @notice
      */
-    function processAuction() external {
+    function processAuction() external onlyKeeper {
         _processAuction();
     }
 
