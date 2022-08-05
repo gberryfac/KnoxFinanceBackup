@@ -867,6 +867,10 @@ export function describeBehaviorOfAuction(
     });
 
     describe("#transferPremium(uint64)", () => {
+      it("should revert if !vault", async () => {
+        await expect(auction.transferPremium(0)).to.be.revertedWith("!vault");
+      });
+
       describe("if not finalized", () => {
         it.skip("should revert", async () => {});
       });
@@ -881,18 +885,18 @@ export function describeBehaviorOfAuction(
         it.skip("should revert if auction is cancelled", async () => {});
 
         it("should revert if premiums have been transferred", async () => {
-          await auction.transferPremium(0);
+          await auction.connect(signers.vault).transferPremium(0);
 
-          await expect(auction.transferPremium(0)).to.be.revertedWith(
-            "premiums transferred"
-          );
+          await expect(
+            auction.connect(signers.vault).transferPremium(0)
+          ).to.be.revertedWith("premiums transferred");
         });
 
         it("should transfer premiums to Vault if successful", async () => {
           const auctionBalanceBefore = await asset.balanceOf(addresses.auction);
           const vaultBalanceBefore = await asset.balanceOf(addresses.vault);
 
-          await auction.transferPremium(0);
+          await auction.connect(signers.vault).transferPremium(0);
           const { totalPremiums } = await auction.getAuction(0);
 
           const auctionBalanceAfter = await asset.balanceOf(addresses.auction);
@@ -912,6 +916,10 @@ export function describeBehaviorOfAuction(
     });
 
     describe("#processAuction(uint64)", () => {
+      it("should revert if !vault", async () => {
+        await expect(auction.processAuction(0)).to.be.revertedWith("!vault");
+      });
+
       describe("if not finalized", () => {
         it.skip("should revert", async () => {});
       });
@@ -931,7 +939,7 @@ export function describeBehaviorOfAuction(
         });
 
         it("should emit AuctionStatus event when processed", async () => {
-          const tx = await auction.processAuction(epoch);
+          const tx = await auction.connect(signers.vault).processAuction(epoch);
           await expect(tx).to.emit(auction, "AuctionStatus").withArgs(2);
         });
       });
@@ -946,16 +954,16 @@ export function describeBehaviorOfAuction(
         it.skip("should revert if auction is cancelled", async () => {});
 
         it("should revert if premiums have not been transferred to Vault", async () => {
-          await expect(auction.processAuction(0)).to.be.revertedWith(
-            "premiums not transferred"
-          );
+          await expect(
+            auction.connect(signers.vault).processAuction(0)
+          ).to.be.revertedWith("premiums not transferred");
         });
 
         it("should revert if long tokens have not been transferred to Auction", async () => {
-          await auction.transferPremium(0);
-          await expect(auction.processAuction(0)).to.be.revertedWith(
-            "long tokens not transferred"
-          );
+          await auction.connect(signers.vault).transferPremium(0);
+          await expect(
+            auction.connect(signers.vault).processAuction(0)
+          ).to.be.revertedWith("long tokens not transferred");
         });
 
         it("should emit AuctionStatus event when processed", async () => {

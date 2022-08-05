@@ -57,6 +57,19 @@ contract AuctionInternal is IAuctionEvents {
     }
 
     /************************************************
+     *  ACCESS
+     ***********************************************/
+
+    /**
+     * @dev Throws if called by any account other than the vault.
+     */
+    modifier onlyVault() {
+        AuctionStorage.Layout storage l = AuctionStorage.layout();
+        require(msg.sender == l.vault, "!vault");
+        _;
+    }
+
+    /************************************************
      *  INITIALIZATION
      ***********************************************/
 

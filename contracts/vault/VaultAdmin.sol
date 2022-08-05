@@ -1,11 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "../access/Access.sol";
-
 import "./VaultInternal.sol";
 
-contract VaultAdmin is Access, VaultInternal {
+contract VaultAdmin is VaultInternal {
     using SafeERC20 for IERC20;
     using VaultStorage for VaultStorage.Layout;
 
@@ -27,8 +25,6 @@ contract VaultAdmin is Access, VaultInternal {
         l.Auction = IAuction(initImpl.auction);
         l.Queue = IQueue(initImpl.queue);
         l.Pricer = IPricer(initImpl.pricer);
-
-        AccessStorage.layout().queue = initImpl.queue;
     }
 
     /************************************************

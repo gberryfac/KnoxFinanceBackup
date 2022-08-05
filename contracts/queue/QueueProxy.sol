@@ -7,14 +7,11 @@ import "@solidstate/contracts/introspection/IERC165.sol";
 import "@solidstate/contracts/proxy/upgradeable/UpgradeableProxyOwnable.sol";
 import "@solidstate/contracts/proxy/upgradeable/UpgradeableProxyStorage.sol";
 
-import "../access/AccessStorage.sol";
-
 import "../vault/IVault.sol";
 
 import "./QueueStorage.sol";
 
 contract QueueProxy is UpgradeableProxyOwnable {
-    using AccessStorage for AccessStorage.Layout;
     using ERC165Storage for ERC165Storage.Layout;
     using OwnableStorage for OwnableStorage.Layout;
     using QueueStorage for QueueStorage.Layout;
@@ -27,6 +24,7 @@ contract QueueProxy is UpgradeableProxyOwnable {
     ) {
         {
             QueueStorage.Layout storage l = QueueStorage.layout();
+            l.vault = vault;
             l.maxTVL = maxTVL;
         }
 
@@ -36,7 +34,6 @@ contract QueueProxy is UpgradeableProxyOwnable {
             l.setSupportedInterface(type(IERC1155).interfaceId, true);
         }
 
-        AccessStorage.layout().vault = vault;
         OwnableStorage.layout().setOwner(msg.sender);
         UpgradeableProxyStorage.layout().setImplementation(implementation);
     }

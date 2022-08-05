@@ -2,14 +2,13 @@
 pragma solidity ^0.8.0;
 
 import "@solidstate/contracts/introspection/ERC165Storage.sol";
-
-import "../access/Access.sol";
+import "@solidstate/contracts/utils/ReentrancyGuard.sol";
 
 import "./AuctionInternal.sol";
 import "./IAuction.sol";
 
 // TODO: Switch to stage modifiers
-contract Auction is Access, AuctionInternal, IAuction {
+contract Auction is AuctionInternal, IAuction, ReentrancyGuard {
     using AuctionStorage for AuctionStorage.Layout;
     using ERC165Storage for ERC165Storage.Layout;
 
@@ -85,7 +84,7 @@ contract Auction is Access, AuctionInternal, IAuction {
      *  WITHDRAW
      ***********************************************/
 
-    function withdraw(uint64 epoch) external {
+    function withdraw(uint64 epoch) external nonReentrant {
         _withdraw(epoch);
     }
 
@@ -112,11 +111,15 @@ contract Auction is Access, AuctionInternal, IAuction {
         _finalizeAuction(epoch);
     }
 
-    function transferPremium(uint64 epoch) external returns (uint256) {
+    function transferPremium(uint64 epoch)
+        external
+        onlyVault
+        returns (uint256)
+    {
         return _transferPremium(epoch);
     }
 
-    function processAuction(uint64 epoch) external {
+    function processAuction(uint64 epoch) external onlyVault {
         _processAuction(epoch);
     }
 

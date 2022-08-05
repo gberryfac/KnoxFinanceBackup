@@ -7,6 +7,8 @@ library QueueStorage {
      ***********************************************/
     struct Layout {
         // @notice
+        address vault;
+        // @notice
         uint64 epoch;
         // @notice
         uint256 maxTVL;
