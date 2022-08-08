@@ -184,7 +184,7 @@ contract AuctionInternal is IAuctionEvents {
         auction.totalTime = initAuction.endTime - initAuction.startTime;
         auction.longTokenId = initAuction.longTokenId;
 
-        emit AuctionStatus(AuctionStorage.Status.INITIALIZED);
+        emit AuctionStatus(initAuction.epoch, auction.status);
     }
 
     function _setAuctionPrices(
@@ -270,7 +270,7 @@ contract AuctionInternal is IAuctionEvents {
 
         uint256 cost = price64x64.mulu(size);
         ERC20.safeTransferFrom(msg.sender, address(this), cost);
-        l.claimsByBuyer[msg.sender].add(epoch);
+        l.epochsByBuyer[msg.sender].add(epoch);
 
         uint256 id = l.orderbooks[epoch]._insert(price64x64, size, msg.sender);
 
@@ -278,7 +278,7 @@ contract AuctionInternal is IAuctionEvents {
             _finalizeAuction(epoch);
         }
 
-        emit OrderAdded(id, msg.sender, price64x64, size, true);
+        emit OrderAdded(epoch, id, msg.sender, price64x64, size, true);
     }
 
     function _cancelLimitOrder(uint64 epoch, uint256 id) internal {
@@ -294,7 +294,7 @@ contract AuctionInternal is IAuctionEvents {
         require(data.buyer == msg.sender, "buyer != msg.sender");
 
         orderbook._remove(id);
-        l.claimsByBuyer[data.buyer].remove(epoch);
+        l.epochsByBuyer[data.buyer].remove(epoch);
 
         if (block.timestamp >= auction.startTime) {
             _finalizeAuction(epoch);
@@ -317,13 +317,13 @@ contract AuctionInternal is IAuctionEvents {
         ERC20.safeTransferFrom(msg.sender, address(this), cost);
 
         auction.lastPrice64x64 = price64x64;
-        l.claimsByBuyer[msg.sender].add(epoch);
+        l.epochsByBuyer[msg.sender].add(epoch);
 
         uint256 id = l.orderbooks[epoch]._insert(price64x64, size, msg.sender);
 
         _finalizeAuction(epoch);
 
-        emit OrderAdded(id, msg.sender, price64x64, size, false);
+        emit OrderAdded(epoch, id, msg.sender, price64x64, size, false);
     }
 
     /************************************************
@@ -336,7 +336,7 @@ contract AuctionInternal is IAuctionEvents {
         (uint256 refund, uint256 fill) =
             _previewWithdraw(l, false, epoch, msg.sender);
 
-        l.claimsByBuyer[msg.sender].remove(epoch);
+        l.epochsByBuyer[msg.sender].remove(epoch);
 
         (bool expired, uint256 exercisedAmount) =
             Vault.getExerciseAmount(epoch, fill);
@@ -486,10 +486,10 @@ contract AuctionInternal is IAuctionEvents {
         ) {
             l.auctions[epoch].lastPrice64x64 = type(int128).max;
             auction.status = AuctionStorage.Status.FINALIZED;
-            emit AuctionStatus(AuctionStorage.Status.FINALIZED);
+            emit AuctionStatus(epoch, auction.status);
         } else if (_processOrders(epoch) || block.timestamp > auction.endTime) {
             auction.status = AuctionStorage.Status.FINALIZED;
-            emit AuctionStatus(AuctionStorage.Status.FINALIZED);
+            emit AuctionStatus(epoch, auction.status);
         }
     }
 
@@ -531,30 +531,30 @@ contract AuctionInternal is IAuctionEvents {
         }
 
         auction.status = AuctionStorage.Status.PROCESSED;
-        emit AuctionStatus(AuctionStorage.Status.PROCESSED);
+        emit AuctionStatus(epoch, auction.status);
     }
 
     /************************************************
      *  VIEW
      ***********************************************/
 
-    function _claimsByBuyer(address buyer)
+    function _epochsByBuyer(address buyer)
         internal
         view
         returns (uint64[] memory)
     {
         AuctionStorage.Layout storage l = AuctionStorage.layout();
-        EnumerableSet.UintSet storage epochs = l.claimsByBuyer[buyer];
+        EnumerableSet.UintSet storage epochs = l.epochsByBuyer[buyer];
 
-        uint64[] memory claims = new uint64[](epochs.length());
+        uint64[] memory epochsByBuyer = new uint64[](epochs.length());
 
         unchecked {
             for (uint256 i; i < epochs.length(); i++) {
-                claims[i] = uint64(epochs.at(i));
+                epochsByBuyer[i] = uint64(epochs.at(i));
             }
         }
 
-        return claims;
+        return epochsByBuyer;
     }
 
     function _getTotalContracts(uint64 epoch) internal view returns (uint256) {

@@ -38,7 +38,7 @@ library AuctionStorage {
         uint256 minSize;
         mapping(uint64 => Auction) auctions;
         mapping(uint64 => OrderBook.Index) orderbooks;
-        mapping(address => EnumerableSet.UintSet) claimsByBuyer;
+        mapping(address => EnumerableSet.UintSet) epochsByBuyer;
     }
 
     bytes32 internal constant STORAGE_SLOT =

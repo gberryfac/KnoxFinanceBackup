@@ -151,12 +151,12 @@ contract Auction is AuctionInternal, IAuction, ReentrancyGuard {
      *  VIEW
      ***********************************************/
 
-    function claimsByBuyer(address buyer)
+    function epochsByBuyer(address buyer)
         external
         view
         returns (uint64[] memory)
     {
-        return _claimsByBuyer(buyer);
+        return _epochsByBuyer(buyer);
     }
 
     function getAuction(uint64 epoch)

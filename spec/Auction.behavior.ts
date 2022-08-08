@@ -2,7 +2,7 @@ import { ethers } from "hardhat";
 import { BigNumber, ContractTransaction } from "ethers";
 const { parseUnits } = ethers.utils;
 
-import { fixedFromFloat, fixedToNumber } from "@premia/utils";
+import { fixedFromFloat, fixedToBn, fixedToNumber } from "@premia/utils";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 
 import chai, { expect } from "chai";
@@ -94,7 +94,7 @@ export function describeBehaviorOfAuction(
 
       await time.fastForwardToFriday8AM();
       await knoxUtil.initializeNextEpoch();
-      await time.increaseTo(startTime.add(1));
+      await time.increaseTo(startTime);
 
       const [txs, totalContractsSold] =
         await utilizeAllContractsMarketOrdersOnly(epoch);
@@ -138,7 +138,7 @@ export function describeBehaviorOfAuction(
       await time.fastForwardToFriday8AM();
       await knoxUtil.initializeNextEpoch();
 
-      await time.increaseTo(startTime.add(1));
+      await time.increaseTo(startTime);
 
       await asset
         .connect(signers.buyer3)
@@ -494,7 +494,7 @@ export function describeBehaviorOfAuction(
           await expect(
             auction.addLimitOrder(
               epoch,
-              fixedFromFloat("0.1"),
+              fixedFromFloat(params.price.max),
               parseUnits("1", params.collateral.decimals - 2)
             )
           ).to.be.revertedWith("size < minimum");
@@ -505,7 +505,7 @@ export function describeBehaviorOfAuction(
             .connect(signers.buyer1)
             .approve(addresses.auction, ethers.constants.MaxUint256);
 
-          const price = fixedFromFloat("0.1");
+          const price = fixedFromFloat(params.price.max);
 
           await expect(auction.addLimitOrder(epoch, price, params.size))
             .to.emit(auction, "OrderAdded")
@@ -522,23 +522,23 @@ export function describeBehaviorOfAuction(
 
           await auction.addLimitOrder(
             epoch,
-            fixedFromFloat("0.1"),
+            fixedFromFloat(params.price.max),
             params.size
           );
 
           const auctionBalanceAfter = await asset.balanceOf(addresses.auction);
           const buyerBalanceAfter = await asset.balanceOf(addresses.buyer1);
 
-          const cost = params.size.div(10);
+          const cost = math.bnToNumber(params.size) * params.price.max;
 
-          expect(math.bnToNumber(auctionBalanceAfter)).to.almost(
-            math.bnToNumber(auctionBalanceBefore.add(cost)),
-            1
+          assert.equal(
+            math.bnToNumber(auctionBalanceAfter.sub(auctionBalanceBefore)),
+            cost
           );
 
-          expect(math.bnToNumber(buyerBalanceAfter)).to.almost(
-            math.bnToNumber(buyerBalanceBefore.sub(cost)),
-            1
+          assert.equal(
+            math.bnToNumber(buyerBalanceBefore.sub(buyerBalanceAfter)),
+            cost
           );
         });
 
@@ -549,7 +549,7 @@ export function describeBehaviorOfAuction(
 
           const tx = await auction.addLimitOrder(
             epoch,
-            fixedFromFloat("0.1"),
+            fixedFromFloat(params.price.max),
             params.size
           );
 
@@ -557,13 +557,16 @@ export function describeBehaviorOfAuction(
           const order = await auction.getOrderById(epoch, args.id);
 
           await assert.bnEqual(order.id, BigNumber.from("1"));
-          await assert.bnEqual(order.price64x64, fixedFromFloat("0.1"));
+          await assert.bnEqual(
+            order.price64x64,
+            fixedFromFloat(params.price.max)
+          );
           await assert.bnEqual(order.size, params.size);
           await assert.equal(order.buyer, addresses.buyer1);
         });
 
         it("should add epoch to buyer if successful", async () => {
-          assert.isEmpty(await auction.claimsByBuyer(addresses.buyer1));
+          assert.isEmpty(await auction.epochsByBuyer(addresses.buyer1));
 
           await asset
             .connect(signers.buyer1)
@@ -571,12 +574,11 @@ export function describeBehaviorOfAuction(
 
           await auction.addLimitOrder(
             epoch,
-            // TODO: use params.price.max/ params.price.min
-            fixedFromFloat("0.1"),
+            fixedFromFloat(params.price.max),
             params.size
           );
 
-          const epochByBuyer = await auction.claimsByBuyer(addresses.buyer1);
+          const epochByBuyer = await auction.epochsByBuyer(addresses.buyer1);
 
           assert.equal(epochByBuyer.length, 1);
           assert.bnEqual(epochByBuyer[0], epoch);
@@ -651,8 +653,6 @@ export function describeBehaviorOfAuction(
     });
 
     describe("#cancelLimitOrder(uint64,uint256)", () => {
-      const cost = params.size.div(10);
-
       describe("if not initialized", () => {
         it("should revert", async () => {
           await expect(
@@ -677,7 +677,7 @@ export function describeBehaviorOfAuction(
 
           await auction.addLimitOrder(
             epoch,
-            fixedFromFloat("0.1"),
+            fixedFromFloat(params.price.max),
             params.size
           );
         });
@@ -708,6 +708,8 @@ export function describeBehaviorOfAuction(
         });
 
         it("should issue refund if successful", async () => {
+          const cost = math.bnToNumber(params.size) * params.price.max;
+
           const auctionBalanceBefore = await asset.balanceOf(addresses.auction);
           const buyerBalanceBefore = await asset.balanceOf(addresses.buyer1);
 
@@ -716,14 +718,14 @@ export function describeBehaviorOfAuction(
           const auctionBalanceAfter = await asset.balanceOf(addresses.auction);
           const buyerBalanceAfter = await asset.balanceOf(addresses.buyer1);
 
-          expect(math.bnToNumber(auctionBalanceAfter)).to.almost(
-            math.bnToNumber(auctionBalanceBefore.sub(cost)),
-            1
+          assert.equal(
+            math.bnToNumber(auctionBalanceBefore.sub(auctionBalanceAfter)),
+            cost
           );
 
-          expect(math.bnToNumber(buyerBalanceAfter)).to.almost(
-            math.bnToNumber(buyerBalanceBefore.add(cost)),
-            1
+          assert.equal(
+            math.bnToNumber(buyerBalanceAfter.sub(buyerBalanceBefore)),
+            cost
           );
         });
 
@@ -745,16 +747,16 @@ export function describeBehaviorOfAuction(
 
           await auction.addLimitOrder(
             epoch,
-            fixedFromFloat("0.1"),
+            fixedFromFloat(params.price.max),
             params.size
           );
 
-          let epochByBuyer = await auction.claimsByBuyer(addresses.buyer1);
+          let epochByBuyer = await auction.epochsByBuyer(addresses.buyer1);
           assert.equal(epochByBuyer.length, 1);
 
           await auction.cancelLimitOrder(epoch, 1);
 
-          epochByBuyer = await auction.claimsByBuyer(addresses.buyer1);
+          epochByBuyer = await auction.epochsByBuyer(addresses.buyer1);
           assert.isEmpty(epochByBuyer);
         });
       });
@@ -814,7 +816,7 @@ export function describeBehaviorOfAuction(
 
           await auction.addLimitOrder(
             epoch,
-            fixedFromFloat("0.1"),
+            fixedFromFloat(params.price.max),
             params.size
           );
 
@@ -876,7 +878,7 @@ export function describeBehaviorOfAuction(
           [startTime, , epoch] = await knoxUtil.setAndInitializeAuction();
           await time.fastForwardToFriday8AM();
           await knoxUtil.initializeNextEpoch();
-          await time.increaseTo(startTime.add(1));
+          await time.increaseTo(startTime);
         });
 
         it("should revert if auction has ended", async () => {
@@ -933,27 +935,29 @@ export function describeBehaviorOfAuction(
           const auctionBalanceBefore = await asset.balanceOf(addresses.auction);
           const buyerBalanceBefore = await asset.balanceOf(addresses.buyer1);
 
-          const price = fixedToNumber(await auction.priceCurve64x64(epoch));
-          const cost = price * math.bnToNumber(params.size);
-          const bnCost = math.toUnits(cost);
-
           await asset
             .connect(signers.buyer1)
             .approve(addresses.auction, ethers.constants.MaxUint256);
 
-          await auction.addMarketOrder(epoch, params.size);
+          const tx = await auction.addMarketOrder(epoch, params.size);
+          const args = await getEventArgs(tx, "OrderAdded");
+          const cost = math.bnToNumber(
+            params.size
+              .mul(fixedToBn(args.price64x64))
+              .div((10 ** params.collateral.decimals).toString())
+          );
 
           const auctionBalanceAfter = await asset.balanceOf(addresses.auction);
           const buyerBalanceAfter = await asset.balanceOf(addresses.buyer1);
 
-          expect(math.bnToNumber(auctionBalanceAfter)).to.almost(
-            math.bnToNumber(auctionBalanceBefore.add(bnCost)),
-            1
+          assert.equal(
+            math.bnToNumber(auctionBalanceAfter.sub(auctionBalanceBefore)),
+            cost
           );
 
-          expect(math.bnToNumber(buyerBalanceAfter)).to.almost(
-            math.bnToNumber(buyerBalanceBefore.sub(bnCost)),
-            1
+          assert.equal(
+            math.bnToNumber(buyerBalanceBefore.sub(buyerBalanceAfter)),
+            cost
           );
         });
 
@@ -975,7 +979,7 @@ export function describeBehaviorOfAuction(
         });
 
         it("should add epoch to buyer if successful", async () => {
-          assert.isEmpty(await auction.claimsByBuyer(addresses.buyer1));
+          assert.isEmpty(await auction.epochsByBuyer(addresses.buyer1));
 
           await asset
             .connect(signers.buyer1)
@@ -983,7 +987,7 @@ export function describeBehaviorOfAuction(
 
           await auction.addMarketOrder(epoch, params.size);
 
-          const epochByBuyer = await auction.claimsByBuyer(addresses.buyer1);
+          const epochByBuyer = await auction.epochsByBuyer(addresses.buyer1);
 
           assert.equal(epochByBuyer.length, 1);
           assert.bnEqual(epochByBuyer[0], epoch);
@@ -1000,7 +1004,7 @@ export function describeBehaviorOfAuction(
 
           await auction.addLimitOrder(
             epoch,
-            fixedFromFloat("0.1"),
+            fixedFromFloat(params.price.max),
             params.size
           );
 
@@ -1066,8 +1070,7 @@ export function describeBehaviorOfAuction(
         it("should emit AuctionStatus event if utilization == %100", async () => {
           await time.fastForwardToFriday8AM();
           await knoxUtil.initializeNextEpoch();
-          // TODO: remove .add(1)
-          await time.increaseTo(startTime.add(1));
+          await time.increaseTo(startTime);
 
           const [txs] = await utilizeAllContractsMarketOrdersOnly(epoch);
 
@@ -1808,7 +1811,7 @@ export function describeBehaviorOfAuction(
           ](epoch);
 
           assert.isTrue(fill.isZero());
-          expect(math.bnToNumber(refund)).to.almost(estimatedRefund, 1);
+          assert.equal(math.bnToNumber(refund), estimatedRefund);
         });
 
         it("should preview buyer2 refund, only", async () => {
@@ -1820,7 +1823,7 @@ export function describeBehaviorOfAuction(
             .callStatic["previewWithdraw(uint64)"](epoch);
 
           assert.isTrue(fill.isZero());
-          expect(math.bnToNumber(refund)).to.almost(estimatedRefund, 1);
+          assert.equal(math.bnToNumber(refund), estimatedRefund);
         });
 
         it("should preview buyer3 refund, only", async () => {
@@ -1832,7 +1835,7 @@ export function describeBehaviorOfAuction(
             .callStatic["previewWithdraw(uint64)"](epoch);
 
           assert.isTrue(fill.isZero());
-          expect(math.bnToNumber(refund)).to.almost(estimatedRefund, 1);
+          assert.equal(math.bnToNumber(refund), estimatedRefund);
         });
       });
 
@@ -1959,14 +1962,11 @@ export function describeBehaviorOfAuction(
         });
 
         it("should preview buyer3 with fill only", async () => {
-          const estimatedRefund = 0;
-
           const [refund, fill] = await auction
             .connect(signers.buyer3)
             .callStatic["previewWithdraw(uint64)"](epoch);
 
-          expect(math.bnToNumber(refund)).to.almost(estimatedRefund, 1);
-
+          expect(math.bnToNumber(refund)).to.almost(0, 1);
           expect(math.bnToNumber(fill)).to.almost(
             math.bnToNumber(simpleAuction.buyerOrderSize),
             1

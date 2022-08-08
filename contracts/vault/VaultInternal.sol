@@ -41,7 +41,7 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
     }
 
     /************************************************
-     *  ACCESS
+     *  ACCESS CONTROL
      ***********************************************/
 
     /**

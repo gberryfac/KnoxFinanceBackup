@@ -48,7 +48,6 @@ interface KnoxUtilArgs {
   asset: MockERC20;
   vaultUtil: VaultUtil;
   poolUtil: PoolUtil;
-  // TODO: consider using interfaces
   queue: Queue;
   auction: Auction;
 }

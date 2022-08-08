@@ -69,7 +69,7 @@ interface IAuction is IAuctionEvents, IERC1155Receiver {
      *  VIEW
      ***********************************************/
 
-    function claimsByBuyer(address buyer)
+    function epochsByBuyer(address buyer)
         external
         view
         returns (uint64[] memory);
