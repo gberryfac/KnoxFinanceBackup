@@ -556,7 +556,7 @@ export function describeBehaviorOfVaultAdmin(
       });
     });
 
-    describe("#depositQueuedToVault()", () => {
+    describe("#processQueuedDeposits()", () => {
       time.revertToSnapshotAfterEach(async () => {
         await asset
           .connect(signers.lp1)
@@ -566,7 +566,7 @@ export function describeBehaviorOfVaultAdmin(
       });
 
       it("should revert if !keeper", async () => {
-        await expect(vault.depositQueuedToVault()).to.be.revertedWith(
+        await expect(vault.processQueuedDeposits()).to.be.revertedWith(
           "!keeper"
         );
       });
@@ -574,7 +574,7 @@ export function describeBehaviorOfVaultAdmin(
       it("should transfer balance of queue to vault", async () => {
         const vaultBalanceBefore = await asset.balanceOf(addresses.vault);
 
-        await vault.connect(signers.keeper).depositQueuedToVault();
+        await vault.connect(signers.keeper).processQueuedDeposits();
 
         const queueBalanceAfter = await asset.balanceOf(addresses.queue);
         const vaultBalanceAfter = await asset.balanceOf(addresses.vault);

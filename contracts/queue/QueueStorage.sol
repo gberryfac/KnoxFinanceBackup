@@ -30,16 +30,12 @@ library QueueStorage {
      *  VIEW
      ***********************************************/
 
-    function _getCurrentTokenId(Layout storage l)
-        internal
-        view
-        returns (uint256)
-    {
-        return _formatTokenId(_getEpoch(l));
+    function _getCurrentTokenId() internal view returns (uint256) {
+        return _formatTokenId(_getEpoch());
     }
 
-    function _getEpoch(Layout storage l) internal view returns (uint64) {
-        return l.epoch;
+    function _getEpoch() internal view returns (uint64) {
+        return layout().epoch;
     }
 
     function _getMaxTVL(Layout storage l) internal view returns (uint256) {

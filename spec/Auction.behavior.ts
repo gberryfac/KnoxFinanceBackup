@@ -1067,7 +1067,7 @@ export function describeBehaviorOfAuction(
             await knoxUtil.setAndInitializeAuction();
         });
 
-        it("should emit AuctionStatus event if utilization == %100", async () => {
+        it("should emit AuctionStatusSet event if utilization == %100", async () => {
           await time.fastForwardToFriday8AM();
           await knoxUtil.initializeNextEpoch();
           await time.increaseTo(startTime);
@@ -1075,15 +1075,15 @@ export function describeBehaviorOfAuction(
           const [txs] = await utilizeAllContractsMarketOrdersOnly(epoch);
 
           await expect(txs[2])
-            .to.emit(auction, "AuctionStatus")
+            .to.emit(auction, "AuctionStatusSet")
             .withArgs(0, Status.FINALIZED);
         });
 
-        it("should emit AuctionStatus event if auction time limit has expired", async () => {
+        it("should emit AuctionStatusSet event if auction time limit has expired", async () => {
           await time.increaseTo(endTime.add(1));
           const tx = await auction.finalizeAuction(epoch);
           await expect(tx)
-            .to.emit(auction, "AuctionStatus")
+            .to.emit(auction, "AuctionStatusSet")
             .withArgs(0, Status.FINALIZED);
         });
       });
@@ -1205,9 +1205,9 @@ export function describeBehaviorOfAuction(
           await expect(auction.processAuction(0)).to.be.revertedWith("!vault");
         });
 
-        it("should emit AuctionStatus event when processed", async () => {
+        it("should emit AuctionStatusSet event when processed", async () => {
           await expect(auction.connect(signers.vault).processAuction(0))
-            .to.emit(auction, "AuctionStatus")
+            .to.emit(auction, "AuctionStatusSet")
             .withArgs(0, Status.PROCESSED);
         });
       });
@@ -1230,9 +1230,9 @@ export function describeBehaviorOfAuction(
           ).to.be.revertedWith("long tokens not transferred");
         });
 
-        it("should emit AuctionStatus event when processed", async () => {
+        it("should emit AuctionStatusSet event when processed", async () => {
           await expect(vault.connect(signers.keeper).processAuction())
-            .to.emit(auction, "AuctionStatus")
+            .to.emit(auction, "AuctionStatusSet")
             .withArgs(0, Status.PROCESSED);
         });
       });
@@ -1364,7 +1364,7 @@ export function describeBehaviorOfAuction(
           await time.fastForwardToFriday8AM();
 
           // initialize next epoch
-          await vault.connect(signers.keeper).depositQueuedToVault();
+          await vault.connect(signers.keeper).processQueuedDeposits();
           // prices are unset, auction is cancelled
           await auction.connect(signers.vault).setAuctionPrices(epoch, 0, 0);
           await vault.connect(signers.keeper).setNextEpoch();

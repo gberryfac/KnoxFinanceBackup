@@ -27,10 +27,10 @@ interface IQueue is IERC165, IERC1155, IERC1155Enumerable, IQueueEvents {
     function deposit(uint256 amount, address receiver) external;
 
     /************************************************
-     *  WITHDRAW
+     *  CANCEL
      ***********************************************/
 
-    function withdraw(uint256 amount) external;
+    function cancel(uint256 amount) external;
 
     /************************************************
      *  REDEEM
@@ -58,7 +58,7 @@ interface IQueue is IERC165, IERC1155, IERC1155Enumerable, IQueueEvents {
 
     function syncEpoch(uint64 epoch) external;
 
-    function depositToVault() external;
+    function processQueuedDeposits() external;
 
     /************************************************
      *  VIEW

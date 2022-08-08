@@ -184,7 +184,7 @@ contract AuctionInternal is IAuctionEvents {
         auction.totalTime = initAuction.endTime - initAuction.startTime;
         auction.longTokenId = initAuction.longTokenId;
 
-        emit AuctionStatus(initAuction.epoch, auction.status);
+        emit AuctionStatusSet(initAuction.epoch, auction.status);
     }
 
     function _setAuctionPrices(
@@ -206,6 +206,12 @@ contract AuctionInternal is IAuctionEvents {
             // cancel the auction if prices are invalid
             _finalizeAuction(epoch);
         }
+
+        emit AuctionPricesSet(
+            epoch,
+            auction.maxPrice64x64,
+            auction.minPrice64x64
+        );
     }
 
     /************************************************
@@ -303,7 +309,7 @@ contract AuctionInternal is IAuctionEvents {
         uint256 cost = data.price64x64.mulu(data.size);
         ERC20.safeTransfer(msg.sender, cost);
 
-        // emit LimitOrderCanceled(msg.sender, id, price64x64, size);
+        emit OrderCanceled(epoch, id, msg.sender);
     }
 
     function _addMarketOrder(uint64 epoch, uint256 size) internal {
@@ -361,7 +367,7 @@ contract AuctionInternal is IAuctionEvents {
             ERC20.safeTransfer(msg.sender, refund);
         }
 
-        // emit Withdrawn()
+        emit OrderWithdrawn(epoch, msg.sender, refund, fill);
     }
 
     function _previewWithdraw(uint64 epoch, address buyer)
@@ -486,10 +492,10 @@ contract AuctionInternal is IAuctionEvents {
         ) {
             l.auctions[epoch].lastPrice64x64 = type(int128).max;
             auction.status = AuctionStorage.Status.FINALIZED;
-            emit AuctionStatus(epoch, auction.status);
+            emit AuctionStatusSet(epoch, auction.status);
         } else if (_processOrders(epoch) || block.timestamp > auction.endTime) {
             auction.status = AuctionStorage.Status.FINALIZED;
-            emit AuctionStatus(epoch, auction.status);
+            emit AuctionStatusSet(epoch, auction.status);
         }
     }
 
@@ -504,8 +510,6 @@ contract AuctionInternal is IAuctionEvents {
 
         auction.totalPremiums = totalPremiums;
         ERC20.safeTransfer(address(Vault), totalPremiums);
-
-        // emit PremiumTransferred()
 
         return auction.totalPremiums;
     }
@@ -531,7 +535,7 @@ contract AuctionInternal is IAuctionEvents {
         }
 
         auction.status = AuctionStorage.Status.PROCESSED;
-        emit AuctionStatus(epoch, auction.status);
+        emit AuctionStatusSet(epoch, auction.status);
     }
 
     /************************************************

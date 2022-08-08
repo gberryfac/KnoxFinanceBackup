@@ -244,7 +244,7 @@ export async function describeBehaviorOfQueue(
 
       it("should withdraw exact amount deposited", async () => {
         const lpBalanceBefore = await asset.balanceOf(addresses.lp1);
-        await queue.withdraw(params.deposit);
+        await queue.cancel(params.deposit);
 
         const lpBalanceAfter = await asset.balanceOf(addresses.lp1);
         assert.bnEqual(lpBalanceBefore, lpBalanceAfter.sub(params.deposit));
@@ -398,17 +398,19 @@ export async function describeBehaviorOfQueue(
       });
     });
 
-    describe("#depositToVault()", () => {
+    describe("#processQueuedDeposits()", () => {
       describe("if shares are not minted", () => {
         time.revertToSnapshotAfterEach(async () => {});
 
         it("should revert if !vault", async () => {
-          await expect(queue.depositToVault()).to.be.revertedWith("!vault");
+          await expect(queue.processQueuedDeposits()).to.be.revertedWith(
+            "!vault"
+          );
         });
 
         it("should set price per share to 0 if shares are not minted", async () => {
           let tokenId = await queue.getCurrentTokenId();
-          await queue.connect(signers.vault).depositToVault();
+          await queue.connect(signers.vault).processQueuedDeposits();
 
           let pricePerShare = await queue.getPricePerShare(tokenId);
           assert.isTrue(pricePerShare.isZero());
@@ -447,7 +449,7 @@ export async function describeBehaviorOfQueue(
           let erc20Balance = await asset.balanceOf(addresses.queue);
           assert.bnEqual(erc20Balance, params.deposit.mul(3));
 
-          await queue.connect(signers.vault).depositToVault();
+          await queue.connect(signers.vault).processQueuedDeposits();
 
           erc20Balance = await asset.balanceOf(addresses.queue);
           assert.isTrue(erc20Balance.isZero());
@@ -456,7 +458,7 @@ export async function describeBehaviorOfQueue(
         it("should calculate price per share correctly", async () => {
           let tokenId = await queue.getCurrentTokenId();
 
-          await queue.connect(signers.vault).depositToVault();
+          await queue.connect(signers.vault).processQueuedDeposits();
           await vault.connect(signers.keeper).setNextEpoch();
 
           let pricePerShare = await queue.getPricePerShare(tokenId);
@@ -488,7 +490,7 @@ export async function describeBehaviorOfQueue(
 
           await time.fastForwardToFriday8AM();
 
-          await queue.connect(signers.vault).depositToVault();
+          await queue.connect(signers.vault).processQueuedDeposits();
           await vault.connect(signers.keeper).setNextEpoch();
 
           pricePerShare = await queue.getPricePerShare(tokenId);
@@ -527,7 +529,7 @@ export async function describeBehaviorOfQueue(
 
         // totalAssets = 40,000
         // totalSupply = 0
-        await queue.connect(signers.vault).depositToVault();
+        await queue.connect(signers.vault).processQueuedDeposits();
         await vault.connect(signers.keeper).setNextEpoch();
 
         shares = await queue["previewUnredeemed(uint256)"](tokenId);
@@ -548,7 +550,7 @@ export async function describeBehaviorOfQueue(
 
         // totalAssets = 50,000
         // totalSupply = 10,000
-        await queue.connect(signers.vault).depositToVault();
+        await queue.connect(signers.vault).processQueuedDeposits();
         await vault.connect(signers.keeper).setNextEpoch();
 
         shares = await queue["previewUnredeemed(uint256)"](tokenId);
