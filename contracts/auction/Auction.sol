@@ -7,7 +7,6 @@ import "@solidstate/contracts/utils/ReentrancyGuard.sol";
 import "./AuctionInternal.sol";
 import "./IAuction.sol";
 
-// TODO: Switch to stage modifiers
 contract Auction is AuctionInternal, IAuction, ReentrancyGuard {
     using AuctionStorage for AuctionStorage.Layout;
     using ERC165Storage for ERC165Storage.Layout;
@@ -33,7 +32,7 @@ contract Auction is AuctionInternal, IAuction, ReentrancyGuard {
         uint64 epoch,
         int128 maxPrice64x64,
         int128 minPrice64x64
-    ) external onlyVault {
+    ) external auctionInitialized(epoch) onlyVault {
         _setAuctionPrices(epoch, maxPrice64x64, minPrice64x64);
     }
 
@@ -65,18 +64,34 @@ contract Auction is AuctionInternal, IAuction, ReentrancyGuard {
         uint64 epoch,
         int128 price64x64,
         uint256 size
-    ) external nonReentrant {
+    )
+        external
+        auctionNotFinalizedOrProcessed(epoch)
+        auctionHasNotEnded(epoch)
+        nonReentrant
+    {
         return _addLimitOrder(epoch, price64x64, size);
     }
 
     // @notice
-    function cancelLimitOrder(uint64 epoch, uint256 id) external nonReentrant {
+    function cancelLimitOrder(uint64 epoch, uint256 id)
+        external
+        auctionNotFinalizedOrProcessed(epoch)
+        auctionHasNotEnded(epoch)
+        nonReentrant
+    {
         _cancelLimitOrder(epoch, id);
     }
 
     // @notice
     // @dev must approve contract prior to committing tokens to auction
-    function addMarketOrder(uint64 epoch, uint256 size) external nonReentrant {
+    function addMarketOrder(uint64 epoch, uint256 size)
+        external
+        auctionNotFinalizedOrProcessed(epoch)
+        auctionHasStarted(epoch)
+        auctionHasNotEnded(epoch)
+        nonReentrant
+    {
         return _addMarketOrder(epoch, size);
     }
 
@@ -84,7 +99,11 @@ contract Auction is AuctionInternal, IAuction, ReentrancyGuard {
      *  WITHDRAW
      ***********************************************/
 
-    function withdraw(uint64 epoch) external nonReentrant {
+    function withdraw(uint64 epoch)
+        external
+        auctionProcessed(epoch)
+        nonReentrant
+    {
         _withdraw(epoch);
     }
 
@@ -103,23 +122,28 @@ contract Auction is AuctionInternal, IAuction, ReentrancyGuard {
      *  MAINTENANCE
      ***********************************************/
 
-    function processOrders(uint64 epoch) external returns (bool) {
-        return _processOrders(epoch);
-    }
-
-    function finalizeAuction(uint64 epoch) external {
+    function finalizeAuction(uint64 epoch)
+        external
+        auctionNotFinalizedOrProcessed(epoch)
+        auctionHasStarted(epoch)
+    {
         _finalizeAuction(epoch);
     }
 
     function transferPremium(uint64 epoch)
         external
+        auctionFinalized(epoch)
         onlyVault
         returns (uint256)
     {
         return _transferPremium(epoch);
     }
 
-    function processAuction(uint64 epoch) external onlyVault {
+    function processAuction(uint64 epoch)
+        external
+        auctionFinalized(epoch)
+        onlyVault
+    {
         _processAuction(epoch);
     }
 

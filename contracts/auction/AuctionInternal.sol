@@ -18,7 +18,6 @@ import "./IAuctionEvents.sol";
 
 import "hardhat/console.sol";
 
-// TODO: Switch to stage modifiers
 contract AuctionInternal is IAuctionEvents {
     using ABDKMath64x64 for int128;
     using ABDKMath64x64 for uint256;
@@ -57,7 +56,7 @@ contract AuctionInternal is IAuctionEvents {
     }
 
     /************************************************
-     *  ACCESS
+     *  ACCESS CONTROL
      ***********************************************/
 
     /**
@@ -69,6 +68,86 @@ contract AuctionInternal is IAuctionEvents {
         _;
     }
 
+    /**
+     * @dev Throws if auction has not started.
+     */
+    modifier auctionHasStarted(uint64 epoch) {
+        AuctionStorage.Layout storage l = AuctionStorage.layout();
+        AuctionStorage.Auction storage auction = l.auctions[epoch];
+        require(auction.startTime > 0, "start time is not set");
+        require(block.timestamp >= auction.startTime, "auction not started");
+        _;
+    }
+
+    /**
+     * @dev Throws if auction has ended
+     */
+    modifier auctionHasNotEnded(uint64 epoch) {
+        AuctionStorage.Layout storage l = AuctionStorage.layout();
+        AuctionStorage.Auction storage auction = l.auctions[epoch];
+        require(auction.endTime > 0, "end time is not set");
+        require(block.timestamp <= auction.endTime, "auction has ended");
+        _;
+    }
+
+    /**
+     * @dev Throws if auction status is not "INITIALIZED"
+     */
+    modifier auctionInitialized(uint64 epoch) {
+        AuctionStorage.Layout storage l = AuctionStorage.layout();
+        AuctionStorage.Auction storage auction = l.auctions[epoch];
+        require(
+            AuctionStorage.Status.INITIALIZED == auction.status,
+            "auction !initialized"
+        );
+        _;
+    }
+
+    /**
+     * @dev Throws if auction status is not "FINALIZED"
+     */
+    modifier auctionFinalized(uint64 epoch) {
+        AuctionStorage.Layout storage l = AuctionStorage.layout();
+        AuctionStorage.Auction storage auction = l.auctions[epoch];
+        require(
+            AuctionStorage.Status.FINALIZED == auction.status,
+            "auction !finalized"
+        );
+        _;
+    }
+
+    /**
+     * @dev Throws if auction status is not "PROCESSED"
+     */
+    modifier auctionProcessed(uint64 epoch) {
+        AuctionStorage.Layout storage l = AuctionStorage.layout();
+        AuctionStorage.Auction storage auction = l.auctions[epoch];
+        require(
+            AuctionStorage.Status.PROCESSED == auction.status,
+            "auction !processed"
+        );
+        _;
+    }
+
+    /**
+     * @dev Throws if auction status is either "FINALIZED" or "PROCESSED"
+     */
+    modifier auctionNotFinalizedOrProcessed(uint64 epoch) {
+        AuctionStorage.Layout storage l = AuctionStorage.layout();
+        AuctionStorage.Auction storage auction = l.auctions[epoch];
+
+        require(
+            AuctionStorage.Status.FINALIZED != auction.status,
+            "auction finalized"
+        );
+
+        require(
+            AuctionStorage.Status.PROCESSED != auction.status,
+            "auction processed"
+        );
+        _;
+    }
+
     /************************************************
      *  INITIALIZATION
      ***********************************************/
@@ -76,13 +155,11 @@ contract AuctionInternal is IAuctionEvents {
     function _initialize(AuctionStorage.InitAuction memory initAuction)
         internal
     {
-        // modifier: reject if auction initialized
-        // TODO: Input validation
         AuctionStorage.Layout storage l = AuctionStorage.layout();
 
         require(
             initAuction.endTime > initAuction.startTime,
-            "endTime < startTime"
+            "endTime <= startTime"
         );
 
         require(
@@ -90,22 +167,22 @@ contract AuctionInternal is IAuctionEvents {
             "start time too early"
         );
 
-        require(initAuction.longTokenId > 0, "token id is not set");
+        require(initAuction.strike64x64 > 0, "strike price == 0");
+        require(initAuction.longTokenId > 0, "token id == 0");
 
-        l.auctions[initAuction.epoch] = AuctionStorage.Auction(
-            AuctionStorage.Status.INITIALIZED,
-            initAuction.strike64x64,
-            0,
-            0,
-            0,
-            initAuction.startTime,
-            initAuction.endTime,
-            0,
-            0,
-            0,
-            initAuction.endTime - initAuction.startTime,
-            initAuction.longTokenId
+        AuctionStorage.Auction storage auction = l.auctions[initAuction.epoch];
+
+        require(
+            auction.status == AuctionStorage.Status.UNINITIALIZED,
+            "auction !uninitialized"
         );
+
+        auction.status = AuctionStorage.Status.INITIALIZED;
+        auction.strike64x64 = initAuction.strike64x64;
+        auction.startTime = initAuction.startTime;
+        auction.endTime = initAuction.endTime;
+        auction.totalTime = initAuction.endTime - initAuction.startTime;
+        auction.longTokenId = initAuction.longTokenId;
 
         emit AuctionStatus(AuctionStorage.Status.INITIALIZED);
     }
@@ -115,8 +192,6 @@ contract AuctionInternal is IAuctionEvents {
         int128 maxPrice64x64,
         int128 minPrice64x64
     ) internal {
-        // modifier: reject if auction not initialized
-        // modifier: reject if auction is finalized
         AuctionStorage.Layout storage l = AuctionStorage.layout();
         AuctionStorage.Auction storage auction = l.auctions[epoch];
 
@@ -139,14 +214,12 @@ contract AuctionInternal is IAuctionEvents {
 
     // @notice
     function _lastPrice64x64(uint64 epoch) internal view returns (int128) {
-        // modifier: reject if auction not initialized
         AuctionStorage.Layout storage l = AuctionStorage.layout();
         return l.auctions[epoch].lastPrice64x64;
     }
 
     // @notice Returns price during the auction
     function _priceCurve64x64(uint64 epoch) internal view returns (int128) {
-        // modifier: reject if auction not initialized
         AuctionStorage.Layout storage l = AuctionStorage.layout();
         AuctionStorage.Auction storage auction = l.auctions[epoch];
 
@@ -168,7 +241,6 @@ contract AuctionInternal is IAuctionEvents {
 
     // @notice The current clearing price of the Dutch auction
     function _clearingPrice64x64(uint64 epoch) internal view returns (int128) {
-        // modifier: reject if auction not initialized
         AuctionStorage.Layout storage l = AuctionStorage.layout();
         AuctionStorage.Auction storage auction = l.auctions[epoch];
 
@@ -190,10 +262,8 @@ contract AuctionInternal is IAuctionEvents {
         int128 price64x64,
         uint256 size
     ) internal {
-        // modifier: reject if auction not initialized
-        // modifier: reject if auction is finalized
-        // modifier: reject if auction is cancelled
         AuctionStorage.Layout storage l = AuctionStorage.layout();
+        AuctionStorage.Auction storage auction = l.auctions[epoch];
 
         require(price64x64 > 0, "price <= 0");
         require(size > l.minSize, "size < minimum");
@@ -204,7 +274,7 @@ contract AuctionInternal is IAuctionEvents {
 
         uint256 id = l.orderbooks[epoch]._insert(price64x64, size, msg.sender);
 
-        if (block.timestamp >= l.auctions[epoch].startTime) {
+        if (block.timestamp >= auction.startTime) {
             _finalizeAuction(epoch);
         }
 
@@ -212,9 +282,8 @@ contract AuctionInternal is IAuctionEvents {
     }
 
     function _cancelLimitOrder(uint64 epoch, uint256 id) internal {
-        // modifier: reject if auction not initialized
-        // modifier: reject if auction is finalized
         AuctionStorage.Layout storage l = AuctionStorage.layout();
+        AuctionStorage.Auction storage auction = l.auctions[epoch];
 
         require(id > 0, "invalid order id");
 
@@ -227,7 +296,7 @@ contract AuctionInternal is IAuctionEvents {
         orderbook._remove(id);
         l.claimsByBuyer[data.buyer].remove(epoch);
 
-        if (block.timestamp >= l.auctions[epoch].startTime) {
+        if (block.timestamp >= auction.startTime) {
             _finalizeAuction(epoch);
         }
 
@@ -238,10 +307,6 @@ contract AuctionInternal is IAuctionEvents {
     }
 
     function _addMarketOrder(uint64 epoch, uint256 size) internal {
-        // modifier: reject if auction not initialized
-        // modifier: reject if auction has not started
-        // modifier: reject if auction is finalized
-        // modifier: reject if auction is cancelled
         AuctionStorage.Layout storage l = AuctionStorage.layout();
         AuctionStorage.Auction storage auction = l.auctions[epoch];
 
@@ -266,7 +331,6 @@ contract AuctionInternal is IAuctionEvents {
      ***********************************************/
 
     function _withdraw(uint64 epoch) internal {
-        // modifier: reject if auction is not processed
         AuctionStorage.Layout storage l = AuctionStorage.layout();
 
         (uint256 refund, uint256 fill) =
@@ -314,7 +378,6 @@ contract AuctionInternal is IAuctionEvents {
         uint64 epoch,
         address buyer
     ) private returns (uint256, uint256) {
-        // modifier: reject if auction is not processed
         OrderBook.Index storage orderbook = l.orderbooks[epoch];
         AuctionStorage.Auction memory auction = l.auctions[epoch];
 
@@ -372,10 +435,6 @@ contract AuctionInternal is IAuctionEvents {
 
     // @notice traverses orderbook to check if the utilization is 100%
     function _processOrders(uint64 epoch) internal returns (bool) {
-        // modifier: reject if auction not initialized
-        // modifier: reject if auction has not started
-        // modifier: reject if auction is finalized
-        // modifier: reject if auction is cancelled
         AuctionStorage.Layout storage l = AuctionStorage.layout();
         OrderBook.Index storage orderbook = l.orderbooks[epoch];
         AuctionStorage.Auction storage auction = l.auctions[epoch];
@@ -385,12 +444,8 @@ contract AuctionInternal is IAuctionEvents {
 
         uint256 totalContracts = _getTotalContracts(epoch);
 
-        if (
-            auction.totalContracts <= 0 &&
-            // TODO: Remove once modifiers are added
-            block.timestamp >= l.auctions[epoch].startTime
-        ) {
-            // Initializes totalContracts if this is the first bid.
+        if (auction.totalContracts <= 0) {
+            // Sets totalContracts if this is the first bid.
             auction.totalContracts = totalContracts;
         }
 
@@ -421,10 +476,6 @@ contract AuctionInternal is IAuctionEvents {
     }
 
     function _finalizeAuction(uint64 epoch) internal {
-        // modifier: reject if auction not initialized
-        // modifier: reject if auction has not started
-        // modifier: reject if auction is finalized
-        // modifier: reject if auction is cancelled
         AuctionStorage.Layout storage l = AuctionStorage.layout();
         AuctionStorage.Auction storage auction = l.auctions[epoch];
 
@@ -443,9 +494,6 @@ contract AuctionInternal is IAuctionEvents {
     }
 
     function _transferPremium(uint64 epoch) internal returns (uint256) {
-        // modifier: reject if auction is not finalized
-        // modifier: reject if auction is processed
-        // modifier: reject if auction is cancelled
         AuctionStorage.Layout storage l = AuctionStorage.layout();
         AuctionStorage.Auction storage auction = l.auctions[epoch];
 
@@ -455,7 +503,6 @@ contract AuctionInternal is IAuctionEvents {
             _lastPrice64x64(epoch).mulu(auction.totalContractsSold);
 
         auction.totalPremiums = totalPremiums;
-
         ERC20.safeTransfer(address(Vault), totalPremiums);
 
         // emit PremiumTransferred()
@@ -464,9 +511,6 @@ contract AuctionInternal is IAuctionEvents {
     }
 
     function _processAuction(uint64 epoch) internal {
-        // modifier: reject if auction is not finalized
-        // modifier: reject if auction is processed
-        // modifier: reject if auction is cancelled
         AuctionStorage.Layout storage l = AuctionStorage.layout();
         AuctionStorage.Auction storage auction = l.auctions[epoch];
 
