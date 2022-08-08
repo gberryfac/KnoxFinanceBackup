@@ -93,6 +93,8 @@ library VaultStorage {
         int128 withdrawalFee64x64;
         // @notice
         address feeRecipient;
+        // @notice
+        address keeper;
         /************************************************
          * EXTERNAL CONTRACTS
          ***********************************************/

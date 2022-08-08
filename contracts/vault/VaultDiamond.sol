@@ -6,8 +6,6 @@ import "@solidstate/contracts/token/ERC20/metadata/ERC20MetadataStorage.sol";
 import "@solidstate/contracts/token/ERC20/metadata/IERC20Metadata.sol";
 import "@solidstate/contracts/token/ERC4626/base/ERC4626BaseStorage.sol";
 
-import "../access/AccessStorage.sol";
-
 import "../interfaces/IPremiaPool.sol";
 
 import "../libraries/Helpers.sol";
@@ -15,7 +13,6 @@ import "../libraries/Helpers.sol";
 import "./VaultStorage.sol";
 
 contract VaultDiamond is SolidStateDiamond {
-    using AccessStorage for AccessStorage.Layout;
     using ERC20MetadataStorage for ERC20MetadataStorage.Layout;
     using ERC4626BaseStorage for ERC4626BaseStorage.Layout;
     using OwnableStorage for OwnableStorage.Layout;
@@ -56,6 +53,7 @@ contract VaultDiamond is SolidStateDiamond {
             l.withdrawalFee64x64 = initProxy.withdrawalFee64x64;
 
             l.feeRecipient = initProxy.feeRecipient;
+            l.keeper = initProxy.keeper;
 
             l.startOffset = 2 hours;
             l.endOffset = 4 hours;
@@ -69,7 +67,6 @@ contract VaultDiamond is SolidStateDiamond {
             l.setDecimals(18);
         }
 
-        AccessStorage.layout().keeper = initProxy.keeper;
         ERC4626BaseStorage.layout().asset = asset;
         OwnableStorage.layout().setOwner(msg.sender);
     }

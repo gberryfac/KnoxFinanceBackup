@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+import "@solidstate/contracts/access/ownable/OwnableInternal.sol";
 import "@solidstate/contracts/token/ERC4626/base/ERC4626BaseInternal.sol";
-
-import "../access/AccessInternal.sol";
 
 import "../interfaces/IPremiaPool.sol";
 
@@ -16,7 +15,7 @@ import "./VaultStorage.sol";
 
 import "hardhat/console.sol";
 
-contract VaultInternal is AccessInternal, ERC4626BaseInternal, IVaultEvents {
+contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
     using ABDKMath64x64 for int128;
     using ABDKMath64x64 for uint256;
     using ABDKMath64x64Token for int128;
@@ -38,8 +37,29 @@ contract VaultInternal is AccessInternal, ERC4626BaseInternal, IVaultEvents {
         Pool = IPremiaPool(pool);
         IPremiaPool.PoolSettings memory settings = Pool.getPoolSettings();
         address asset = isCall ? settings.underlying : settings.base;
-
         ERC20 = IERC20(asset);
+    }
+
+    /************************************************
+     *  ACCESS CONTROL
+     ***********************************************/
+
+    /**
+     * @dev Throws if called by any account other than the keeper.
+     */
+    modifier onlyKeeper() {
+        VaultStorage.Layout storage l = VaultStorage.layout();
+        require(msg.sender == l.keeper, "!keeper");
+        _;
+    }
+
+    /**
+     * @dev Throws if called by any account other than the queue.
+     */
+    modifier onlyQueue() {
+        VaultStorage.Layout storage l = VaultStorage.layout();
+        require(msg.sender == address(l.Queue), "!queue");
+        _;
     }
 
     /************************************************

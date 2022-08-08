@@ -4,18 +4,17 @@ pragma solidity ^0.8.0;
 import "@solidstate/contracts/introspection/ERC165Storage.sol";
 import "@solidstate/contracts/token/ERC1155/base/ERC1155Base.sol";
 import "@solidstate/contracts/token/ERC1155/enumerable/ERC1155Enumerable.sol";
-
-import "../access/Access.sol";
+import "@solidstate/contracts/utils/ReentrancyGuard.sol";
 
 import "./IQueue.sol";
 import "./QueueInternal.sol";
 
 contract Queue is
-    Access,
     ERC1155Base,
     ERC1155Enumerable,
     IQueue,
-    QueueInternal
+    QueueInternal,
+    ReentrancyGuard
 {
     using ERC165Storage for ERC165Storage.Layout;
     using QueueStorage for QueueStorage.Layout;
@@ -26,6 +25,24 @@ contract Queue is
         address pool,
         address vault
     ) QueueInternal(isCall, pool, vault) {}
+
+    /************************************************
+     *  SAFETY
+     ***********************************************/
+
+    /**
+     * @notice Pauses the vault during an emergency preventing deposits and borrowing.
+     */
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    /**
+     * @notice Unpauses the vault during following an emergency allowing deposits and borrowing.
+     */
+    function unpause() external onlyOwner {
+        _unpause();
+    }
 
     /************************************************
      *  ADMIN

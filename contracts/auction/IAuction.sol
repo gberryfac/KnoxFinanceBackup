@@ -59,8 +59,6 @@ interface IAuction is IAuctionEvents, IERC1155Receiver {
      *  MAINTENANCE
      ***********************************************/
 
-    function processOrders(uint64 epoch) external returns (bool);
-
     function finalizeAuction(uint64 epoch) external;
 
     function transferPremium(uint64 epoch) external returns (uint256);
@@ -71,7 +69,7 @@ interface IAuction is IAuctionEvents, IERC1155Receiver {
      *  VIEW
      ***********************************************/
 
-    function claimsByBuyer(address buyer)
+    function epochsByBuyer(address buyer)
         external
         view
         returns (uint64[] memory);

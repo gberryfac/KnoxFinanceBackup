@@ -16,7 +16,7 @@ library AuctionStorage {
         uint256 endTime;
     }
 
-    enum Status {INITIALIZED, FINALIZED, PROCESSED}
+    enum Status {UNINITIALIZED, INITIALIZED, FINALIZED, PROCESSED}
 
     struct Auction {
         Status status;
@@ -34,10 +34,11 @@ library AuctionStorage {
     }
 
     struct Layout {
+        address vault;
         uint256 minSize;
         mapping(uint64 => Auction) auctions;
         mapping(uint64 => OrderBook.Index) orderbooks;
-        mapping(address => EnumerableSet.UintSet) claimsByBuyer;
+        mapping(address => EnumerableSet.UintSet) epochsByBuyer;
     }
 
     bytes32 internal constant STORAGE_SLOT =

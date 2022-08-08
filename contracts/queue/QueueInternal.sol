@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+import "@solidstate/contracts/access/ownable/OwnableInternal.sol";
+import "@solidstate/contracts/security/PausableInternal.sol";
 import "@solidstate/contracts/token/ERC20/IERC20.sol";
 import "@solidstate/contracts/token/ERC1155/base/ERC1155BaseInternal.sol";
 import "@solidstate/contracts/token/ERC1155/enumerable/ERC1155EnumerableInternal.sol";
@@ -18,7 +20,9 @@ import "hardhat/console.sol";
 contract QueueInternal is
     ERC1155BaseInternal,
     ERC1155EnumerableInternal,
-    IQueueEvents
+    IQueueEvents,
+    OwnableInternal,
+    PausableInternal
 {
     using QueueStorage for QueueStorage.Layout;
     using SafeERC20 for IERC20;
@@ -39,6 +43,19 @@ contract QueueInternal is
 
         ERC20 = IERC20(asset);
         Vault = IVault(vault);
+    }
+
+    /************************************************
+     *  ACCESS CONTROL
+     ***********************************************/
+
+    /**
+     * @dev Throws if called by any account other than the vault.
+     */
+    modifier onlyVault() {
+        QueueStorage.Layout storage l = QueueStorage.layout();
+        require(msg.sender == l.vault, "!vault");
+        _;
     }
 
     /************************************************

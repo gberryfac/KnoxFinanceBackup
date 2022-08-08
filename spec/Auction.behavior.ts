@@ -2,7 +2,7 @@ import { ethers } from "hardhat";
 import { BigNumber, ContractTransaction } from "ethers";
 const { parseUnits } = ethers.utils;
 
-import { fixedFromFloat, fixedToNumber } from "@premia/utils";
+import { fixedFromFloat, fixedToBn, fixedToNumber } from "@premia/utils";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 
 import chai, { expect } from "chai";
@@ -29,6 +29,13 @@ import {
 interface AuctionBehaviorArgs {
   getKnoxUtil: () => Promise<KnoxUtil>;
   getParams: () => types.VaultParams;
+}
+
+enum Status {
+  UNINITIALIZED,
+  INITIALIZED,
+  FINALIZED,
+  PROCESSED,
 }
 
 export function describeBehaviorOfAuction(
@@ -73,10 +80,10 @@ export function describeBehaviorOfAuction(
 
       poolUtil = knoxUtil.poolUtil;
 
-      await asset.connect(signers.deployer).mint(addresses.buyer1, params.mint);
-      await asset.connect(signers.deployer).mint(addresses.buyer2, params.mint);
-      await asset.connect(signers.deployer).mint(addresses.buyer3, params.mint);
-      await asset.connect(signers.deployer).mint(addresses.vault, params.mint);
+      await asset.connect(signers.buyer1).mint(addresses.buyer1, params.mint);
+      await asset.connect(signers.buyer2).mint(addresses.buyer2, params.mint);
+      await asset.connect(signers.buyer3).mint(addresses.buyer3, params.mint);
+      await asset.connect(signers.vault).mint(addresses.vault, params.mint);
 
       signers.vault = await accounts.impersonateVault(signers, addresses);
     });
@@ -87,15 +94,12 @@ export function describeBehaviorOfAuction(
 
       await time.fastForwardToFriday8AM();
       await knoxUtil.initializeNextEpoch();
-      await time.increaseTo(startTime.add(1));
+      await time.increaseTo(startTime);
 
       const [txs, totalContractsSold] =
         await utilizeAllContractsMarketOrdersOnly(epoch);
 
       const buyerOrderSize = totalContractsSold.div(3);
-
-      await time.increaseTo(endTime.add(1));
-      await auction.finalizeAuction(epoch);
 
       if (processAuction) {
         await vault.connect(signers.keeper).processAuction();
@@ -134,7 +138,7 @@ export function describeBehaviorOfAuction(
       await time.fastForwardToFriday8AM();
       await knoxUtil.initializeNextEpoch();
 
-      await time.increaseTo(startTime.add(1));
+      await time.increaseTo(startTime);
 
       await asset
         .connect(signers.buyer3)
@@ -143,9 +147,6 @@ export function describeBehaviorOfAuction(
       const marketOrder = await auction
         .connect(signers.buyer3)
         .addMarketOrder(epoch, buyer3OrderSize);
-
-      await time.increaseTo(endTime.add(1));
-      await auction.finalizeAuction(epoch);
 
       if (processAuction) {
         await vault.connect(signers.keeper).processAuction();
@@ -225,11 +226,13 @@ export function describeBehaviorOfAuction(
       const strike = underlyingPrice / basePrice;
       const strike64x64 = fixedFromFloat(strike);
 
-      time.revertToSnapshotAfterEach(async () => {});
+      let timestamp: number;
+
+      time.revertToSnapshotAfterEach(async () => {
+        timestamp = await time.now();
+      });
 
       it("should revert if caller is !vault", async () => {
-        let timestamp = await time.now();
-
         await expect(
           auction.initialize({
             epoch: 0,
@@ -241,15 +244,71 @@ export function describeBehaviorOfAuction(
         ).to.be.revertedWith("!vault");
       });
 
-      it.skip("should revert if auction initialized", async () => {});
+      it("should revert if auction is already initialized", async () => {
+        const initAuction = {
+          epoch: 0,
+          strike64x64: strike64x64,
+          longTokenId: BigNumber.from("1"),
+          startTime: BigNumber.from(timestamp + 60),
+          endTime: BigNumber.from(timestamp + 86400),
+        };
 
-      it.skip("should revert if endTime < startTime", async () => {});
+        await auction.connect(signers.vault).initialize(initAuction);
 
-      it.skip("should revert if block.timestamp < startTime", async () => {});
+        await expect(
+          auction.connect(signers.vault).initialize(initAuction)
+        ).to.be.revertedWith("auction !uninitialized");
+      });
+
+      it("should revert if endTime <= startTime", async () => {
+        await expect(
+          auction.connect(signers.vault).initialize({
+            epoch: 0,
+            strike64x64: strike64x64,
+            longTokenId: BigNumber.from("1"),
+            startTime: BigNumber.from(timestamp + 60),
+            endTime: BigNumber.from(timestamp + 60),
+          })
+        ).to.be.revertedWith("endTime <= startTime");
+      });
+
+      it("should revert if block.timestamp < startTime", async () => {
+        await expect(
+          auction.connect(signers.vault).initialize({
+            epoch: 0,
+            strike64x64: strike64x64,
+            longTokenId: BigNumber.from("1"),
+            startTime: BigNumber.from(timestamp),
+            endTime: BigNumber.from(timestamp + 86400),
+          })
+        ).to.be.revertedWith("start time too early");
+      });
+
+      it("should revert if strike price == 0", async () => {
+        await expect(
+          auction.connect(signers.vault).initialize({
+            epoch: 0,
+            strike64x64: BigNumber.from("0"),
+            longTokenId: BigNumber.from("1"),
+            startTime: BigNumber.from(timestamp + 60),
+            endTime: BigNumber.from(timestamp + 86400),
+          })
+        ).to.be.revertedWith("strike price == 0");
+      });
+
+      it("should revert if long token id == 0", async () => {
+        await expect(
+          auction.connect(signers.vault).initialize({
+            epoch: 0,
+            strike64x64: strike64x64,
+            longTokenId: BigNumber.from("0"),
+            startTime: BigNumber.from(timestamp + 60),
+            endTime: BigNumber.from(timestamp + 86400),
+          })
+        ).to.be.revertedWith("token id == 0");
+      });
 
       it("should initialize new auction with correct state", async () => {
-        let timestamp = await time.now();
-
         const initAuction = {
           epoch: 0,
           strike64x64: strike64x64,
@@ -262,7 +321,7 @@ export function describeBehaviorOfAuction(
 
         const data = await auction.getAuction(0);
 
-        assert.equal(await auction.getStatus(0), 0);
+        assert.equal(await auction.getStatus(0), Status.INITIALIZED);
 
         await assert.bnEqual(data.startTime, initAuction.startTime);
         await assert.bnEqual(data.endTime, initAuction.endTime);
@@ -283,13 +342,22 @@ export function describeBehaviorOfAuction(
 
     describe("#setAuctionPrices(uint64,int128,int128)", () => {
       describe("if not initialized", () => {
-        it.skip("should revert", async () => {});
+        it("should revert", async () => {
+          await expect(
+            auction
+              .connect(signers.vault)
+              .setAuctionPrices(0, maxPrice64x64, minPrice64x64)
+          ).to.be.revertedWith("auction !initialized");
+        });
       });
 
-      describe("else", () => {
+      describe("else if initialized", () => {
+        let startTime: BigNumber;
         let epoch: BigNumber;
+
         time.revertToSnapshotAfterEach(async () => {
-          [, , epoch] = await knoxUtil.setAndInitializeAuction();
+          [startTime, , epoch] = await knoxUtil.setAndInitializeAuction();
+          await time.increaseTo(startTime);
         });
 
         it("should revert if caller is !vault", async () => {
@@ -298,30 +366,39 @@ export function describeBehaviorOfAuction(
           ).to.be.revertedWith("!vault");
         });
 
-        it.skip("should revert if auction initialized", async () => {});
+        it("should set last price to int128.max if auction is cancelled (max price == 0, min price == 0, max price < min price)", async () => {
+          await auction
+            .connect(signers.vault)
+            .setAuctionPrices(epoch, 0, fixedFromFloat(params.price.min));
 
-        it("should cancel auction if maxPrice64x64 >= minPrice64x64", async () => {
+          assert.bnEqual(
+            await auction.lastPrice64x64(epoch),
+            BigNumber.from("170141183460469231731687303715884105727") // max int128
+          );
+        });
+
+        it("should finalize auction if maxPrice64x64 >= minPrice64x64", async () => {
           await auction
             .connect(signers.vault)
             .setAuctionPrices(epoch, minPrice64x64, maxPrice64x64);
 
-          assert.equal(await auction.getStatus(epoch), 1);
+          assert.equal(await auction.getStatus(epoch), Status.FINALIZED);
         });
 
-        it("should cancel auction if maxPrice64x64 <= 0", async () => {
+        it("should finalize auction if maxPrice64x64 <= 0", async () => {
           await auction
             .connect(signers.vault)
             .setAuctionPrices(epoch, 0, minPrice64x64);
 
-          assert.equal(await auction.getStatus(epoch), 1);
+          assert.equal(await auction.getStatus(epoch), Status.FINALIZED);
         });
 
-        it("should cancel auction if minPrice64x64 <= 0", async () => {
+        it("should finalize auction if minPrice64x64 <= 0", async () => {
           await auction
             .connect(signers.vault)
             .setAuctionPrices(epoch, maxPrice64x64, 0);
 
-          assert.equal(await auction.getStatus(epoch), 1);
+          assert.equal(await auction.getStatus(epoch), Status.FINALIZED);
         });
 
         it("should set correct auction prices", async () => {
@@ -339,10 +416,12 @@ export function describeBehaviorOfAuction(
 
     describe("#priceCurve64x64(uint64)", () => {
       describe("if not initialized", () => {
-        it.skip("should revert", async () => {});
+        it("should revert", async () => {
+          await expect(auction.priceCurve64x64(0)).to.be.reverted;
+        });
       });
 
-      describe("else", () => {
+      describe("else if initialized", () => {
         let startTime: BigNumber;
         let endTime: BigNumber;
         let epoch: BigNumber;
@@ -380,108 +459,233 @@ export function describeBehaviorOfAuction(
 
     describe("#addLimitOrder(uint64,uint256,uint256)", () => {
       describe("if not initialized", () => {
-        it.skip("should revert", async () => {});
+        it("should revert", async () => {
+          await expect(
+            auction.addLimitOrder(
+              0,
+              fixedFromFloat(params.price.max),
+              params.size
+            )
+          ).to.be.revertedWith("end time is not set");
+        });
       });
 
-      describe("else", () => {
+      describe("else if auction has not started", () => {
+        let endTime: BigNumber;
         let epoch: BigNumber;
-        const cost = params.size.div(10);
 
         time.revertToSnapshotAfterEach(async () => {
-          [, , epoch] = await knoxUtil.setAndInitializeAuction();
+          [, endTime, epoch] = await knoxUtil.setAndInitializeAuction();
         });
 
-        it.skip("should revert if auction is finalized", async () => {});
+        it("should revert if auction expires", async () => {
+          await time.increaseTo(endTime.add(1));
 
-        it.skip("should revert if price <= 0", async () => {});
+          await expect(
+            auction.addLimitOrder(
+              epoch,
+              fixedFromFloat(params.price.max),
+              params.size
+            )
+          ).to.be.revertedWith("auction has ended");
+        });
 
         it("should revert if order size is below min size", async () => {
           await expect(
             auction.addLimitOrder(
               epoch,
-              fixedFromFloat("0.1"),
+              fixedFromFloat(params.price.max),
               parseUnits("1", params.collateral.decimals - 2)
             )
           ).to.be.revertedWith("size < minimum");
         });
 
-        it.skip("should revert auction finalizes", async () => {});
-
         it("should emit OrderAdded event if successful", async () => {
-          await asset.connect(signers.buyer1).approve(addresses.auction, cost);
+          await asset
+            .connect(signers.buyer1)
+            .approve(addresses.auction, ethers.constants.MaxUint256);
 
-          const price = fixedFromFloat("0.1");
+          const price = fixedFromFloat(params.price.max);
 
           await expect(auction.addLimitOrder(epoch, price, params.size))
             .to.emit(auction, "OrderAdded")
-            .withArgs(1, addresses.buyer1, price, params.size, true);
+            .withArgs(0, 1, addresses.buyer1, price, params.size, true);
         });
 
         it("should send funds to Auction if successful", async () => {
           const auctionBalanceBefore = await asset.balanceOf(addresses.auction);
           const buyerBalanceBefore = await asset.balanceOf(addresses.buyer1);
 
-          await asset.connect(signers.buyer1).approve(addresses.auction, cost);
+          await asset
+            .connect(signers.buyer1)
+            .approve(addresses.auction, ethers.constants.MaxUint256);
 
           await auction.addLimitOrder(
             epoch,
-            fixedFromFloat("0.1"),
+            fixedFromFloat(params.price.max),
             params.size
           );
 
           const auctionBalanceAfter = await asset.balanceOf(addresses.auction);
           const buyerBalanceAfter = await asset.balanceOf(addresses.buyer1);
 
-          expect(math.bnToNumber(auctionBalanceAfter)).to.almost(
-            math.bnToNumber(auctionBalanceBefore.add(cost)),
-            1
+          const cost = math.bnToNumber(params.size) * params.price.max;
+
+          assert.equal(
+            math.bnToNumber(auctionBalanceAfter.sub(auctionBalanceBefore)),
+            cost
           );
 
-          expect(math.bnToNumber(buyerBalanceAfter)).to.almost(
-            math.bnToNumber(buyerBalanceBefore.sub(cost)),
-            1
+          assert.equal(
+            math.bnToNumber(buyerBalanceBefore.sub(buyerBalanceAfter)),
+            cost
           );
         });
 
         it("should add order to orderbook if successful", async () => {
-          await asset.connect(signers.buyer1).approve(addresses.auction, cost);
+          await asset
+            .connect(signers.buyer1)
+            .approve(addresses.auction, ethers.constants.MaxUint256);
 
           const tx = await auction.addLimitOrder(
             epoch,
-            fixedFromFloat("0.1"),
+            fixedFromFloat(params.price.max),
             params.size
           );
 
           const args = await getEventArgs(tx, "OrderAdded");
           const order = await auction.getOrderById(epoch, args.id);
 
-          await assert.bnEqual(order[0], BigNumber.from("1"));
-          await assert.bnEqual(order[1], fixedFromFloat("0.1"));
-          await assert.bnEqual(order[2], params.size);
-          await assert.equal(order[3], addresses.buyer1);
+          await assert.bnEqual(order.id, BigNumber.from("1"));
+          await assert.bnEqual(
+            order.price64x64,
+            fixedFromFloat(params.price.max)
+          );
+          await assert.bnEqual(order.size, params.size);
+          await assert.equal(order.buyer, addresses.buyer1);
         });
 
-        it.skip("should add claim to claim by buyer if successful", async () => {});
+        it("should add epoch to buyer if successful", async () => {
+          assert.isEmpty(await auction.epochsByBuyer(addresses.buyer1));
+
+          await asset
+            .connect(signers.buyer1)
+            .approve(addresses.auction, ethers.constants.MaxUint256);
+
+          await auction.addLimitOrder(
+            epoch,
+            fixedFromFloat(params.price.max),
+            params.size
+          );
+
+          const epochByBuyer = await auction.epochsByBuyer(addresses.buyer1);
+
+          assert.equal(epochByBuyer.length, 1);
+          assert.bnEqual(epochByBuyer[0], epoch);
+        });
+      });
+
+      describe("else if auction has started", () => {
+        let startTime: BigNumber;
+        let epoch: BigNumber;
+
+        time.revertToSnapshotAfterEach(async () => {
+          [startTime, , epoch] = await knoxUtil.setAndInitializeAuction();
+          await time.fastForwardToFriday8AM();
+          await knoxUtil.initializeNextEpoch();
+        });
+
+        it("should check if auction is finalized", async () => {
+          await time.increaseTo(startTime);
+
+          const totalContracts = await auction.getTotalContracts(epoch);
+
+          await asset
+            .connect(signers.buyer1)
+            .approve(addresses.auction, ethers.constants.MaxUint256);
+
+          await auction.addLimitOrder(
+            epoch,
+            fixedFromFloat(params.price.max),
+            totalContracts
+          );
+
+          assert.equal(await auction.getStatus(epoch), Status.FINALIZED);
+        });
+      });
+
+      describe("else if finalized", () => {
+        time.revertToSnapshotAfterEach(async () => {
+          const [, endTime, epoch] = await knoxUtil.setAndInitializeAuction();
+
+          await time.fastForwardToFriday8AM();
+          await knoxUtil.initializeNextEpoch();
+          await time.increaseTo(endTime.add(1));
+          await auction.finalizeAuction(epoch);
+        });
+
+        it("should revert", async () => {
+          await expect(
+            auction.addLimitOrder(
+              0,
+              fixedFromFloat(params.price.max),
+              params.size
+            )
+          ).to.be.revertedWith("auction finalized");
+        });
+      });
+
+      describe("else if processed", () => {
+        time.revertToSnapshotAfterEach(async () => {
+          await setupSimpleAuction(true);
+        });
+
+        it("should revert", async () => {
+          await expect(
+            auction.addLimitOrder(
+              0,
+              fixedFromFloat(params.price.max),
+              params.size
+            )
+          ).to.be.revertedWith("auction processed");
+        });
       });
     });
 
     describe("#cancelLimitOrder(uint64,uint256)", () => {
       describe("if not initialized", () => {
-        it.skip("should revert", async () => {});
+        it("should revert", async () => {
+          await expect(
+            auction.addLimitOrder(
+              0,
+              fixedFromFloat(params.price.max),
+              params.size
+            )
+          ).to.be.revertedWith("end time is not set");
+        });
       });
 
-      describe("else", () => {
+      describe("else if auction has not started", () => {
+        let endTime: BigNumber;
         let epoch: BigNumber;
-        const cost = params.size.div(10);
 
         time.revertToSnapshotAfterEach(async () => {
-          [, , epoch] = await knoxUtil.setAndInitializeAuction();
-          await asset.connect(signers.buyer1).approve(addresses.auction, cost);
+          [, endTime, epoch] = await knoxUtil.setAndInitializeAuction();
+          await asset
+            .connect(signers.buyer1)
+            .approve(addresses.auction, ethers.constants.MaxUint256);
 
           await auction.addLimitOrder(
             epoch,
-            fixedFromFloat("0.1"),
+            fixedFromFloat(params.price.max),
             params.size
+          );
+        });
+
+        it("should revert if auction expires", async () => {
+          await time.increaseTo(endTime);
+          await expect(auction.cancelLimitOrder(epoch, 1)).to.be.revertedWith(
+            "auction has ended"
           );
         });
 
@@ -503,11 +707,9 @@ export function describeBehaviorOfAuction(
           ).to.be.revertedWith("buyer != msg.sender");
         });
 
-        it.skip("should revert if auction is finalized", async () => {});
-
-        it.skip("should revert auction finalizes", async () => {});
-
         it("should issue refund if successful", async () => {
+          const cost = math.bnToNumber(params.size) * params.price.max;
+
           const auctionBalanceBefore = await asset.balanceOf(addresses.auction);
           const buyerBalanceBefore = await asset.balanceOf(addresses.buyer1);
 
@@ -516,14 +718,14 @@ export function describeBehaviorOfAuction(
           const auctionBalanceAfter = await asset.balanceOf(addresses.auction);
           const buyerBalanceAfter = await asset.balanceOf(addresses.buyer1);
 
-          expect(math.bnToNumber(auctionBalanceAfter)).to.almost(
-            math.bnToNumber(auctionBalanceBefore.sub(cost)),
-            1
+          assert.equal(
+            math.bnToNumber(auctionBalanceBefore.sub(auctionBalanceAfter)),
+            cost
           );
 
-          expect(math.bnToNumber(buyerBalanceAfter)).to.almost(
-            math.bnToNumber(buyerBalanceBefore.add(cost)),
-            1
+          assert.equal(
+            math.bnToNumber(buyerBalanceAfter.sub(buyerBalanceBefore)),
+            cost
           );
         });
 
@@ -532,38 +734,162 @@ export function describeBehaviorOfAuction(
 
           const order = await auction.getOrderById(epoch, 1);
 
-          await assert.bnEqual(order[0], ethers.constants.Zero);
-          await assert.bnEqual(order[1], ethers.constants.Zero);
-          await assert.bnEqual(order[2], ethers.constants.Zero);
-          await assert.equal(order[3], ethers.constants.AddressZero);
+          await assert.bnEqual(order.id, ethers.constants.Zero);
+          await assert.bnEqual(order.price64x64, ethers.constants.Zero);
+          await assert.bnEqual(order.size, ethers.constants.Zero);
+          await assert.equal(order.buyer, ethers.constants.AddressZero);
         });
 
-        it.skip("should remove claim from claim by buyer if successful", async () => {});
-      });
-    });
+        it("should remove claim from buyer if successful", async () => {
+          await asset
+            .connect(signers.buyer1)
+            .approve(addresses.auction, ethers.constants.MaxUint256);
 
-    describe("#addMarketOrder(uint64,uint256)", () => {
-      describe("if not initialized", () => {
-        it.skip("should revert", async () => {});
+          await auction.addLimitOrder(
+            epoch,
+            fixedFromFloat(params.price.max),
+            params.size
+          );
+
+          let epochByBuyer = await auction.epochsByBuyer(addresses.buyer1);
+          assert.equal(epochByBuyer.length, 1);
+
+          await auction.cancelLimitOrder(epoch, 1);
+
+          epochByBuyer = await auction.epochsByBuyer(addresses.buyer1);
+          assert.isEmpty(epochByBuyer);
+        });
       });
 
-      describe("else", () => {
+      describe("else if auction has started", () => {
         let startTime: BigNumber;
         let epoch: BigNumber;
 
         time.revertToSnapshotAfterEach(async () => {
           [startTime, , epoch] = await knoxUtil.setAndInitializeAuction();
+          await time.fastForwardToFriday8AM();
+          await knoxUtil.initializeNextEpoch();
+        });
+
+        it("should check if auction is finalized", async () => {
+          const totalContracts = await auction.getTotalContracts(epoch);
+
+          await asset
+            .connect(signers.buyer1)
+            .approve(addresses.auction, ethers.constants.MaxUint256);
+
+          await auction.addLimitOrder(
+            epoch,
+            fixedFromFloat(params.price.max),
+            totalContracts
+          );
+
+          await asset
+            .connect(signers.buyer2)
+            .approve(addresses.auction, ethers.constants.MaxUint256);
+
+          await auction
+            .connect(signers.buyer2)
+            .addLimitOrder(
+              epoch,
+              fixedFromFloat(params.price.max),
+              totalContracts
+            );
+
+          await time.increaseTo(startTime);
+          assert.equal(await auction.getStatus(epoch), Status.INITIALIZED);
+
+          // Buyer 2 cancels order but utilization is >= 100%
+          await auction.connect(signers.buyer1).cancelLimitOrder(epoch, 1);
+
+          assert.equal(await auction.getStatus(epoch), Status.FINALIZED);
+        });
+      });
+
+      describe("else if finalized", () => {
+        time.revertToSnapshotAfterEach(async () => {
+          const [, endTime, epoch] = await knoxUtil.setAndInitializeAuction();
+
+          await asset
+            .connect(signers.buyer1)
+            .approve(addresses.auction, ethers.constants.MaxUint256);
+
+          await auction.addLimitOrder(
+            epoch,
+            fixedFromFloat(params.price.max),
+            params.size
+          );
 
           await time.fastForwardToFriday8AM();
           await knoxUtil.initializeNextEpoch();
-          await time.increaseTo(startTime.add(1));
+          await time.increaseTo(endTime.add(1));
+          await auction.finalizeAuction(epoch);
         });
 
-        it.skip("should revert if auction has not started", async () => {});
+        it("should revert", async () => {
+          await expect(auction.cancelLimitOrder(0, 1)).to.be.revertedWith(
+            "auction finalized"
+          );
+        });
+      });
 
-        it.skip("should revert if auction is finalized", async () => {});
+      describe("else if processed", () => {
+        time.revertToSnapshotAfterEach(async () => {
+          await setupSimpleAuction(true);
+        });
 
-        it.skip("should revert if auction is cancelled", async () => {});
+        it("should revert", async () => {
+          await expect(auction.cancelLimitOrder(0, 1)).to.be.revertedWith(
+            "auction processed"
+          );
+        });
+      });
+    });
+
+    describe("#addMarketOrder(uint64,uint256)", () => {
+      describe("if not initialized", () => {
+        it("should revert", async () => {
+          await expect(
+            auction.addMarketOrder(0, params.size)
+          ).to.be.revertedWith("start time is not set");
+        });
+      });
+
+      describe("else if auction has not started", () => {
+        time.revertToSnapshotAfterEach(async () => {
+          await knoxUtil.setAndInitializeAuction();
+          await time.fastForwardToFriday8AM();
+          await knoxUtil.initializeNextEpoch();
+        });
+
+        it("should revert", async () => {
+          await expect(
+            auction.addMarketOrder(0, params.size)
+          ).to.be.revertedWith("auction not started");
+        });
+      });
+
+      describe("else if auction has started", () => {
+        let startTime: BigNumber;
+        let endTime: BigNumber;
+        let epoch: BigNumber;
+
+        time.revertToSnapshotAfterEach(async () => {
+          [startTime, , epoch] = await knoxUtil.setAndInitializeAuction();
+          await time.fastForwardToFriday8AM();
+          await knoxUtil.initializeNextEpoch();
+          await time.increaseTo(startTime);
+        });
+
+        it("should revert if auction has ended", async () => {
+          it("should revert", async () => {
+            await time.increaseTo(endTime);
+
+            await expect(
+              auction.addMarketOrder(0, params.size)
+            ).to.be.revertedWith("auction has ended");
+          });
+        });
 
         it("should revert if order size is below min size", async () => {
           await expect(
@@ -574,19 +900,12 @@ export function describeBehaviorOfAuction(
           ).to.be.revertedWith("size < minimum");
         });
 
-        it.skip("should revert auction finalizes", async () => {});
-
         it("should set the totalContracts equal to Vault ERC20 balance if totalContracts is unset", async () => {
           let totalContracts = await auction.getTotalContracts(epoch);
 
-          const price64x64 = await auction.priceCurve64x64(epoch);
-          const price = fixedToNumber(price64x64);
-          const cost = price * math.bnToNumber(params.size);
-          const bnCost = math.toUnits(cost);
-
           await asset
             .connect(signers.buyer1)
-            .approve(addresses.auction, bnCost);
+            .approve(addresses.auction, ethers.constants.MaxUint256);
 
           await auction.addMarketOrder(epoch, params.size);
           const data = await auction.getAuction(epoch);
@@ -594,19 +913,15 @@ export function describeBehaviorOfAuction(
         });
 
         it("should emit OrderAdded event if successful", async () => {
-          const price64x64 = await auction.priceCurve64x64(epoch);
-          const price = fixedToNumber(price64x64);
-          const cost = price * math.bnToNumber(params.size);
-          const bnCost = math.toUnits(cost);
-
           await asset
             .connect(signers.buyer1)
-            .approve(addresses.auction, bnCost);
+            .approve(addresses.auction, ethers.constants.MaxUint256);
 
           const tx = await auction.addMarketOrder(epoch, params.size);
           const args = await getEventArgs(tx, "OrderAdded");
 
           await expect(tx).to.emit(auction, "OrderAdded").withArgs(
+            0,
             1,
             addresses.buyer1,
             // Exact price depends on the time the tx was settled
@@ -620,220 +935,129 @@ export function describeBehaviorOfAuction(
           const auctionBalanceBefore = await asset.balanceOf(addresses.auction);
           const buyerBalanceBefore = await asset.balanceOf(addresses.buyer1);
 
-          const price = fixedToNumber(await auction.priceCurve64x64(epoch));
-          const cost = price * math.bnToNumber(params.size);
-          const bnCost = math.toUnits(cost);
-
           await asset
             .connect(signers.buyer1)
-            .approve(addresses.auction, bnCost);
+            .approve(addresses.auction, ethers.constants.MaxUint256);
 
-          await auction.addMarketOrder(epoch, params.size);
+          const tx = await auction.addMarketOrder(epoch, params.size);
+          const args = await getEventArgs(tx, "OrderAdded");
+          const cost = math.bnToNumber(
+            params.size
+              .mul(fixedToBn(args.price64x64))
+              .div((10 ** params.collateral.decimals).toString())
+          );
 
           const auctionBalanceAfter = await asset.balanceOf(addresses.auction);
           const buyerBalanceAfter = await asset.balanceOf(addresses.buyer1);
 
-          expect(math.bnToNumber(auctionBalanceAfter)).to.almost(
-            math.bnToNumber(auctionBalanceBefore.add(bnCost)),
-            1
+          assert.equal(
+            math.bnToNumber(auctionBalanceAfter.sub(auctionBalanceBefore)),
+            cost
           );
 
-          expect(math.bnToNumber(buyerBalanceAfter)).to.almost(
-            math.bnToNumber(buyerBalanceBefore.sub(bnCost)),
-            1
+          assert.equal(
+            math.bnToNumber(buyerBalanceBefore.sub(buyerBalanceAfter)),
+            cost
           );
         });
 
         it("should add order to orderbook if successful", async () => {
-          const price64x64 = await auction.priceCurve64x64(epoch);
-          const price = fixedToNumber(price64x64);
-          const cost = price * math.bnToNumber(params.size);
-          const bnCost = math.toUnits(cost);
-
           await asset
             .connect(signers.buyer1)
-            .approve(addresses.auction, bnCost);
+            .approve(addresses.auction, ethers.constants.MaxUint256);
 
           const tx = await auction.addMarketOrder(epoch, params.size);
           const args = await getEventArgs(tx, "OrderAdded");
 
           const order = await auction.getOrderById(epoch, args.id);
 
-          await assert.bnEqual(order[0], BigNumber.from("1"));
-
+          await assert.bnEqual(order.id, BigNumber.from("1"));
           // Exact price depends on the time the tx was settled
-          await assert.equal(order[1].toString(), args.price64x64);
-
-          await assert.bnEqual(order[2], params.size);
-          await assert.equal(order[3], addresses.buyer1);
+          await assert.equal(order.price64x64.toString(), args.price64x64);
+          await assert.bnEqual(order.size, params.size);
+          await assert.equal(order.buyer, addresses.buyer1);
         });
 
-        it.skip("should add claim to claim by buyer if successful", async () => {});
+        it("should add epoch to buyer if successful", async () => {
+          assert.isEmpty(await auction.epochsByBuyer(addresses.buyer1));
+
+          await asset
+            .connect(signers.buyer1)
+            .approve(addresses.auction, ethers.constants.MaxUint256);
+
+          await auction.addMarketOrder(epoch, params.size);
+
+          const epochByBuyer = await auction.epochsByBuyer(addresses.buyer1);
+
+          assert.equal(epochByBuyer.length, 1);
+          assert.bnEqual(epochByBuyer[0], epoch);
+        });
       });
-    });
 
-    describe("#processOrders(uint64)", () => {
-      describe("if not initialized", () => {
-        it.skip("should revert", async () => {});
-      });
-
-      describe("else", () => {
-        let startTime: BigNumber;
-        let epoch: BigNumber;
-
+      describe("else if finalized", () => {
         time.revertToSnapshotAfterEach(async () => {
-          [startTime, , epoch] = await knoxUtil.setAndInitializeAuction();
+          const [, endTime, epoch] = await knoxUtil.setAndInitializeAuction();
+
+          await asset
+            .connect(signers.buyer1)
+            .approve(addresses.auction, ethers.constants.MaxUint256);
+
+          await auction.addLimitOrder(
+            epoch,
+            fixedFromFloat(params.price.max),
+            params.size
+          );
 
           await time.fastForwardToFriday8AM();
           await knoxUtil.initializeNextEpoch();
+          await time.increaseTo(endTime.add(1));
+          await auction.finalizeAuction(epoch);
         });
 
-        it.skip("should revert if auction has not started", async () => {});
+        it("should revert", async () => {
+          await expect(
+            auction.addMarketOrder(0, params.size)
+          ).to.be.revertedWith("auction finalized");
+        });
+      });
 
-        it.skip("should revert if auction is finalized", async () => {});
-
-        it.skip("should revert if auction is cancelled", async () => {});
-
-        it("should return true if vault utilization == 100%", async () => {
-          await time.increaseTo(startTime.add(1));
-
-          const [txs, totalContractsSold] =
-            await utilizeAllContractsMarketOrdersOnly(epoch);
-
-          // Gets args of last tx
-          const args = await getEventArgs(txs[2], "OrderAdded");
-
-          await auction.processOrders(epoch);
-
-          assert.isTrue(await auction.callStatic.processOrders(epoch));
-
-          assert.bnEqual(
-            await auction.getTotalContractsSold(epoch),
-            totalContractsSold
-          );
-
-          assert.bnEqual(await auction.lastPrice64x64(epoch), args.price64x64);
+      describe("else if processed", () => {
+        time.revertToSnapshotAfterEach(async () => {
+          await setupSimpleAuction(true);
         });
 
-        it("should return false if vault utilization < 100%", async () => {
-          await time.increaseTo(startTime.add(1));
-
-          await asset
-            .connect(signers.buyer1)
-            .approve(addresses.auction, ethers.constants.MaxUint256);
-
-          const tx = await auction
-            .connect(signers.buyer1)
-            .addMarketOrder(epoch, params.size);
-
-          const args = await getEventArgs(tx, "OrderAdded");
-
-          await auction.processOrders(epoch);
-          assert.isFalse(await auction.callStatic.processOrders(epoch));
-
-          assert.bnEqual(
-            await auction.getTotalContractsSold(epoch),
-            params.size
-          );
-          assert.bnEqual(await auction.lastPrice64x64(epoch), args.price64x64);
-        });
-
-        it("should only process orders where price > clearing price", async () => {
-          await asset
-            .connect(signers.buyer1)
-            .approve(addresses.auction, ethers.constants.MaxUint256);
-
-          await auction.addLimitOrder(
-            epoch,
-            fixedFromFloat("0.05"),
-            params.size
-          );
-
-          await asset
-            .connect(signers.buyer1)
-            .approve(addresses.auction, ethers.constants.MaxUint256);
-
-          await auction.addLimitOrder(
-            epoch,
-            fixedFromFloat("0.03"),
-            params.size
-          );
-
-          await asset
-            .connect(signers.buyer1)
-            .approve(addresses.auction, ethers.constants.MaxUint256);
-
-          await auction.addLimitOrder(
-            epoch,
-            fixedFromFloat("0.01"),
-            params.size
-          );
-
-          await time.increaseTo(startTime.add(1));
-
-          await asset
-            .connect(signers.buyer1)
-            .approve(addresses.auction, ethers.constants.MaxUint256);
-
-          // All limit orders fail to fill
-          const tx = await auction.addMarketOrder(epoch, params.size);
-          const args = await getEventArgs(tx, "OrderAdded");
-
-          await auction.processOrders(epoch);
-
-          assert.isFalse(await auction.callStatic.processOrders(epoch));
-          assert.bnEqual(
-            await auction.getTotalContractsSold(epoch),
-            params.size
-          );
-          assert.bnEqual(await auction.lastPrice64x64(epoch), args.price64x64);
+        it("should revert", async () => {
+          await expect(
+            auction.addMarketOrder(0, params.size)
+          ).to.be.revertedWith("auction processed");
         });
       });
     });
 
     describe("#finalizeAuction(uint64)", () => {
       describe("if not initialized", () => {
-        it.skip("should revert", async () => {});
-      });
-
-      describe("else if auction price is not set", () => {
-        let epoch: BigNumber;
-
-        time.revertToSnapshotAfterEach(async () => {
-          [, , epoch] = await knoxUtil.setAndInitializeAuction();
-        });
-
-        it("should set last price to int128.max if auction is cancelled (max price == 0, min price == 0, max price < min price)", async () => {
-          await auction
-            .connect(signers.vault)
-            .setAuctionPrices(epoch, 0, fixedFromFloat(params.price.min));
-
-          assert.bnEqual(
-            await auction.lastPrice64x64(epoch),
-            BigNumber.from("170141183460469231731687303715884105727") // max int128
+        it("should revert", async () => {
+          await expect(auction.finalizeAuction(0)).to.be.revertedWith(
+            "start time is not set"
           );
         });
+      });
 
-        it("should return emit AuctionStatus if max price == 0", async () => {
-          await auction
-            .connect(signers.vault)
-            .setAuctionPrices(epoch, 0, fixedFromFloat(params.price.min));
-
-          const tx = await auction.finalizeAuction(epoch);
-          await expect(tx).to.emit(auction, "AuctionStatus").withArgs(1);
+      describe("else if auction has not started", () => {
+        time.revertToSnapshotAfterEach(async () => {
+          await knoxUtil.setAndInitializeAuction();
+          await time.fastForwardToFriday8AM();
+          await knoxUtil.initializeNextEpoch();
         });
 
-        it("should return emit AuctionStatus if min price == 0", async () => {
-          await auction
-            .connect(signers.vault)
-            .setAuctionPrices(epoch, fixedFromFloat(params.price.max), 0);
-
-          const tx = await auction.finalizeAuction(epoch);
-          await expect(tx).to.emit(auction, "AuctionStatus").withArgs(1);
+        it("should revert", async () => {
+          await expect(auction.finalizeAuction(0)).to.be.revertedWith(
+            "auction not started"
+          );
         });
       });
 
-      describe("else", () => {
+      describe("else if auction has started", () => {
         let startTime: BigNumber;
         let endTime: BigNumber;
         let epoch: BigNumber;
@@ -843,32 +1067,63 @@ export function describeBehaviorOfAuction(
             await knoxUtil.setAndInitializeAuction();
         });
 
-        it.skip("should revert if auction has not started", async () => {});
-
-        it.skip("should revert if auction is finalized", async () => {});
-
         it("should emit AuctionStatus event if utilization == %100", async () => {
           await time.fastForwardToFriday8AM();
           await knoxUtil.initializeNextEpoch();
-          await time.increaseTo(startTime.add(1));
+          await time.increaseTo(startTime);
 
-          await utilizeAllContractsMarketOrdersOnly(epoch);
+          const [txs] = await utilizeAllContractsMarketOrdersOnly(epoch);
 
-          const tx = await auction.finalizeAuction(epoch);
-          await expect(tx).to.emit(auction, "AuctionStatus").withArgs(1);
+          await expect(txs[2])
+            .to.emit(auction, "AuctionStatus")
+            .withArgs(0, Status.FINALIZED);
         });
 
         it("should emit AuctionStatus event if auction time limit has expired", async () => {
           await time.increaseTo(endTime.add(1));
           const tx = await auction.finalizeAuction(epoch);
-          await expect(tx).to.emit(auction, "AuctionStatus").withArgs(1);
+          await expect(tx)
+            .to.emit(auction, "AuctionStatus")
+            .withArgs(0, Status.FINALIZED);
+        });
+      });
+
+      describe("else if finalized", () => {
+        time.revertToSnapshotAfterEach(async () => {
+          const [, endTime] = await knoxUtil.setAndInitializeAuction();
+          await time.fastForwardToFriday8AM();
+          await knoxUtil.initializeNextEpoch();
+          await time.increaseTo(endTime.add(1));
+          await auction.finalizeAuction(0);
+        });
+
+        it("should revert", async () => {
+          await expect(auction.finalizeAuction(0)).to.be.revertedWith(
+            "auction finalized"
+          );
+        });
+      });
+
+      describe("else if processed", () => {
+        time.revertToSnapshotAfterEach(async () => {
+          await setupSimpleAuction(true);
+        });
+
+        it("should revert", async () => {
+          await expect(auction.finalizeAuction(0)).to.be.revertedWith(
+            "auction processed"
+          );
         });
       });
     });
 
     describe("#transferPremium(uint64)", () => {
       describe("if not finalized", () => {
-        it.skip("should revert", async () => {});
+        it("should revert", async () => {
+          await expect(
+            auction.connect(signers.vault).transferPremium(0)
+          ).to.be.revertedWith("!finalized");
+        });
       });
 
       describe("else if utilization == 100%", () => {
@@ -876,23 +1131,23 @@ export function describeBehaviorOfAuction(
           await setupSimpleAuction(false);
         });
 
-        it.skip("should revert if auction is processed", async () => {});
-
-        it.skip("should revert if auction is cancelled", async () => {});
+        it("should revert if !vault", async () => {
+          await expect(auction.transferPremium(0)).to.be.revertedWith("!vault");
+        });
 
         it("should revert if premiums have been transferred", async () => {
-          await auction.transferPremium(0);
+          await auction.connect(signers.vault).transferPremium(0);
 
-          await expect(auction.transferPremium(0)).to.be.revertedWith(
-            "premiums transferred"
-          );
+          await expect(
+            auction.connect(signers.vault).transferPremium(0)
+          ).to.be.revertedWith("premiums transferred");
         });
 
         it("should transfer premiums to Vault if successful", async () => {
           const auctionBalanceBefore = await asset.balanceOf(addresses.auction);
           const vaultBalanceBefore = await asset.balanceOf(addresses.vault);
 
-          await auction.transferPremium(0);
+          await auction.connect(signers.vault).transferPremium(0);
           const { totalPremiums } = await auction.getAuction(0);
 
           const auctionBalanceAfter = await asset.balanceOf(addresses.auction);
@@ -909,11 +1164,27 @@ export function describeBehaviorOfAuction(
           );
         });
       });
+
+      describe("else if processed", () => {
+        time.revertToSnapshotAfterEach(async () => {
+          await setupSimpleAuction(true);
+        });
+
+        it("should revert", async () => {
+          await expect(
+            auction.connect(signers.vault).transferPremium(0)
+          ).to.be.revertedWith("!finalized");
+        });
+      });
     });
 
     describe("#processAuction(uint64)", () => {
       describe("if not finalized", () => {
-        it.skip("should revert", async () => {});
+        it("should revert", async () => {
+          await expect(
+            auction.connect(signers.vault).transferPremium(0)
+          ).to.be.revertedWith("!finalized");
+        });
       });
 
       describe("else if auction has no orders", () => {
@@ -930,9 +1201,14 @@ export function describeBehaviorOfAuction(
           await auction.finalizeAuction(epoch);
         });
 
+        it("should revert if !vault", async () => {
+          await expect(auction.processAuction(0)).to.be.revertedWith("!vault");
+        });
+
         it("should emit AuctionStatus event when processed", async () => {
-          const tx = await auction.processAuction(epoch);
-          await expect(tx).to.emit(auction, "AuctionStatus").withArgs(2);
+          await expect(auction.connect(signers.vault).processAuction(0))
+            .to.emit(auction, "AuctionStatus")
+            .withArgs(0, Status.PROCESSED);
         });
       });
 
@@ -941,27 +1217,35 @@ export function describeBehaviorOfAuction(
           await setupSimpleAuction(false);
         });
 
-        it.skip("should revert if auction is processed", async () => {});
-
-        it.skip("should revert if auction is cancelled", async () => {});
-
         it("should revert if premiums have not been transferred to Vault", async () => {
-          await expect(auction.processAuction(0)).to.be.revertedWith(
-            "premiums not transferred"
-          );
+          await expect(
+            auction.connect(signers.vault).processAuction(0)
+          ).to.be.revertedWith("premiums not transferred");
         });
 
         it("should revert if long tokens have not been transferred to Auction", async () => {
-          await auction.transferPremium(0);
-          await expect(auction.processAuction(0)).to.be.revertedWith(
-            "long tokens not transferred"
-          );
+          await auction.connect(signers.vault).transferPremium(0);
+          await expect(
+            auction.connect(signers.vault).processAuction(0)
+          ).to.be.revertedWith("long tokens not transferred");
         });
 
         it("should emit AuctionStatus event when processed", async () => {
           await expect(vault.connect(signers.keeper).processAuction())
             .to.emit(auction, "AuctionStatus")
-            .withArgs(2);
+            .withArgs(0, Status.PROCESSED);
+        });
+      });
+
+      describe("else if processed", () => {
+        time.revertToSnapshotAfterEach(async () => {
+          await setupSimpleAuction(true);
+        });
+
+        it("should revert", async () => {
+          await expect(
+            auction.connect(signers.vault).transferPremium(0)
+          ).to.be.revertedWith("!finalized");
         });
       });
     });
@@ -1028,7 +1312,15 @@ export function describeBehaviorOfAuction(
       };
 
       describe("if not processed", () => {
-        it.skip("should revert", async () => {});
+        time.revertToSnapshotAfterEach(async () => {
+          await setupSimpleAuction(false);
+        });
+
+        it("should revert", async () => {
+          await expect(
+            auction.connect(signers.buyer1).withdraw(0)
+          ).to.be.revertedWith("auction !processed");
+        });
       });
 
       describe("else if cancelled", () => {
@@ -1073,12 +1365,9 @@ export function describeBehaviorOfAuction(
 
           // initialize next epoch
           await vault.connect(signers.keeper).depositQueuedToVault();
+          // prices are unset, auction is cancelled
           await auction.connect(signers.vault).setAuctionPrices(epoch, 0, 0);
           await vault.connect(signers.keeper).setNextEpoch();
-
-          await time.increaseTo(endTime.add(1));
-          await auction.finalizeAuction(epoch);
-
           await vault.connect(signers.keeper).processAuction();
         });
 
@@ -1425,10 +1714,10 @@ export function describeBehaviorOfAuction(
           const args = await getEventArgs(simpleAuction.txs[0], "OrderAdded");
           const order = await auction.getOrderById(epoch, args.id);
 
-          await assert.bnEqual(order[0], ethers.constants.Zero);
-          await assert.bnEqual(order[1], ethers.constants.Zero);
-          await assert.bnEqual(order[2], ethers.constants.Zero);
-          await assert.equal(order[3], ethers.constants.AddressZero);
+          await assert.bnEqual(order.id, ethers.constants.Zero);
+          await assert.bnEqual(order.price64x64, ethers.constants.Zero);
+          await assert.bnEqual(order.size, ethers.constants.Zero);
+          await assert.equal(order.buyer, ethers.constants.AddressZero);
         });
 
         it("should remove tx2 from order book", async () => {
@@ -1437,10 +1726,10 @@ export function describeBehaviorOfAuction(
           const args = await getEventArgs(simpleAuction.txs[1], "OrderAdded");
           const order = await auction.getOrderById(epoch, args.id);
 
-          await assert.bnEqual(order[0], ethers.constants.Zero);
-          await assert.bnEqual(order[1], ethers.constants.Zero);
-          await assert.bnEqual(order[2], ethers.constants.Zero);
-          await assert.equal(order[3], ethers.constants.AddressZero);
+          await assert.bnEqual(order.id, ethers.constants.Zero);
+          await assert.bnEqual(order.price64x64, ethers.constants.Zero);
+          await assert.bnEqual(order.size, ethers.constants.Zero);
+          await assert.equal(order.buyer, ethers.constants.AddressZero);
         });
 
         it("should remove tx3 from order book", async () => {
@@ -1449,10 +1738,10 @@ export function describeBehaviorOfAuction(
           const args = await getEventArgs(simpleAuction.txs[2], "OrderAdded");
           const order = await auction.getOrderById(epoch, args.id);
 
-          await assert.bnEqual(order[0], ethers.constants.Zero);
-          await assert.bnEqual(order[1], ethers.constants.Zero);
-          await assert.bnEqual(order[2], ethers.constants.Zero);
-          await assert.equal(order[3], ethers.constants.AddressZero);
+          await assert.bnEqual(order.id, ethers.constants.Zero);
+          await assert.bnEqual(order.price64x64, ethers.constants.Zero);
+          await assert.bnEqual(order.size, ethers.constants.Zero);
+          await assert.equal(order.buyer, ethers.constants.AddressZero);
         });
       });
     });
@@ -1508,9 +1797,8 @@ export function describeBehaviorOfAuction(
             .connect(signers.buyer3)
             .addLimitOrder(epoch, maxPrice64x64, buyer3OrderSize);
 
+          // auction prices are unset, auction is cancelled
           await auction.connect(signers.vault).setAuctionPrices(epoch, 0, 0);
-
-          await auction.finalizeAuction(epoch);
         });
 
         it("should preview buyer1 refund, only", async () => {
@@ -1523,7 +1811,7 @@ export function describeBehaviorOfAuction(
           ](epoch);
 
           assert.isTrue(fill.isZero());
-          expect(math.bnToNumber(refund)).to.almost(estimatedRefund, 1);
+          assert.equal(math.bnToNumber(refund), estimatedRefund);
         });
 
         it("should preview buyer2 refund, only", async () => {
@@ -1535,7 +1823,7 @@ export function describeBehaviorOfAuction(
             .callStatic["previewWithdraw(uint64)"](epoch);
 
           assert.isTrue(fill.isZero());
-          expect(math.bnToNumber(refund)).to.almost(estimatedRefund, 1);
+          assert.equal(math.bnToNumber(refund), estimatedRefund);
         });
 
         it("should preview buyer3 refund, only", async () => {
@@ -1547,7 +1835,7 @@ export function describeBehaviorOfAuction(
             .callStatic["previewWithdraw(uint64)"](epoch);
 
           assert.isTrue(fill.isZero());
-          expect(math.bnToNumber(refund)).to.almost(estimatedRefund, 1);
+          assert.equal(math.bnToNumber(refund), estimatedRefund);
         });
       });
 
@@ -1674,14 +1962,11 @@ export function describeBehaviorOfAuction(
         });
 
         it("should preview buyer3 with fill only", async () => {
-          const estimatedRefund = 0;
-
           const [refund, fill] = await auction
             .connect(signers.buyer3)
             .callStatic["previewWithdraw(uint64)"](epoch);
 
-          expect(math.bnToNumber(refund)).to.almost(estimatedRefund, 1);
-
+          expect(math.bnToNumber(refund)).to.almost(0, 1);
           expect(math.bnToNumber(fill)).to.almost(
             math.bnToNumber(simpleAuction.buyerOrderSize),
             1
@@ -1703,10 +1988,10 @@ export function describeBehaviorOfAuction(
           const args = await getEventArgs(simpleAuction.txs[0], "OrderAdded");
           const order = await auction.getOrderById(epoch, args.id);
 
-          await assert.bnEqual(order[0], args.id);
-          await assert.bnEqual(order[1], args.price64x64);
-          await assert.bnEqual(order[2], args.size);
-          await assert.equal(order[3], args.buyer);
+          await assert.bnEqual(order.id, args.id);
+          await assert.bnEqual(order.price64x64, args.price64x64);
+          await assert.bnEqual(order.size, args.size);
+          await assert.equal(order.buyer, args.buyer);
         });
 
         it("should not remove tx2 from order book", async () => {
@@ -1717,10 +2002,10 @@ export function describeBehaviorOfAuction(
           const args = await getEventArgs(simpleAuction.txs[1], "OrderAdded");
           const order = await auction.getOrderById(epoch, args.id);
 
-          await assert.bnEqual(order[0], args.id);
-          await assert.bnEqual(order[1], args.price64x64);
-          await assert.bnEqual(order[2], args.size);
-          await assert.equal(order[3], args.buyer);
+          await assert.bnEqual(order.id, args.id);
+          await assert.bnEqual(order.price64x64, args.price64x64);
+          await assert.bnEqual(order.size, args.size);
+          await assert.equal(order.buyer, args.buyer);
         });
 
         it("should not remove tx3 from order book", async () => {
@@ -1731,18 +2016,35 @@ export function describeBehaviorOfAuction(
           const args = await getEventArgs(simpleAuction.txs[2], "OrderAdded");
           const order = await auction.getOrderById(epoch, args.id);
 
-          await assert.bnEqual(order[0], args.id);
-          await assert.bnEqual(order[1], args.price64x64);
-          await assert.bnEqual(order[2], args.size);
-          await assert.equal(order[3], args.buyer);
+          await assert.bnEqual(order.id, args.id);
+          await assert.bnEqual(order.price64x64, args.price64x64);
+          await assert.bnEqual(order.size, args.size);
+          await assert.equal(order.buyer, args.buyer);
         });
       });
     });
 
-    describe.skip("#getTotalContracts(uint64)", () => {
-      time.revertToSnapshotAfterEach(async () => {});
+    describe("#getTotalContracts(uint64)", () => {
+      time.revertToSnapshotAfterEach(async () => {
+        await knoxUtil.setAndInitializeAuction();
+      });
 
-      it("", async () => {});
+      it("should return the total contracts available", async () => {
+        let expectedTotalContracts =
+          math.bnToNumber(params.mint) * (1 - params.reserveRate64x64);
+
+        if (!params.isCall) {
+          const price =
+            params.underlying.oracle.price / params.base.oracle.price;
+
+          expectedTotalContracts = expectedTotalContracts / price;
+        }
+
+        assert.equal(
+          math.bnToNumber(await auction.getTotalContracts(0)),
+          expectedTotalContracts
+        );
+      });
     });
   });
 }
