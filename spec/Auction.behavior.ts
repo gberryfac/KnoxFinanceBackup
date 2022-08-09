@@ -1365,8 +1365,8 @@ export function describeBehaviorOfAuction(
 
           // initialize next epoch
           // prices are unset, auction is cancelled
+          await vault.connect(signers.keeper).initalizeNextEpoch();
           await auction.connect(signers.vault).setAuctionPrices(epoch, 0, 0);
-          await vault.connect(signers.keeper).setNextEpoch();
           await vault.connect(signers.keeper).processAuction();
         });
 

@@ -58,7 +58,7 @@ interface IQueue is IERC165, IERC1155, IERC1155Enumerable, IQueueEvents {
 
     function syncEpoch(uint64 epoch) external;
 
-    function processQueuedDeposits() external;
+    function processDeposits() external;
 
     /************************************************
      *  VIEW

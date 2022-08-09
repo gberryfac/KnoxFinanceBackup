@@ -156,7 +156,7 @@ contract QueueInternal is
         emit EpochSet(l.epoch, msg.sender);
     }
 
-    function _processQueuedDeposits() internal {
+    function _processDeposits() internal {
         uint256 deposits = ERC20.balanceOf(address(this));
 
         ERC20.approve(address(Vault), deposits);

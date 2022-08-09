@@ -126,8 +126,8 @@ contract Queue is
         _syncEpoch(epoch);
     }
 
-    function processQueuedDeposits() external onlyVault {
-        _processQueuedDeposits();
+    function processDeposits() external onlyVault {
+        _processDeposits();
     }
 
     /************************************************

@@ -79,11 +79,6 @@ interface IVaultAdmin {
      *  PROCESS LAST EPOCH
      ***********************************************/
 
-    // /**
-    //  * @notice
-    //  */
-    function initializeAndProcessEpochs() external;
-
     /**
      * @notice Prepares the strategy and initiates the next round of option sales
      */
@@ -100,15 +95,6 @@ interface IVaultAdmin {
     function collectPerformanceFee() external;
 
     /************************************************
-     *  SET AUCTION PRICES
-     ***********************************************/
-
-    /**
-     * @notice Sets the start and end time of the auction.
-     */
-    function setAuctionPrices() external;
-
-    /************************************************
      *  INITIALIZE NEXT EPOCH
      ***********************************************/
 
@@ -117,10 +103,14 @@ interface IVaultAdmin {
     //  */
     function initalizeNextEpoch() external;
 
-    // /**
-    //  * @notice
-    //  */
-    function setNextEpoch() external;
+    /************************************************
+     *  SET AUCTION PRICES
+     ***********************************************/
+
+    /**
+     * @notice Sets the start and end time of the auction.
+     */
+    function setAuctionPrices() external;
 
     /************************************************
      *  PROCESS AUCTION

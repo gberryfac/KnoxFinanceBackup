@@ -270,10 +270,19 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
      *  INITIALIZE NEXT EPOCH
      ***********************************************/
 
+    // resets state variables and increments epoch id
     function _initalizeNextEpoch() internal {
-        _setAuctionPrices();
-        _setNextEpoch();
+        VaultStorage.Layout storage l = VaultStorage.layout();
+        l.totalShortContracts = 0;
+        l.Queue.processDeposits();
+
+        l.epoch = l.epoch + 1;
+        l.Queue.syncEpoch(l.epoch);
     }
+
+    /************************************************
+     *  SET AUCTION PRICES
+     ***********************************************/
 
     // sets option prices of current epoch auction
     function _setAuctionPrices() internal {
@@ -318,16 +327,6 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
         }
 
         l.Auction.setAuctionPrices(l.epoch, maxPrice64x64, minPrice64x64);
-    }
-
-    // resets state variables and increments epoch id
-    function _setNextEpoch() internal {
-        VaultStorage.Layout storage l = VaultStorage.layout();
-        l.totalShortContracts = 0;
-        l.Queue.processQueuedDeposits();
-
-        l.epoch = l.epoch + 1;
-        l.Queue.syncEpoch(l.epoch);
     }
 
     /************************************************

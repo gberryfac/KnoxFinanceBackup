@@ -556,7 +556,7 @@ export function describeBehaviorOfVaultAdmin(
       });
     });
 
-    describe("#setNextEpoch()", () => {
+    describe("#initalizeNextEpoch()", () => {
       let epoch: BigNumber;
       let startTime: BigNumber;
 
@@ -602,7 +602,7 @@ export function describeBehaviorOfVaultAdmin(
       });
 
       it("should revert if !keeper", async () => {
-        await expect(vault.setNextEpoch()).to.be.revertedWith("!keeper");
+        await expect(vault.initalizeNextEpoch()).to.be.revertedWith("!keeper");
       });
 
       it("should set state parameters and increment epoch", async () => {
@@ -614,7 +614,7 @@ export function describeBehaviorOfVaultAdmin(
         assert.bnEqual(vaultEpochBefore, BigNumber.from(epoch));
         assert.bnGt(totalShortContractsBefore, BigNumber.from(0));
 
-        await vault.connect(signers.keeper).setNextEpoch();
+        await vault.connect(signers.keeper).initalizeNextEpoch();
 
         const queueEpochAfter = await queue.getEpoch();
         const vaultEpochAfter = await vault.getEpoch();

@@ -218,10 +218,9 @@ export class KnoxUtil {
     const maxPrice64x64 = fixedFromFloat(this.params.price.max);
     const minPrice64x64 = fixedFromFloat(this.params.price.min);
 
+    await vault.connect(this.signers.keeper).initalizeNextEpoch();
     await this.auction
       .connect(this.signers.vault)
       .setAuctionPrices(epoch, maxPrice64x64, minPrice64x64);
-
-    await vault.connect(this.signers.keeper).setNextEpoch();
   }
 }
