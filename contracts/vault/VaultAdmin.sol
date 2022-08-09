@@ -104,18 +104,6 @@ contract VaultAdmin is VaultInternal {
     }
 
     /************************************************
-     *  MAINTENANCE
-     ***********************************************/
-
-    /**
-     * @notice Prepares the strategy and initiates the next round of option sales
-     */
-    function initializeAndProcessEpochs() external onlyKeeper {
-        _processLastEpoch();
-        _initalizeNextEpoch();
-    }
-
-    /************************************************
      *  PROCESS LAST EPOCH
      ***********************************************/
 
@@ -151,25 +139,15 @@ contract VaultAdmin is VaultInternal {
         _initalizeNextEpoch();
     }
 
-    /**
-     * @notice
-     */
-    function processQueuedDeposits() external onlyKeeper {
-        _processQueuedDeposits();
-    }
+    /************************************************
+     *  SET AUCTION PRICES
+     ***********************************************/
 
     /**
      * @notice
      */
     function setAuctionPrices() external onlyKeeper {
         _setAuctionPrices();
-    }
-
-    /**
-     * @notice
-     */
-    function setNextEpoch() external onlyKeeper {
-        _setNextEpoch();
     }
 
     /************************************************

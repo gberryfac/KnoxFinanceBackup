@@ -556,39 +556,7 @@ export function describeBehaviorOfVaultAdmin(
       });
     });
 
-    describe("#processQueuedDeposits()", () => {
-      time.revertToSnapshotAfterEach(async () => {
-        await asset
-          .connect(signers.lp1)
-          .approve(addresses.queue, params.deposit);
-
-        await queue.connect(signers.lp1)["deposit(uint256)"](params.deposit);
-      });
-
-      it("should revert if !keeper", async () => {
-        await expect(vault.processQueuedDeposits()).to.be.revertedWith(
-          "!keeper"
-        );
-      });
-
-      it("should transfer balance of queue to vault", async () => {
-        const vaultBalanceBefore = await asset.balanceOf(addresses.vault);
-
-        await vault.connect(signers.keeper).processQueuedDeposits();
-
-        const queueBalanceAfter = await asset.balanceOf(addresses.queue);
-        const vaultBalanceAfter = await asset.balanceOf(addresses.vault);
-
-        assert.bnEqual(queueBalanceAfter, BigNumber.from(0));
-
-        assert.bnEqual(
-          vaultBalanceAfter.sub(vaultBalanceBefore),
-          params.deposit
-        );
-      });
-    });
-
-    describe("#setNextEpoch()", () => {
+    describe("#initalizeNextEpoch()", () => {
       let epoch: BigNumber;
       let startTime: BigNumber;
 
@@ -634,7 +602,7 @@ export function describeBehaviorOfVaultAdmin(
       });
 
       it("should revert if !keeper", async () => {
-        await expect(vault.setNextEpoch()).to.be.revertedWith("!keeper");
+        await expect(vault.initalizeNextEpoch()).to.be.revertedWith("!keeper");
       });
 
       it("should set state parameters and increment epoch", async () => {
@@ -646,7 +614,7 @@ export function describeBehaviorOfVaultAdmin(
         assert.bnEqual(vaultEpochBefore, BigNumber.from(epoch));
         assert.bnGt(totalShortContractsBefore, BigNumber.from(0));
 
-        await vault.connect(signers.keeper).setNextEpoch();
+        await vault.connect(signers.keeper).initalizeNextEpoch();
 
         const queueEpochAfter = await queue.getEpoch();
         const vaultEpochAfter = await vault.getEpoch();
