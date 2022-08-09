@@ -100,6 +100,15 @@ interface IVaultAdmin {
     function collectPerformanceFee() external;
 
     /************************************************
+     *  SET AUCTION PRICES
+     ***********************************************/
+
+    /**
+     * @notice Sets the start and end time of the auction.
+     */
+    function setAuctionPrices() external;
+
+    /************************************************
      *  INITIALIZE NEXT EPOCH
      ***********************************************/
 
@@ -107,15 +116,6 @@ interface IVaultAdmin {
     //  * @notice
     //  */
     function initalizeNextEpoch() external;
-
-    //  * @notice
-    //  */
-    function processQueuedDeposits() external;
-
-    /**
-     * @notice Sets the start and end time of the auction.
-     */
-    function setAuctionPrices() external;
 
     // /**
     //  * @notice

@@ -458,7 +458,6 @@ export async function describeBehaviorOfQueue(
         it("should calculate price per share correctly", async () => {
           let tokenId = await queue.getCurrentTokenId();
 
-          await queue.connect(signers.vault).processQueuedDeposits();
           await vault.connect(signers.keeper).setNextEpoch();
 
           let pricePerShare = await queue.getPricePerShare(tokenId);
@@ -489,8 +488,6 @@ export async function describeBehaviorOfQueue(
           tokenId = await queue.getCurrentTokenId();
 
           await time.fastForwardToFriday8AM();
-
-          await queue.connect(signers.vault).processQueuedDeposits();
           await vault.connect(signers.keeper).setNextEpoch();
 
           pricePerShare = await queue.getPricePerShare(tokenId);
@@ -529,7 +526,6 @@ export async function describeBehaviorOfQueue(
 
         // totalAssets = 40,000
         // totalSupply = 0
-        await queue.connect(signers.vault).processQueuedDeposits();
         await vault.connect(signers.keeper).setNextEpoch();
 
         shares = await queue["previewUnredeemed(uint256)"](tokenId);
@@ -550,7 +546,6 @@ export async function describeBehaviorOfQueue(
 
         // totalAssets = 50,000
         // totalSupply = 10,000
-        await queue.connect(signers.vault).processQueuedDeposits();
         await vault.connect(signers.keeper).setNextEpoch();
 
         shares = await queue["previewUnredeemed(uint256)"](tokenId);

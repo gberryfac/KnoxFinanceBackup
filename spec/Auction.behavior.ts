@@ -1364,7 +1364,6 @@ export function describeBehaviorOfAuction(
           await time.fastForwardToFriday8AM();
 
           // initialize next epoch
-          await vault.connect(signers.keeper).processQueuedDeposits();
           // prices are unset, auction is cancelled
           await auction.connect(signers.vault).setAuctionPrices(epoch, 0, 0);
           await vault.connect(signers.keeper).setNextEpoch();

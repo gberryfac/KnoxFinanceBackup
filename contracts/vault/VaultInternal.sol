@@ -271,15 +271,8 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
      ***********************************************/
 
     function _initalizeNextEpoch() internal {
-        _processQueuedDeposits();
         _setAuctionPrices();
         _setNextEpoch();
-    }
-
-    // transfers collateral deposited in current epoch from queue to vault
-    function _processQueuedDeposits() internal {
-        VaultStorage.Layout storage l = VaultStorage.layout();
-        l.Queue.processQueuedDeposits();
     }
 
     // sets option prices of current epoch auction
@@ -331,10 +324,9 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
     function _setNextEpoch() internal {
         VaultStorage.Layout storage l = VaultStorage.layout();
         l.totalShortContracts = 0;
+        l.Queue.processQueuedDeposits();
 
-        // transitions to next epoch
         l.epoch = l.epoch + 1;
-
         l.Queue.syncEpoch(l.epoch);
     }
 

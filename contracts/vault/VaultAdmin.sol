@@ -154,13 +154,6 @@ contract VaultAdmin is VaultInternal {
     /**
      * @notice
      */
-    function processQueuedDeposits() external onlyKeeper {
-        _processQueuedDeposits();
-    }
-
-    /**
-     * @notice
-     */
     function setAuctionPrices() external onlyKeeper {
         _setAuctionPrices();
     }

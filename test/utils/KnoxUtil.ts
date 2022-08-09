@@ -215,8 +215,6 @@ export class KnoxUtil {
     const vault = this.vaultUtil.vault;
     const epoch = await vault.getEpoch();
 
-    await vault.connect(this.signers.keeper).processQueuedDeposits();
-
     const maxPrice64x64 = fixedFromFloat(this.params.price.max);
     const minPrice64x64 = fixedFromFloat(this.params.price.min);
 

@@ -556,38 +556,6 @@ export function describeBehaviorOfVaultAdmin(
       });
     });
 
-    describe("#processQueuedDeposits()", () => {
-      time.revertToSnapshotAfterEach(async () => {
-        await asset
-          .connect(signers.lp1)
-          .approve(addresses.queue, params.deposit);
-
-        await queue.connect(signers.lp1)["deposit(uint256)"](params.deposit);
-      });
-
-      it("should revert if !keeper", async () => {
-        await expect(vault.processQueuedDeposits()).to.be.revertedWith(
-          "!keeper"
-        );
-      });
-
-      it("should transfer balance of queue to vault", async () => {
-        const vaultBalanceBefore = await asset.balanceOf(addresses.vault);
-
-        await vault.connect(signers.keeper).processQueuedDeposits();
-
-        const queueBalanceAfter = await asset.balanceOf(addresses.queue);
-        const vaultBalanceAfter = await asset.balanceOf(addresses.vault);
-
-        assert.bnEqual(queueBalanceAfter, BigNumber.from(0));
-
-        assert.bnEqual(
-          vaultBalanceAfter.sub(vaultBalanceBefore),
-          params.deposit
-        );
-      });
-    });
-
     describe("#setNextEpoch()", () => {
       let epoch: BigNumber;
       let startTime: BigNumber;
