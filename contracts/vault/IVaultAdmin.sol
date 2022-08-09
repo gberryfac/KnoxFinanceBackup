@@ -110,7 +110,7 @@ interface IVaultAdmin {
 
     //  * @notice
     //  */
-    function depositQueuedToVault() external;
+    function processQueuedDeposits() external;
 
     /**
      * @notice Sets the start and end time of the auction.

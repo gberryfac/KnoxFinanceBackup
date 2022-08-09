@@ -68,39 +68,71 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
 
     function _setAuctionWindowOffsets(uint16 start, uint16 end) internal {
         VaultStorage.Layout storage l = VaultStorage.layout();
+
+        emit AuctionWindowOffsetsSet(
+            l.epoch,
+            l.startOffset,
+            start,
+            l.endOffset,
+            end,
+            msg.sender
+        );
+
         l.startOffset = start;
         l.endOffset = end;
-        // emit AuctionWindowOffsetsSet();
     }
 
     function _setFeeRecipient(address newFeeRecipient) internal {
         VaultStorage.Layout storage l = VaultStorage.layout();
         require(newFeeRecipient != address(0), "address not provided");
         require(newFeeRecipient != l.feeRecipient, "new address equals old");
+
+        emit FeeRecipientSet(
+            l.epoch,
+            l.feeRecipient,
+            newFeeRecipient,
+            msg.sender
+        );
+
         l.feeRecipient = newFeeRecipient;
-        // emit FeeRecipientSet();
     }
 
     function _setPricer(address newPricer) internal {
         VaultStorage.Layout storage l = VaultStorage.layout();
         require(newPricer != address(0), "address not provided");
         require(newPricer != address(l.Pricer), "new address equals old");
+
+        emit PricerSet(l.epoch, address(l.Pricer), newPricer, msg.sender);
+
         l.Pricer = IPricer(newPricer);
-        // emit PricerSet();
     }
 
     function _setPerformanceFee64x64(int128 newPerformanceFee64x64) internal {
         VaultStorage.Layout storage l = VaultStorage.layout();
         require(newPerformanceFee64x64 < ONE_64x64, "invalid fee amount");
+
+        emit PerformanceFeeSet(
+            l.epoch,
+            l.performanceFee64x64,
+            newPerformanceFee64x64,
+            msg.sender
+        );
+
         l.performanceFee64x64 = newPerformanceFee64x64;
-        // emit PerformanceFeeSet(l.performanceFee64x64, newPerformanceFee);
     }
 
     function _setWithdrawalFee64x64(int128 newWithdrawalFee64x64) internal {
         VaultStorage.Layout storage l = VaultStorage.layout();
         require(newWithdrawalFee64x64 < ONE_64x64, "invalid fee amount");
+
+        emit WithdrawalFeeSet(
+            l.epoch,
+            l.withdrawalFee64x64,
+            newWithdrawalFee64x64,
+            msg.sender
+        );
+
         l.withdrawalFee64x64 = newWithdrawalFee64x64;
-        // emit WithdrawalFeeSet(l.withdrawalFee64x64, newWithdrawalFee64x64);
     }
 
     /************************************************
@@ -145,7 +177,13 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
 
         require(option.strike64x64 > 0, "invalid strike price");
 
-        // emit OptionParametersSet(l.isCall, option.expiry, option.strike64x64);
+        emit OptionParametersSet(
+            l.epoch,
+            option.expiry,
+            option.strike64x64,
+            option.longTokenId,
+            option.shortTokenId
+        );
     }
 
     function _initializeAuction() internal {
@@ -172,11 +210,6 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
      *  PROCESS LAST EPOCH
      ***********************************************/
 
-    function _initializeAndProcessEpochs() internal {
-        _processLastEpoch();
-        _initalizeNextEpoch();
-    }
-
     function _processLastEpoch() internal {
         _withdrawReservedLiquidity();
         _collectPerformanceFee();
@@ -195,15 +228,21 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
             );
 
         Pool.withdraw(reservedLiquidity, l.isCall);
-        // emit ReservedLiquidityWithdrawn(reservedLiquidity);
+
+        emit ReservedLiquidityWithdrawn(l.epoch, reservedLiquidity);
     }
 
     // collect performance fees on net income collected in previous epoch
     function _collectPerformanceFee() internal {
         VaultStorage.Layout storage l = VaultStorage.layout();
 
+        uint64 lastEpoch = _lastEpoch(l);
+
         (, uint256 exerciseAmount) =
-            _getExerciseAmount(_lastEpoch(l), l.totalShortContracts);
+            _getExerciseAmount(lastEpoch, l.totalShortContracts);
+
+        uint256 netIncome;
+        uint256 feeInCollateral;
 
         if (l.totalPremiums > exerciseAmount) {
             /**
@@ -211,22 +250,20 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
              * If it is negative, last week's option expired ITM past breakeven, and the vault took
              * a loss so we do not collect performance fee for last week.
              */
-            uint256 netIncome = l.totalPremiums - exerciseAmount;
-
-            uint256 performanceFeeInAsset =
-                l.performanceFee64x64.mulu(netIncome);
-
-            ERC20.safeTransfer(l.feeRecipient, performanceFeeInAsset);
+            netIncome = l.totalPremiums - exerciseAmount;
+            feeInCollateral = l.performanceFee64x64.mulu(netIncome);
+            ERC20.safeTransfer(l.feeRecipient, feeInCollateral);
         }
 
-        l.totalPremiums = 0;
+        emit PerformanceFeeCollected(
+            lastEpoch,
+            netIncome,
+            l.totalPremiums,
+            exerciseAmount,
+            feeInCollateral
+        );
 
-        // Note: index epoch
-        // emit CollectPerformanceFee(
-        //     lastEpoch
-        //     netIncome
-        //     performanceFeeInAsset
-        // );
+        l.totalPremiums = 0;
     }
 
     /************************************************
@@ -234,15 +271,15 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
      ***********************************************/
 
     function _initalizeNextEpoch() internal {
-        _depositQueuedToVault();
+        _processQueuedDeposits();
         _setAuctionPrices();
         _setNextEpoch();
     }
 
     // transfers collateral deposited in current epoch from queue to vault
-    function _depositQueuedToVault() internal {
+    function _processQueuedDeposits() internal {
         VaultStorage.Layout storage l = VaultStorage.layout();
-        l.Queue.depositToVault();
+        l.Queue.processQueuedDeposits();
     }
 
     // sets option prices of current epoch auction
@@ -288,8 +325,6 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
         }
 
         l.Auction.setAuctionPrices(l.epoch, maxPrice64x64, minPrice64x64);
-
-        // emit PriceRangeSet(l.maxPrice, l.minPrice);
     }
 
     // resets state variables and increments epoch id
@@ -301,9 +336,6 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
         l.epoch = l.epoch + 1;
 
         l.Queue.syncEpoch(l.epoch);
-
-        // Note: index epoch
-        // emit SetNextEpoch(l.epoch);
     }
 
     /************************************************
@@ -317,8 +349,9 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
         uint64 lastEpoch = _lastEpoch(l);
         VaultStorage.Option memory lastOption = _lastOption(l);
 
-        if (!l.Auction.isFinalized(lastEpoch))
+        if (!l.Auction.isFinalized(lastEpoch)) {
             l.Auction.finalizeAuction(lastEpoch);
+        }
 
         l.totalPremiums = l.Auction.transferPremium(lastEpoch);
         uint256 totalContractsSold = l.Auction.getTotalContractsSold(lastEpoch);
@@ -347,6 +380,12 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
 
         l.totalShortContracts = totalContractsSold;
         l.Auction.processAuction(lastEpoch);
+
+        emit AuctionProcessed(
+            lastEpoch,
+            totalCollateralUsed,
+            l.totalShortContracts
+        );
     }
 
     /************************************************
@@ -528,13 +567,13 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
             receiver
         );
 
-        // emit Withdraw(
-        //     caller,
-        //     receiver,
-        //     owner,
-        //     collateralAmountSansFee + shortContractsSansFee,
-        //     shareAmount
-        // );
+        emit Distributions(
+            _lastEpoch(l),
+            collateralAmountSansFee,
+            shortContractsSansFee
+        );
+
+        emit Withdraw(caller, receiver, owner, assetAmount, shareAmount);
     }
 
     /************************************************
@@ -616,7 +655,7 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
     ) private returns (uint256, uint256) {
         uint256 collateralAndPremiumAmount = collateralAmount + premiumAmount;
 
-        uint256 feesInCollateralAsset =
+        uint256 feeInCollateral =
             l.withdrawalFee64x64.mulu(collateralAndPremiumAmount);
 
         uint256 feesInShortContracts =
@@ -625,17 +664,20 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
         VaultStorage.Option memory lastOption = _lastOption(l);
 
         _transferCollateralAndShortAssets(
-            feesInCollateralAsset,
+            feeInCollateral,
             feesInShortContracts,
             lastOption.shortTokenId,
             l.feeRecipient
         );
 
-        // Note: index address
-        // emit CollectWithdrawalFee(msg.sender, feesInCollateralAsset, feesInShortAsset)
+        emit WithdrawalFeeCollected(
+            _lastEpoch(l),
+            feeInCollateral,
+            feesInShortContracts
+        );
 
         return (
-            collateralAndPremiumAmount - feesInCollateralAsset,
+            collateralAndPremiumAmount - feeInCollateral,
             shortContracts - feesInShortContracts
         );
     }

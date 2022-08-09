@@ -69,11 +69,11 @@ contract Queue is
     }
 
     /************************************************
-     *  WITHDRAW
+     *  CANCEL
      ***********************************************/
 
-    function withdraw(uint256 amount) external nonReentrant {
-        _withdraw(amount);
+    function cancel(uint256 amount) external nonReentrant {
+        _cancel(amount);
     }
 
     /************************************************
@@ -126,8 +126,8 @@ contract Queue is
         _syncEpoch(epoch);
     }
 
-    function depositToVault() external onlyVault {
-        _depositToVault();
+    function processQueuedDeposits() external onlyVault {
+        _processQueuedDeposits();
     }
 
     /************************************************
@@ -139,7 +139,7 @@ contract Queue is
     }
 
     function getEpoch() external view returns (uint64) {
-        return QueueStorage.layout()._getEpoch();
+        return QueueStorage._getEpoch();
     }
 
     function getMaxTVL() external view returns (uint256) {

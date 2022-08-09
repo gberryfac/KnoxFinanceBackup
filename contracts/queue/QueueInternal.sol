@@ -66,7 +66,7 @@ contract QueueInternal is
         QueueStorage.Layout storage l = QueueStorage.layout();
         require(newMaxTVL > 0, "value exceeds minimum");
         l.maxTVL = newMaxTVL;
-        // emit MaxTVLSet(l.maxTVL, newMaxTVL);
+        emit MaxTVLSet(l.epoch, l.maxTVL, newMaxTVL, msg.sender);
     }
 
     /************************************************
@@ -91,18 +91,20 @@ contract QueueInternal is
         // An approve() by the msg.sender is required beforehand
         ERC20.safeTransferFrom(msg.sender, address(this), amount);
 
-        // Note: Index receiver
-        // emit DepositedToQueue(receiver, amount, l.tokenId);
+        emit Deposit(l.epoch, receiver, msg.sender, amount);
     }
 
     /************************************************
-     *  WITHDRAW
+     *  CANCEL
      ***********************************************/
 
-    function _withdraw(uint256 amount) internal {
+    function _cancel(uint256 amount) internal {
         uint256 currentTokenId = _getCurrentTokenId();
         _burn(msg.sender, currentTokenId, amount);
         ERC20.safeTransfer(msg.sender, amount);
+
+        uint64 epoch = QueueStorage._getEpoch();
+        emit Cancel(epoch, msg.sender, amount);
     }
 
     /************************************************
@@ -128,8 +130,8 @@ contract QueueInternal is
         _burn(owner, tokenId, balance);
         require(Vault.transfer(receiver, unredeemedShares), "transfer failed");
 
-        // Note: Index receiver
-        // emit RedeemedShares(receiver, unredeemedShares, tokenId);
+        uint64 epoch = QueueStorage._getEpoch();
+        emit Redeem(epoch, receiver, owner, unredeemedShares);
     }
 
     function _redeemMax(address receiver, address owner) internal {
@@ -151,29 +153,35 @@ contract QueueInternal is
     function _syncEpoch(uint64 epoch) internal {
         QueueStorage.Layout storage l = QueueStorage.layout();
         l.epoch = epoch;
+        emit EpochSet(l.epoch, msg.sender);
     }
 
-    function _depositToVault() internal {
-        uint256 queueBalance = ERC20.balanceOf(address(this));
+    function _processQueuedDeposits() internal {
+        uint256 deposits = ERC20.balanceOf(address(this));
 
-        ERC20.approve(address(Vault), queueBalance);
-        uint256 shareAmount = Vault.deposit(queueBalance, address(this));
-
-        QueueStorage.Layout storage l = QueueStorage.layout();
+        ERC20.approve(address(Vault), deposits);
+        uint256 shares = Vault.deposit(deposits, address(this));
 
         uint256 currentTokenId = _getCurrentTokenId();
-        uint256 totalSupply = _totalSupply(currentTokenId);
+        uint256 claimTokenSupply = _totalSupply(currentTokenId);
         uint256 pricePerShare = ONE_SHARE;
 
-        if (shareAmount == 0) {
+        if (shares == 0) {
             pricePerShare = 0;
-        } else if (totalSupply > 0) {
-            pricePerShare = (pricePerShare * shareAmount) / totalSupply;
+        } else if (claimTokenSupply > 0) {
+            pricePerShare = (pricePerShare * shares) / claimTokenSupply;
         }
 
+        QueueStorage.Layout storage l = QueueStorage.layout();
         l.pricePerShare[currentTokenId] = pricePerShare;
 
-        // emit DepositQueuedToVault(pricePerShare, mintedShares);
+        emit ProcessQueuedDeposits(
+            l.epoch,
+            deposits,
+            pricePerShare,
+            shares,
+            claimTokenSupply
+        );
     }
 
     /************************************************
@@ -191,7 +199,7 @@ contract QueueInternal is
     }
 
     function _getCurrentTokenId() internal view returns (uint256) {
-        return QueueStorage.layout()._getCurrentTokenId();
+        return QueueStorage._getCurrentTokenId();
     }
 
     /************************************************
