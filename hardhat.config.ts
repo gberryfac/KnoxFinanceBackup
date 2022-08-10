@@ -86,13 +86,10 @@ const config: HardhatUserConfig = {
   dodoc: {
     runOnCompile: DODOC_ON_COMPILE === "true",
     include: [
-      "contracts/interfaces/IKnox.sol",
-      "contracts/interfaces/IStandardDelta.sol",
-      "contracts/interfaces/IStandardDeltaPricer.sol",
-      "contracts/vaults/Queue.sol",
-      "contracts/strategies/StandardDelta.sol",
-      "contracts/strategies/StandardDeltaPricer.sol",
-      "contracts/vaults/Vault.sol",
+      "contracts/vault/IVault.sol",
+      "contracts/queue/IQueue.sol",
+      "contracts/auction/IAuction.sol",
+      "contracts/pricer/IPricer.sol",
     ],
   },
   gasReporter: {
