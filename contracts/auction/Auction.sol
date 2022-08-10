@@ -18,9 +18,12 @@ contract Auction is AuctionInternal, IAuction, ReentrancyGuard {
     ) AuctionInternal(isCall, pool, vault) {}
 
     /************************************************
-     *  INITIALIZATION
+     *  INITIALIZE AUCTION
      ***********************************************/
 
+    /**
+     * @inheritdoc IAuction
+     */
     function initialize(AuctionStorage.InitAuction memory initAuction)
         external
         onlyVault
@@ -28,6 +31,9 @@ contract Auction is AuctionInternal, IAuction, ReentrancyGuard {
         _initialize(initAuction);
     }
 
+    /**
+     * @inheritdoc IAuction
+     */
     function setAuctionPrices(
         uint64 epoch,
         int128 maxPrice64x64,
@@ -40,17 +46,23 @@ contract Auction is AuctionInternal, IAuction, ReentrancyGuard {
      *  PRICING
      ***********************************************/
 
-    // @notice
+    /**
+     * @inheritdoc IAuction
+     */
     function lastPrice64x64(uint64 epoch) external view returns (int128) {
         return _lastPrice64x64(epoch);
     }
 
-    // @notice
+    /**
+     * @inheritdoc IAuction
+     */
     function priceCurve64x64(uint64 epoch) external view returns (int128) {
         return _priceCurve64x64(epoch);
     }
 
-    // @notice
+    /**
+     * @inheritdoc IAuction
+     */
     function clearingPrice64x64(uint64 epoch) external view returns (int128) {
         return _clearingPrice64x64(epoch);
     }
@@ -59,7 +71,9 @@ contract Auction is AuctionInternal, IAuction, ReentrancyGuard {
      *  PURCHASE
      ***********************************************/
 
-    // @notice
+    /**
+     * @inheritdoc IAuction
+     */
     function addLimitOrder(
         uint64 epoch,
         int128 price64x64,
@@ -73,7 +87,9 @@ contract Auction is AuctionInternal, IAuction, ReentrancyGuard {
         return _addLimitOrder(epoch, price64x64, size);
     }
 
-    // @notice
+    /**
+     * @inheritdoc IAuction
+     */
     function cancelLimitOrder(uint64 epoch, uint256 id)
         external
         auctionNotFinalizedOrProcessed(epoch)
@@ -83,8 +99,9 @@ contract Auction is AuctionInternal, IAuction, ReentrancyGuard {
         _cancelLimitOrder(epoch, id);
     }
 
-    // @notice
-    // @dev must approve contract prior to committing tokens to auction
+    /**
+     * @inheritdoc IAuction
+     */
     function addMarketOrder(uint64 epoch, uint256 size)
         external
         auctionNotFinalizedOrProcessed(epoch)
@@ -99,6 +116,9 @@ contract Auction is AuctionInternal, IAuction, ReentrancyGuard {
      *  WITHDRAW
      ***********************************************/
 
+    /**
+     * @inheritdoc IAuction
+     */
     function withdraw(uint64 epoch)
         external
         auctionProcessed(epoch)
@@ -107,10 +127,16 @@ contract Auction is AuctionInternal, IAuction, ReentrancyGuard {
         _withdraw(epoch);
     }
 
+    /**
+     * @inheritdoc IAuction
+     */
     function previewWithdraw(uint64 epoch) external returns (uint256, uint256) {
         return _previewWithdraw(epoch, msg.sender);
     }
 
+    /**
+     * @inheritdoc IAuction
+     */
     function previewWithdraw(uint64 epoch, address buyer)
         external
         returns (uint256, uint256)
@@ -119,9 +145,12 @@ contract Auction is AuctionInternal, IAuction, ReentrancyGuard {
     }
 
     /************************************************
-     *  MAINTENANCE
+     *  FINALIZE AUCTION
      ***********************************************/
 
+    /**
+     * @inheritdoc IAuction
+     */
     function finalizeAuction(uint64 epoch)
         external
         auctionNotFinalizedOrProcessed(epoch)
@@ -130,6 +159,9 @@ contract Auction is AuctionInternal, IAuction, ReentrancyGuard {
         _finalizeAuction(epoch);
     }
 
+    /**
+     * @inheritdoc IAuction
+     */
     function transferPremium(uint64 epoch)
         external
         auctionFinalized(epoch)
@@ -139,6 +171,9 @@ contract Auction is AuctionInternal, IAuction, ReentrancyGuard {
         return _transferPremium(epoch);
     }
 
+    /**
+     * @inheritdoc IAuction
+     */
     function processAuction(uint64 epoch)
         external
         auctionFinalized(epoch)
@@ -151,6 +186,9 @@ contract Auction is AuctionInternal, IAuction, ReentrancyGuard {
      *  VIEW
      ***********************************************/
 
+    /**
+     * @inheritdoc IAuction
+     */
     function epochsByBuyer(address buyer)
         external
         view
@@ -159,49 +197,69 @@ contract Auction is AuctionInternal, IAuction, ReentrancyGuard {
         return _epochsByBuyer(buyer);
     }
 
+    /**
+     * @inheritdoc IAuction
+     */
     function getAuction(uint64 epoch)
         external
         view
         returns (AuctionStorage.Auction memory)
     {
-        return AuctionStorage.layout()._getAuction(epoch);
+        return AuctionStorage._getAuction(epoch);
     }
 
+    /**
+     * @inheritdoc IAuction
+     */
     function getMinSize() external view returns (uint256) {
-        return AuctionStorage.layout()._getMinSize();
+        return AuctionStorage._getMinSize();
     }
 
+    /**
+     * @inheritdoc IAuction
+     */
     function getOrderById(uint64 epoch, uint256 id)
         external
         view
         returns (OrderBook.Data memory)
     {
-        return AuctionStorage.layout()._getOrderById(epoch, id);
+        return AuctionStorage._getOrderById(epoch, id);
     }
 
+    /**
+     * @inheritdoc IAuction
+     */
     function getStatus(uint64 epoch)
         external
         view
         returns (AuctionStorage.Status)
     {
-        return AuctionStorage.layout()._getStatus(epoch);
+        return AuctionStorage._getStatus(epoch);
     }
 
+    /**
+     * @inheritdoc IAuction
+     */
     function getTotalContracts(uint64 epoch) external view returns (uint256) {
         return _getTotalContracts(epoch);
     }
 
+    /**
+     * @inheritdoc IAuction
+     */
     function getTotalContractsSold(uint64 epoch)
         external
         view
         returns (uint256)
     {
-        return AuctionStorage.layout()._getTotalContractsSold(epoch);
+        return AuctionStorage._getTotalContractsSold(epoch);
     }
 
+    /**
+     * @inheritdoc IAuction
+     */
     function isFinalized(uint64 epoch) external view returns (bool) {
-        AuctionStorage.Layout storage l = AuctionStorage.layout();
-        return l._isFinalized(epoch);
+        return AuctionStorage._isFinalized(epoch);
     }
 
     /************************************************

@@ -66,22 +66,34 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
      *  ADMIN
      ***********************************************/
 
-    function _setAuctionWindowOffsets(uint16 start, uint16 end) internal {
+    /**
+     * @notice sets the auction window offsets
+     * @param newStartOffset new start offset
+     * @param newEndOffset new end offset
+     */
+    function _setAuctionWindowOffsets(
+        uint16 newStartOffset,
+        uint16 newEndOffset
+    ) internal {
         VaultStorage.Layout storage l = VaultStorage.layout();
 
         emit AuctionWindowOffsetsSet(
             l.epoch,
             l.startOffset,
-            start,
+            newStartOffset,
             l.endOffset,
-            end,
+            newEndOffset,
             msg.sender
         );
 
-        l.startOffset = start;
-        l.endOffset = end;
+        l.startOffset = newStartOffset;
+        l.endOffset = newEndOffset;
     }
 
+    /**
+     * @notice sets the new fee recipient
+     * @param newFeeRecipient address of the new fee recipient
+     */
     function _setFeeRecipient(address newFeeRecipient) internal {
         VaultStorage.Layout storage l = VaultStorage.layout();
         require(newFeeRecipient != address(0), "address not provided");
@@ -97,6 +109,24 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
         l.feeRecipient = newFeeRecipient;
     }
 
+    /**
+     * @notice sets the new keeper
+     * @param newKeeper address of the new keeper
+     */
+    function _setKeeper(address newKeeper) internal {
+        VaultStorage.Layout storage l = VaultStorage.layout();
+        require(newKeeper != address(0), "address not provided");
+        require(newKeeper != address(l.keeper), "new address equals old");
+
+        emit KeeperSet(l.epoch, l.keeper, newKeeper, msg.sender);
+
+        l.keeper = newKeeper;
+    }
+
+    /**
+     * @notice sets the new pricer
+     * @param newPricer address of the new pricer
+     */
     function _setPricer(address newPricer) internal {
         VaultStorage.Layout storage l = VaultStorage.layout();
         require(newPricer != address(0), "address not provided");
@@ -107,6 +137,10 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
         l.Pricer = IPricer(newPricer);
     }
 
+    /**
+     * @notice sets the performance fee for the vault
+     * @param newPerformanceFee64x64 performance fee as a 64x64 fixed point number
+     */
     function _setPerformanceFee64x64(int128 newPerformanceFee64x64) internal {
         VaultStorage.Layout storage l = VaultStorage.layout();
         require(newPerformanceFee64x64 < ONE_64x64, "invalid fee amount");
@@ -121,6 +155,10 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
         l.performanceFee64x64 = newPerformanceFee64x64;
     }
 
+    /**
+     * @notice sets the withdrawal fee for the vault
+     * @param newWithdrawalFee64x64 withdrawal fee as a 64x64 fixed point number
+     */
     function _setWithdrawalFee64x64(int128 newWithdrawalFee64x64) internal {
         VaultStorage.Layout storage l = VaultStorage.layout();
         require(newWithdrawalFee64x64 < ONE_64x64, "invalid fee amount");
@@ -139,12 +177,17 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
      *  INITIALIZE AUCTION
      ***********************************************/
 
+    /**
+     * @notice sets the option parameters and initializes auction
+     */
     function _setAndInitializeAuction() internal {
         _setOptionParameters();
         _initializeAuction();
     }
 
-    // sets option parameters used in the current epoch's auction
+    /**
+     * @notice sets the parameters for the next option to be sold
+     */
     function _setOptionParameters() internal {
         VaultStorage.Layout storage l = VaultStorage.layout();
 
@@ -153,7 +196,7 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
         int128 strike64x64 =
             l.Pricer.getDeltaStrikePrice64x64(l.isCall, expiry, l.delta64x64);
 
-        strike64x64 = l.Pricer.snapToGrid(l.isCall, strike64x64);
+        strike64x64 = l.Pricer.snapToGrid64x64(l.isCall, strike64x64);
 
         // Sets parameters for the next option
         VaultStorage.Option storage option = l.options[l.epoch];
@@ -186,6 +229,9 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
         );
     }
 
+    /**
+     * @notice initializes auction
+     */
     function _initializeAuction() internal {
         VaultStorage.Layout storage l = VaultStorage.layout();
         VaultStorage.Option storage option = l.options[l.epoch];
@@ -210,12 +256,17 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
      *  PROCESS LAST EPOCH
      ***********************************************/
 
+    /**
+     * @notice withdraws reserved liquidity and collects performance fees
+     */
     function _processLastEpoch() internal {
         _withdrawReservedLiquidity();
         _collectPerformanceFee();
     }
 
-    // withdraws reserved liquidity from options underwritten in previous epoch
+    /**
+     * @notice transfers reserved liquidity from pool to vault
+     */
     function _withdrawReservedLiquidity() internal {
         VaultStorage.Layout storage l = VaultStorage.layout();
 
@@ -232,7 +283,9 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
         emit ReservedLiquidityWithdrawn(l.epoch, reservedLiquidity);
     }
 
-    // collect performance fees on net income collected in previous epoch
+    /**
+     * @notice collects performance fees on epoch net income
+     */
     function _collectPerformanceFee() internal {
         VaultStorage.Layout storage l = VaultStorage.layout();
 
@@ -270,7 +323,9 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
      *  INITIALIZE NEXT EPOCH
      ***********************************************/
 
-    // resets state variables and increments epoch id
+    /**
+     * @notice initializes the next epoch
+     */
     function _initalizeNextEpoch() internal {
         VaultStorage.Layout storage l = VaultStorage.layout();
         l.totalShortContracts = 0;
@@ -284,7 +339,9 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
      *  SET AUCTION PRICES
      ***********************************************/
 
-    // sets option prices of current epoch auction
+    /**
+     * @notice calculates and sets the auction prices
+     */
     function _setAuctionPrices() internal {
         VaultStorage.Layout storage l = VaultStorage.layout();
         VaultStorage.Option storage option = l.options[l.epoch];
@@ -298,7 +355,10 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
                 l.delta64x64.sub(l.deltaOffset64x64)
             );
 
-        offsetStrike64x64 = l.Pricer.snapToGrid(l.isCall, offsetStrike64x64);
+        offsetStrike64x64 = l.Pricer.snapToGrid64x64(
+            l.isCall,
+            offsetStrike64x64
+        );
 
         int128 spot64x64 = l.Pricer.latestAnswer64x64();
         int128 timeToMaturity64x64 =
@@ -333,7 +393,9 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
      *  PROCESS AUCTION
      ***********************************************/
 
-    // processes auction initialized in previous epoch
+    /**
+     * @notice processes the auction when it has been finalized
+     */
     function _processAuction() internal {
         VaultStorage.Layout storage l = VaultStorage.layout();
 
@@ -383,6 +445,10 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
      *  VIEW
      ***********************************************/
 
+    /**
+     * @notice gets the total vault collateral
+     * @return total vault collateral
+     */
     function _totalCollateral() internal view returns (uint256) {
         return
             ERC20.balanceOf(address(this)) -
@@ -390,12 +456,19 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
             _totalReserves();
     }
 
+    /**
+     * @notice gets the total premiums of the epoch
+     * @return total premiums
+     */
     function _totalPremiums() internal view returns (uint256) {
         VaultStorage.Layout storage l = VaultStorage.layout();
         return l.totalPremiums;
     }
 
-    // displays the short position value denominated in the collateral asset
+    /**
+     * @notice gets the short position value denominated in the collateral asset
+     * @return total short position in collateral amount
+     */
     function _totalShortAsCollateral() internal view returns (uint256) {
         VaultStorage.Layout storage l = VaultStorage.layout();
         VaultStorage.Option memory lastOption = _lastOption(l);
@@ -411,12 +484,19 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
             );
     }
 
-    // displays the amount in short contracts underwitten by the vault in the last epoch
+    /**
+     * @notice gets the amount in short contracts underwitten by the vault in the last epoch
+     * @return total short contracts
+     */
     function _totalShortAsContracts() internal view returns (uint256) {
         VaultStorage.Layout storage l = VaultStorage.layout();
         return l.totalShortContracts;
     }
 
+    /**
+     * @notice gets the total reserved collateral
+     * @return total reserved collateral
+     */
     function _totalReserves() internal view returns (uint256) {
         VaultStorage.Layout storage l = VaultStorage.layout();
         return l.reserveRate64x64.mulu(ERC20.balanceOf(address(this)));
@@ -694,6 +774,11 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
         }
     }
 
+    /**
+     * @notice calculates the exercise amount
+     * @param epoch epoch id
+     * @param size amount of contracts
+     */
     function _getExerciseAmount(uint64 epoch, uint256 size)
         internal
         view

@@ -31,14 +31,14 @@ contract Queue is
      ***********************************************/
 
     /**
-     * @notice Pauses the vault during an emergency preventing deposits and borrowing.
+     * @notice pauses the vault during an emergency preventing deposits and borrowing.
      */
     function pause() external onlyOwner {
         _pause();
     }
 
     /**
-     * @notice Unpauses the vault during following an emergency allowing deposits and borrowing.
+     * @notice unpauses the vault during following an emergency allowing deposits and borrowing.
      */
     function unpause() external onlyOwner {
         _unpause();
@@ -48,6 +48,9 @@ contract Queue is
      *  ADMIN
      ***********************************************/
 
+    /**
+     * @inheritdoc IQueue
+     */
     function setMaxTVL(uint256 newMaxTVL) external onlyOwner {
         _setMaxTVL(newMaxTVL);
     }
@@ -56,10 +59,16 @@ contract Queue is
      *  DEPOSIT
      ***********************************************/
 
+    /**
+     * @inheritdoc IQueue
+     */
     function deposit(uint256 amount) external nonReentrant whenNotPaused {
         _deposit(amount, msg.sender);
     }
 
+    /**
+     * @inheritdoc IQueue
+     */
     function deposit(uint256 amount, address receiver)
         external
         nonReentrant
@@ -72,6 +81,9 @@ contract Queue is
      *  CANCEL
      ***********************************************/
 
+    /**
+     * @inheritdoc IQueue
+     */
     function cancel(uint256 amount) external nonReentrant {
         _cancel(amount);
     }
@@ -80,14 +92,23 @@ contract Queue is
      *  REDEEM
      ***********************************************/
 
+    /**
+     * @inheritdoc IQueue
+     */
     function redeem(uint256 tokenId) external nonReentrant {
         _redeem(tokenId, msg.sender, msg.sender);
     }
 
+    /**
+     * @inheritdoc IQueue
+     */
     function redeem(uint256 tokenId, address receiver) external nonReentrant {
         _redeem(tokenId, receiver, msg.sender);
     }
 
+    /**
+     * @inheritdoc IQueue
+     */
     function redeem(
         uint256 tokenId,
         address receiver,
@@ -101,6 +122,9 @@ contract Queue is
         _redeem(tokenId, receiver, owner);
     }
 
+    /**
+     * @inheritdoc IQueue
+     */
     function redeemMax() external nonReentrant {
         _redeemMax(msg.sender, msg.sender);
     }
@@ -109,6 +133,9 @@ contract Queue is
         _redeemMax(receiver, msg.sender);
     }
 
+    /**
+     * @inheritdoc IQueue
+     */
     function redeemMax(address receiver, address owner) external nonReentrant {
         require(
             owner == msg.sender || isApprovedForAll(owner, msg.sender),
@@ -119,13 +146,19 @@ contract Queue is
     }
 
     /************************************************
-     *  PROCESS LAST EPOCH
+     *  INITIALIZE NEXT EPOCH
      ***********************************************/
 
+    /**
+     * @inheritdoc IQueue
+     */
     function syncEpoch(uint64 epoch) external onlyVault {
         _syncEpoch(epoch);
     }
 
+    /**
+     * @inheritdoc IQueue
+     */
     function processDeposits() external onlyVault {
         _processDeposits();
     }
@@ -134,22 +167,37 @@ contract Queue is
      *  VIEW
      ***********************************************/
 
+    /**
+     * @inheritdoc IQueue
+     */
     function getCurrentTokenId() external view returns (uint256) {
-        return _getCurrentTokenId();
+        return QueueStorage._getCurrentTokenId();
     }
 
+    /**
+     * @inheritdoc IQueue
+     */
     function getEpoch() external view returns (uint64) {
         return QueueStorage._getEpoch();
     }
 
+    /**
+     * @inheritdoc IQueue
+     */
     function getMaxTVL() external view returns (uint256) {
-        return QueueStorage.layout()._getMaxTVL();
+        return QueueStorage._getMaxTVL();
     }
 
+    /**
+     * @inheritdoc IQueue
+     */
     function getPricePerShare(uint256 tokenId) external view returns (uint256) {
-        return QueueStorage.layout()._getPricePerShare(tokenId);
+        return QueueStorage._getPricePerShare(tokenId);
     }
 
+    /**
+     * @inheritdoc IQueue
+     */
     function previewUnredeemed(uint256 tokenId)
         external
         view
@@ -158,6 +206,9 @@ contract Queue is
         return _previewUnredeemed(tokenId, msg.sender);
     }
 
+    /**
+     * @inheritdoc IQueue
+     */
     function previewUnredeemed(uint256 tokenId, address account)
         external
         view
@@ -170,10 +221,16 @@ contract Queue is
      * HELPERS
      ***********************************************/
 
+    /**
+     * @inheritdoc IQueue
+     */
     function formatClaimTokenId(uint64 epoch) external view returns (uint256) {
         return QueueStorage._formatTokenId(epoch);
     }
 
+    /**
+     * @inheritdoc IQueue
+     */
     function parseClaimTokenId(uint256 tokenId)
         external
         pure

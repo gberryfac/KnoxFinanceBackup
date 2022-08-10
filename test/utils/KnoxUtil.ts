@@ -141,7 +141,7 @@ export class KnoxUtil {
 
     const mockPricer = await deployMockContract(signers.deployer as any, [
       "function getDeltaStrikePrice64x64(bool,uint64,int128) external view returns (int128)",
-      "function snapToGrid(bool,int128) external view returns (int128)",
+      "function snapToGrid64x64(bool,int128) external view returns (int128)",
     ]);
 
     const underlyingPrice = params.underlying.oracle.price;
@@ -151,7 +151,7 @@ export class KnoxUtil {
     const strike64x64 = fixedFromFloat(strike);
 
     await mockPricer.mock.getDeltaStrikePrice64x64.returns(strike64x64);
-    await mockPricer.mock.snapToGrid.returns(strike64x64);
+    await mockPricer.mock.snapToGrid64x64.returns(strike64x64);
 
     addresses.pricer = mockPricer.address;
 

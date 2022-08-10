@@ -8,10 +8,16 @@ contract Pricer is IPricer, PricerInternal {
         PricerInternal(pool, volatilityOracle)
     {}
 
+    /**
+     * @inheritdoc IPricer
+     */
     function latestAnswer64x64() external view returns (int128) {
         return _latestAnswer64x64();
     }
 
+    /**
+     * @inheritdoc IPricer
+     */
     function getTimeToMaturity64x64(uint64 expiry)
         external
         view
@@ -20,6 +26,9 @@ contract Pricer is IPricer, PricerInternal {
         return _getTimeToMaturity64x64(expiry);
     }
 
+    /**
+     * @inheritdoc IPricer
+     */
     function getAnnualizedVolatility64x64(
         int128 spot64x64,
         int128 strike64x64,
@@ -33,6 +42,9 @@ contract Pricer is IPricer, PricerInternal {
             );
     }
 
+    /**
+     * @inheritdoc IPricer
+     */
     function getBlackScholesPrice64x64(
         int128 spot64x64,
         int128 strike64x64,
@@ -48,6 +60,9 @@ contract Pricer is IPricer, PricerInternal {
             );
     }
 
+    /**
+     * @inheritdoc IPricer
+     */
     function getDeltaStrikePrice64x64(
         bool isCall,
         uint64 expiry,
@@ -56,7 +71,14 @@ contract Pricer is IPricer, PricerInternal {
         return _getDeltaStrikePrice64x64(isCall, expiry, delta64x64);
     }
 
-    function snapToGrid(bool isCall, int128 n) external pure returns (int128) {
-        return _snapToGrid(isCall, n);
+    /**
+     * @inheritdoc IPricer
+     */
+    function snapToGrid64x64(bool isCall, int128 n)
+        external
+        pure
+        returns (int128)
+    {
+        return _snapToGrid64x64(isCall, n);
     }
 }

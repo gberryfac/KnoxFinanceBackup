@@ -23,18 +23,17 @@ interface IVaultEvents {
         uint256 shortContractsSansFee
     );
 
-    event PerformanceFeeCollected(
-        uint64 indexed epoch,
-        uint256 netIncome,
-        uint256 totalPremiums,
-        uint256 exerciseAmount,
-        uint256 feeInCollateral
-    );
-
     event FeeRecipientSet(
         uint64 indexed epoch,
         address oldFeeRecipient,
         address newFeeRecipient,
+        address caller
+    );
+
+    event KeeperSet(
+        uint64 indexed epoch,
+        address oldKeeper,
+        address newKeeper,
         address caller
     );
 
@@ -44,6 +43,14 @@ interface IVaultEvents {
         int128 strike64x64,
         uint256 longTokenId,
         uint256 shortTokenId
+    );
+
+    event PerformanceFeeCollected(
+        uint64 indexed epoch,
+        uint256 netIncome,
+        uint256 totalPremiums,
+        uint256 exerciseAmount,
+        uint256 feeInCollateral
     );
 
     event PerformanceFeeSet(
