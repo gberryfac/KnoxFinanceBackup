@@ -143,8 +143,8 @@ function behavesLikePricer(params: Params) {
         );
 
         // Check Asset Properties
-        const base = await pricer.base();
-        const underlying = await pricer.underlying();
+        const base = await pricer.Base();
+        const underlying = await pricer.Underlying();
 
         assert.equal(base, baseAsset.address);
         assert.equal(underlying, underlyingAsset.address);
@@ -271,25 +271,34 @@ function behavesLikePricer(params: Params) {
       });
     });
 
-    describe("#snapToGrid(bool,int128)", () => {
+    describe("#snapToGrid64x64(bool,int128)", () => {
       time.revertToSnapshotAfterEach(async () => {});
 
       it("should not round if already round", async () => {
         const n = fixedFromFloat(4500);
         const answer = 4500;
-        assert.equal(fixedToNumber(await pricer.snapToGrid(true, n)), answer);
+        assert.equal(
+          fixedToNumber(await pricer.snapToGrid64x64(true, n)),
+          answer
+        );
       });
 
       it("should round up if call option", async () => {
         const n = fixedFromFloat(4401);
         const answer = 4500;
-        assert.equal(fixedToNumber(await pricer.snapToGrid(true, n)), answer);
+        assert.equal(
+          fixedToNumber(await pricer.snapToGrid64x64(true, n)),
+          answer
+        );
       });
 
       it("should round down if put option", async () => {
         const n = fixedFromFloat(4599);
         const answer = 4500;
-        assert.equal(fixedToNumber(await pricer.snapToGrid(false, n)), answer);
+        assert.equal(
+          fixedToNumber(await pricer.snapToGrid64x64(false, n)),
+          answer
+        );
       });
     });
   });

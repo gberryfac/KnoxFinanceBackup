@@ -8,51 +8,51 @@ interface IVaultAdmin {
      *  INITIALIZATION
      ***********************************************/
 
-    // /**
-    //  * @notice
-    //  * @param
-    //  * @param
-    //  */
+    /**
+     * @notice initializes vault with queue, auction, and pricer addresses
+     * @param initImpl initialization parameters
+     */
     function initialize(VaultStorage.InitImpl memory initImpl) external;
 
     /************************************************
      *  ADMIN
      ***********************************************/
 
-    // /**
-    //  * @notice
-    //  * @param
-    //  * @param
-    //  */
-    function setAuctionWindowOffsets(uint16 start, uint16 end) external;
+    /**
+     * @notice sets the auction window offsets
+     * @param newStartOffset new start offset
+     * @param newEndOffset new end offset
+     */
+    function setAuctionWindowOffsets(uint16 newStartOffset, uint16 newEndOffset)
+        external;
 
     /**
-     * @notice Sets the new fee recipient
-     * @param newFeeRecipient is the address of the new fee recipient
+     * @notice sets the new fee recipient
+     * @param newFeeRecipient address of the new fee recipient
      */
     function setFeeRecipient(address newFeeRecipient) external;
 
     /**
-     * @notice Sets the new keeper
-     * @param newKeeper is the address of the new keeper
+     * @notice sets the new keeper
+     * @param newKeeper address of the new keeper
      */
     function setKeeper(address newKeeper) external;
 
-    // /**
-    //  * @notice
-    //  * @param
-    //  */
+    /**
+     * @notice sets the new pricer
+     * @param newPricer address of the new pricer
+     */
     function setPricer(address newPricer) external;
 
     /**
-     * @notice Sets the performance fee for the vault
-     * @param newPerformanceFee64x64 is the performance fee as a 64x64 fixed point number
+     * @notice sets the performance fee for the vault
+     * @param newPerformanceFee64x64 performance fee as a 64x64 fixed point number
      */
     function setPerformanceFee64x64(int128 newPerformanceFee64x64) external;
 
     /**
-     * @notice Sets the withdrawal fee for the vault
-     * @param newWithdrawalFee64x64 is the withdrawal fee as a 64x64 fixed point number
+     * @notice sets the withdrawal fee for the vault
+     * @param newWithdrawalFee64x64 withdrawal fee as a 64x64 fixed point number
      */
     function setWithdrawalFee64x64(int128 newWithdrawalFee64x64) external;
 
@@ -61,17 +61,17 @@ interface IVaultAdmin {
      ***********************************************/
 
     /**
-     * @notice
+     * @notice sets the option parameters and initializes auction
      */
     function setAndInitializeAuction() external;
 
     /**
-     * @notice Sets the parameters for the next option to be sold
+     * @notice sets the parameters for the next option to be sold
      */
     function setOptionParameters() external;
 
     /**
-     * @notice
+     * @notice initializes auction
      */
     function initializeAuction() external;
 
@@ -80,27 +80,27 @@ interface IVaultAdmin {
      ***********************************************/
 
     /**
-     * @notice Prepares the strategy and initiates the next round of option sales
+     * @notice withdraws reserved liquidity and collects performance fees
      */
     function processLastEpoch() external;
 
     /**
-     * @notice Transfers reserved liquidity from Premia pool to Vault.
+     * @notice transfers reserved liquidity from pool to vault
      */
     function withdrawReservedLiquidity() external;
 
-    // /**
-    //  * @notice
-    //  */
+    /**
+     * @notice collects performance fees on epoch net income
+     */
     function collectPerformanceFee() external;
 
     /************************************************
      *  INITIALIZE NEXT EPOCH
      ***********************************************/
 
-    // /**
-    //  * @notice
-    //  */
+    /**
+     * @notice initializes the next epoch
+     */
     function initalizeNextEpoch() external;
 
     /************************************************
@@ -108,7 +108,7 @@ interface IVaultAdmin {
      ***********************************************/
 
     /**
-     * @notice Sets the start and end time of the auction.
+     * @notice calculates and sets the auction prices
      */
     function setAuctionPrices() external;
 
@@ -117,7 +117,7 @@ interface IVaultAdmin {
      ***********************************************/
 
     /**
-     * @notice
+     * @notice processes the auction when it has been finalized
      */
     function processAuction() external;
 
@@ -126,7 +126,9 @@ interface IVaultAdmin {
      ***********************************************/
 
     /**
-     * @notice
+     * @notice calculates the exercise amount
+     * @param epoch epoch id
+     * @param size amount of contracts
      */
     function getExerciseAmount(uint64 epoch, uint256 size)
         external

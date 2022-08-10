@@ -149,9 +149,13 @@ contract AuctionInternal is IAuctionEvents {
     }
 
     /************************************************
-     *  INITIALIZATION
+     *  INITIALIZE AUCTION
      ***********************************************/
 
+    /**
+     * @notice initializes a new auction
+     * @param initAuction auction parameters
+     */
     function _initialize(AuctionStorage.InitAuction memory initAuction)
         internal
     {
@@ -187,6 +191,12 @@ contract AuctionInternal is IAuctionEvents {
         emit AuctionStatusSet(initAuction.epoch, auction.status);
     }
 
+    /**
+     * @notice sets the auction max/min prices
+     * @param epoch epoch id
+     * @param maxPrice64x64 max price as 64x64 fixed point number
+     * @param minPrice64x64 min price as 64x64 fixed point number
+     */
     function _setAuctionPrices(
         uint64 epoch,
         int128 maxPrice64x64,
@@ -218,13 +228,21 @@ contract AuctionInternal is IAuctionEvents {
      *  PRICING
      ***********************************************/
 
-    // @notice
+    /**
+     * @notice last price paid during the auction
+     * @param epoch epoch id
+     * @return price as 64x64 fixed point number
+     */
     function _lastPrice64x64(uint64 epoch) internal view returns (int128) {
         AuctionStorage.Layout storage l = AuctionStorage.layout();
         return l.auctions[epoch].lastPrice64x64;
     }
 
-    // @notice Returns price during the auction
+    /**
+     * @notice calculates price as a function of time
+     * @param epoch epoch id
+     * @return price at the current block time as 64x64 fixed point number
+     */
     function _priceCurve64x64(uint64 epoch) internal view returns (int128) {
         AuctionStorage.Layout storage l = AuctionStorage.layout();
         AuctionStorage.Auction storage auction = l.auctions[epoch];
@@ -245,7 +263,11 @@ contract AuctionInternal is IAuctionEvents {
         return maxPrice64x64.sub(y);
     }
 
-    // @notice The current clearing price of the Dutch auction
+    /**
+     * @notice clearing price of the auction
+     * @param epoch epoch id
+     * @return price as 64x64 fixed point number
+     */
     function _clearingPrice64x64(uint64 epoch) internal view returns (int128) {
         AuctionStorage.Layout storage l = AuctionStorage.layout();
         AuctionStorage.Auction storage auction = l.auctions[epoch];
@@ -263,6 +285,13 @@ contract AuctionInternal is IAuctionEvents {
      *  PURCHASE
      ***********************************************/
 
+    /**
+     * @notice adds an order specified by the price and size
+     * @dev sender must approve contract
+     * @param epoch epoch id
+     * @param price64x64 max price as 64x64 fixed point number
+     * @param size amount of contracts
+     */
     function _addLimitOrder(
         uint64 epoch,
         int128 price64x64,
@@ -287,6 +316,12 @@ contract AuctionInternal is IAuctionEvents {
         emit OrderAdded(epoch, id, msg.sender, price64x64, size, true);
     }
 
+    /**
+     * @notice cancels an order
+     * @dev sender must approve contract
+     * @param epoch epoch id
+     * @param id order id
+     */
     function _cancelLimitOrder(uint64 epoch, uint256 id) internal {
         AuctionStorage.Layout storage l = AuctionStorage.layout();
         AuctionStorage.Auction storage auction = l.auctions[epoch];
@@ -312,6 +347,12 @@ contract AuctionInternal is IAuctionEvents {
         emit OrderCanceled(epoch, id, msg.sender);
     }
 
+    /**
+     * @notice adds an order specified by size only
+     * @dev sender must approve contract
+     * @param epoch epoch id
+     * @param size amount of contracts
+     */
     function _addMarketOrder(uint64 epoch, uint256 size) internal {
         AuctionStorage.Layout storage l = AuctionStorage.layout();
         AuctionStorage.Auction storage auction = l.auctions[epoch];
@@ -336,6 +377,10 @@ contract AuctionInternal is IAuctionEvents {
      *  WITHDRAW
      ***********************************************/
 
+    /**
+     * @notice removes any amount(s) owed to the buyer (fill and/or refund)
+     * @param epoch epoch id
+     */
     function _withdraw(uint64 epoch) internal {
         AuctionStorage.Layout storage l = AuctionStorage.layout();
 
@@ -370,6 +415,13 @@ contract AuctionInternal is IAuctionEvents {
         emit OrderWithdrawn(epoch, msg.sender, refund, fill);
     }
 
+    /**
+     * @notice calculates amount(s) owed to the buyer
+     * @param epoch epoch id
+     * @param buyer address of buyer
+     * @return amount refunded
+     * @return amount filled
+     */
     function _previewWithdraw(uint64 epoch, address buyer)
         internal
         returns (uint256, uint256)
@@ -436,11 +488,10 @@ contract AuctionInternal is IAuctionEvents {
     }
 
     /************************************************
-     *  MAINTENANCE
+     *  FINALIZE AUCTION
      ***********************************************/
 
-    // @notice traverses orderbook to check if the utilization is 100%
-    function _processOrders(uint64 epoch) internal returns (bool) {
+    function _processOrders(uint64 epoch) private returns (bool) {
         AuctionStorage.Layout storage l = AuctionStorage.layout();
         OrderBook.Index storage orderbook = l.orderbooks[epoch];
         AuctionStorage.Auction storage auction = l.auctions[epoch];
@@ -451,7 +502,7 @@ contract AuctionInternal is IAuctionEvents {
         uint256 totalContracts = _getTotalContracts(epoch);
 
         if (auction.totalContracts <= 0) {
-            // Sets totalContracts if this is the first bid.
+            // sets totalContracts if this is the first bid.
             auction.totalContracts = totalContracts;
         }
 
@@ -461,10 +512,10 @@ contract AuctionInternal is IAuctionEvents {
         for (uint256 i = 1; i <= length; i++) {
             OrderBook.Data memory data = orderbook._getOrderById(next);
 
-            // Check if the last "active" order has been reached
+            // check if the last "active" order has been reached
             if (data.price64x64 < _clearingPrice64x64(epoch)) break;
 
-            // Checks if utilization >= 100%
+            // checks if utilization >= 100%
             if (totalContractsSold + data.size >= totalContracts) {
                 auction.lastPrice64x64 = data.price64x64;
                 auction.totalContractsSold = totalContracts;
@@ -481,6 +532,10 @@ contract AuctionInternal is IAuctionEvents {
         return false;
     }
 
+    /**
+     * @notice checks various conditions to determine if auction is finalized
+     * @param epoch epoch id
+     */
     function _finalizeAuction(uint64 epoch) internal {
         AuctionStorage.Layout storage l = AuctionStorage.layout();
         AuctionStorage.Auction storage auction = l.auctions[epoch];
@@ -499,6 +554,11 @@ contract AuctionInternal is IAuctionEvents {
         }
     }
 
+    /**
+     * @notice transfers the premiums paid during auction to the vault
+     * @param epoch epoch id
+     * @return amount in premiums paid during auction
+     */
     function _transferPremium(uint64 epoch) internal returns (uint256) {
         AuctionStorage.Layout storage l = AuctionStorage.layout();
         AuctionStorage.Auction storage auction = l.auctions[epoch];
@@ -514,6 +574,10 @@ contract AuctionInternal is IAuctionEvents {
         return auction.totalPremiums;
     }
 
+    /**
+     * @notice checks various conditions to determine if auction is processed
+     * @param epoch epoch id
+     */
     function _processAuction(uint64 epoch) internal {
         AuctionStorage.Layout storage l = AuctionStorage.layout();
         AuctionStorage.Auction storage auction = l.auctions[epoch];
@@ -542,6 +606,11 @@ contract AuctionInternal is IAuctionEvents {
      *  VIEW
      ***********************************************/
 
+    /**
+     * @notice displays the epochs the buyer has a fill and/or refund
+     * @param buyer address of buyer
+     * @return array of epoch ids
+     */
     function _epochsByBuyer(address buyer)
         internal
         view
@@ -561,6 +630,11 @@ contract AuctionInternal is IAuctionEvents {
         return epochsByBuyer;
     }
 
+    /**
+     * @notice gets the total number of contracts
+     * @param epoch epoch id
+     * @return total number of contracts
+     */
     function _getTotalContracts(uint64 epoch) internal view returns (uint256) {
         AuctionStorage.Layout storage l = AuctionStorage.layout();
         AuctionStorage.Auction storage auction = l.auctions[epoch];
@@ -578,14 +652,5 @@ contract AuctionInternal is IAuctionEvents {
         }
 
         return auction.totalContracts;
-    }
-
-    function _getTotalContractsSold(uint64 epoch)
-        internal
-        view
-        returns (uint256)
-    {
-        AuctionStorage.Layout storage l = AuctionStorage.layout();
-        return l.auctions[epoch].totalContractsSold;
     }
 }

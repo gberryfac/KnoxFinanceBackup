@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import "./VaultInternal.sol";
 
-contract VaultAdmin is VaultInternal {
+contract VaultAdmin is IVaultAdmin, VaultInternal {
     using SafeERC20 for IERC20;
     using VaultStorage for VaultStorage.Layout;
 
@@ -14,13 +14,16 @@ contract VaultAdmin is VaultInternal {
      ***********************************************/
 
     /**
-     * @notice
+     * @inheritdoc IVaultAdmin
      */
     function initialize(VaultStorage.InitImpl memory initImpl)
         external
         onlyOwner
     {
-        // TODO: Validation
+        require(initImpl.auction != address(0), "address not provided");
+        require(initImpl.queue != address(0), "address not provided");
+        require(initImpl.pricer != address(0), "address not provided");
+
         VaultStorage.Layout storage l = VaultStorage.layout();
         l.Auction = IAuction(initImpl.auction);
         l.Queue = IQueue(initImpl.queue);
@@ -31,33 +34,39 @@ contract VaultAdmin is VaultInternal {
      *  ADMIN
      ***********************************************/
 
-    // /**
-    //  * @notice
-    //  * @param
-    //  * @param
-    //  */
-    function setAuctionWindowOffsets(uint16 start, uint16 end)
+    /**
+     * @inheritdoc IVaultAdmin
+     */
+    function setAuctionWindowOffsets(uint16 newStartOffset, uint16 newEndOffset)
         external
         onlyOwner
     {
-        _setAuctionWindowOffsets(start, end);
+        _setAuctionWindowOffsets(newStartOffset, newEndOffset);
     }
 
     /**
-     * @notice Sets the new fee recipient
-     * @param newFeeRecipient is the address of the new fee recipient
+     * @inheritdoc IVaultAdmin
      */
     function setFeeRecipient(address newFeeRecipient) external onlyOwner {
         _setFeeRecipient(newFeeRecipient);
     }
 
+    /**
+     * @inheritdoc IVaultAdmin
+     */
+    function setKeeper(address newKeeper) external onlyOwner {
+        _setKeeper(newKeeper);
+    }
+
+    /**
+     * @inheritdoc IVaultAdmin
+     */
     function setPricer(address newPricer) external onlyOwner {
         _setPricer(newPricer);
     }
 
     /**
-     * @notice Sets the performance fee for the vault
-     * @param newPerformanceFee64x64 is the performance fee as a 64x64 fixed point number
+     * @inheritdoc IVaultAdmin
      */
     function setPerformanceFee64x64(int128 newPerformanceFee64x64)
         external
@@ -67,9 +76,7 @@ contract VaultAdmin is VaultInternal {
     }
 
     /**
-     * @notice Sets the withdrawal fee for the vault
-     * @param newWithdrawalFee64x64 is the withdrawal fee as a 64x64 fixed point number
-     * @dev withdrawal fee must be annualized by dividing by the number of weeks in the year. i.e. 2% / 52.142857
+     * @inheritdoc IVaultAdmin
      */
     function setWithdrawalFee64x64(int128 newWithdrawalFee64x64)
         external
@@ -83,21 +90,21 @@ contract VaultAdmin is VaultInternal {
      ***********************************************/
 
     /**
-     * @notice
+     * @inheritdoc IVaultAdmin
      */
     function setAndInitializeAuction() external onlyKeeper {
         _setAndInitializeAuction();
     }
 
     /**
-     * @notice Sets the parameters for the next option to be sold
+     * @inheritdoc IVaultAdmin
      */
     function setOptionParameters() external onlyKeeper {
         _setOptionParameters();
     }
 
     /**
-     * @notice
+     * @inheritdoc IVaultAdmin
      */
     function initializeAuction() external onlyKeeper {
         _initializeAuction();
@@ -108,21 +115,21 @@ contract VaultAdmin is VaultInternal {
      ***********************************************/
 
     /**
-     * @notice Prepares the strategy and initiates the next round of option sales
+     * @inheritdoc IVaultAdmin
      */
     function processLastEpoch() external onlyKeeper {
         _processLastEpoch();
     }
 
     /**
-     * @notice Transfers reserved liquidity from Premia pool to Vault.
+     * @inheritdoc IVaultAdmin
      */
     function withdrawReservedLiquidity() external onlyKeeper {
         _withdrawReservedLiquidity();
     }
 
     /**
-     * @notice
+     * @inheritdoc IVaultAdmin
      */
     function collectPerformanceFee() external onlyKeeper {
         _collectPerformanceFee();
@@ -133,7 +140,7 @@ contract VaultAdmin is VaultInternal {
      ***********************************************/
 
     /**
-     * @notice
+     * @inheritdoc IVaultAdmin
      */
     function initalizeNextEpoch() external onlyKeeper {
         _initalizeNextEpoch();
@@ -144,7 +151,7 @@ contract VaultAdmin is VaultInternal {
      ***********************************************/
 
     /**
-     * @notice
+     * @inheritdoc IVaultAdmin
      */
     function setAuctionPrices() external onlyKeeper {
         _setAuctionPrices();
@@ -155,7 +162,7 @@ contract VaultAdmin is VaultInternal {
      ***********************************************/
 
     /**
-     * @notice
+     * @inheritdoc IVaultAdmin
      */
     function processAuction() external onlyKeeper {
         _processAuction();
@@ -165,6 +172,9 @@ contract VaultAdmin is VaultInternal {
      * HELPERS
      ***********************************************/
 
+    /**
+     * @inheritdoc IVaultAdmin
+     */
     function getExerciseAmount(uint64 epoch, uint256 size)
         external
         view

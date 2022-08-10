@@ -51,48 +51,44 @@ library AuctionStorage {
         }
     }
 
-    function _getAuction(Layout storage l, uint64 epoch)
+    /************************************************
+     *  VIEW
+     ***********************************************/
+
+    function _getAuction(uint64 epoch) internal view returns (Auction memory) {
+        return layout().auctions[epoch];
+    }
+
+    function _getMinSize() internal view returns (uint256) {
+        return layout().minSize;
+    }
+
+    function _getOrderById(uint64 epoch, uint256 id)
         internal
         view
-        returns (Auction memory)
+        returns (OrderBook.Data memory)
     {
-        return l.auctions[epoch];
-    }
-
-    function _getMinSize(Layout storage l) internal view returns (uint256) {
-        return l.minSize;
-    }
-
-    function _getOrderById(
-        Layout storage l,
-        uint64 epoch,
-        uint256 id
-    ) internal view returns (OrderBook.Data memory) {
-        OrderBook.Index storage orderbook = l.orderbooks[epoch];
+        OrderBook.Index storage orderbook = layout().orderbooks[epoch];
         return orderbook._getOrderById(id);
     }
 
-    function _getStatus(Layout storage l, uint64 epoch)
+    function _getStatus(uint64 epoch)
         internal
         view
         returns (AuctionStorage.Status)
     {
-        return l.auctions[epoch].status;
+        return layout().auctions[epoch].status;
     }
 
-    function _getTotalContractsSold(Layout storage l, uint64 epoch)
+    function _getTotalContractsSold(uint64 epoch)
         internal
         view
         returns (uint256)
     {
-        return l.auctions[epoch].totalContractsSold;
+        return layout().auctions[epoch].totalContractsSold;
     }
 
-    function _isFinalized(Layout storage l, uint64 epoch)
-        internal
-        view
-        returns (bool)
-    {
-        return l.auctions[epoch].status == Status.FINALIZED;
+    function _isFinalized(uint64 epoch) internal view returns (bool) {
+        return layout().auctions[epoch].status == Status.FINALIZED;
     }
 }

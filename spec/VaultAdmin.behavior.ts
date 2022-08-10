@@ -184,6 +184,16 @@ export function describeBehaviorOfVaultAdmin(
       });
     });
 
+    describe("#setKeeper(address)", () => {
+      time.revertToSnapshotAfterEach(async () => {});
+
+      it("should revert if !owner", async () => {
+        await expect(vault.setKeeper(addresses.lp1)).to.be.revertedWith(
+          "Ownable: sender must be owner"
+        );
+      });
+    });
+
     describe("#setPricer(address)", () => {
       time.revertToSnapshotAfterEach(async () => {});
 

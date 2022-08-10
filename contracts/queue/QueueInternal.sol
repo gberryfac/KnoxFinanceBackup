@@ -62,6 +62,10 @@ contract QueueInternal is
      *  ADMIN
      ***********************************************/
 
+    /**
+     * @notice sets a new max TVL for deposits
+     * @param newMaxTVL is the new TVL limit for deposits
+     */
     function _setMaxTVL(uint256 newMaxTVL) internal {
         QueueStorage.Layout storage l = QueueStorage.layout();
         require(newMaxTVL > 0, "value exceeds minimum");
@@ -73,6 +77,11 @@ contract QueueInternal is
      *  DEPOSIT
      ***********************************************/
 
+    /**
+     * @notice deposits collateral asset
+     * @param amount total collateral deposited
+     * @param receiver claim token recipient
+     */
     function _deposit(uint256 amount, address receiver) internal {
         QueueStorage.Layout storage l = QueueStorage.layout();
 
@@ -85,10 +94,10 @@ contract QueueInternal is
         // redeems shares from previous epochs
         _redeemMax(receiver, msg.sender);
 
-        uint256 currentTokenId = _getCurrentTokenId();
+        uint256 currentTokenId = QueueStorage._getCurrentTokenId();
         _mint(receiver, currentTokenId, amount, "");
 
-        // An approve() by the msg.sender is required beforehand
+        // an approve() by the msg.sender is required beforehand
         ERC20.safeTransferFrom(msg.sender, address(this), amount);
 
         emit Deposit(l.epoch, receiver, msg.sender, amount);
@@ -98,8 +107,13 @@ contract QueueInternal is
      *  CANCEL
      ***********************************************/
 
+    /**
+     * @notice cancels deposit, refunds collateral asset
+     * @dev cancellation must be made within the same epoch as the deposit
+     * @param amount total collateral which will be withdrawn
+     */
     function _cancel(uint256 amount) internal {
-        uint256 currentTokenId = _getCurrentTokenId();
+        uint256 currentTokenId = QueueStorage._getCurrentTokenId();
         _burn(msg.sender, currentTokenId, amount);
         ERC20.safeTransfer(msg.sender, amount);
 
@@ -111,12 +125,18 @@ contract QueueInternal is
      *  REDEEM
      ***********************************************/
 
+    /**
+     * @notice exchanges claim token for vault shares
+     * @param tokenId claim token id
+     * @param receiver vault share recipient
+     * @param owner claim token holder
+     */
     function _redeem(
         uint256 tokenId,
         address receiver,
         address owner
     ) internal {
-        uint256 currentTokenId = _getCurrentTokenId();
+        uint256 currentTokenId = QueueStorage._getCurrentTokenId();
 
         require(
             tokenId != currentTokenId,
@@ -134,9 +154,14 @@ contract QueueInternal is
         emit Redeem(epoch, receiver, owner, unredeemedShares);
     }
 
+    /**
+     * @notice exchanges all claim tokens for vault shares
+     * @param receiver vault share recipient
+     * @param owner claim token holder
+     */
     function _redeemMax(address receiver, address owner) internal {
         uint256[] memory tokenIds = _tokensByAccount(owner);
-        uint256 currentTokenId = _getCurrentTokenId();
+        uint256 currentTokenId = QueueStorage._getCurrentTokenId();
 
         for (uint256 i; i < tokenIds.length; i++) {
             uint256 tokenId = tokenIds[i];
@@ -150,19 +175,26 @@ contract QueueInternal is
      *  PROCESS LAST EPOCH
      ***********************************************/
 
+    /**
+     * @notice syncs queue epoch with vault epoch
+     * @param epoch current epoch of vault
+     */
     function _syncEpoch(uint64 epoch) internal {
         QueueStorage.Layout storage l = QueueStorage.layout();
         l.epoch = epoch;
         emit EpochSet(l.epoch, msg.sender);
     }
 
+    /**
+     * @notice transfers deposited collateral to vault, calculates the price per share
+     */
     function _processDeposits() internal {
         uint256 deposits = ERC20.balanceOf(address(this));
 
         ERC20.approve(address(Vault), deposits);
         uint256 shares = Vault.deposit(deposits, address(this));
 
-        uint256 currentTokenId = _getCurrentTokenId();
+        uint256 currentTokenId = QueueStorage._getCurrentTokenId();
         uint256 claimTokenSupply = _totalSupply(currentTokenId);
         uint256 pricePerShare = ONE_SHARE;
 
@@ -188,6 +220,12 @@ contract QueueInternal is
      *  VIEW
      ***********************************************/
 
+    /**
+     * @notice calculates unredeemed vault shares available
+     * @param tokenId claim token id
+     * @param account claim token holder
+     * @return total unredeemed vault shares
+     */
     function _previewUnredeemed(uint256 tokenId, address account)
         internal
         view
@@ -196,10 +234,6 @@ contract QueueInternal is
         QueueStorage.Layout storage l = QueueStorage.layout();
         uint256 balance = _balanceOf(account, tokenId);
         return (balance * l.pricePerShare[tokenId]) / ONE_SHARE;
-    }
-
-    function _getCurrentTokenId() internal view returns (uint256) {
-        return QueueStorage._getCurrentTokenId();
     }
 
     /************************************************

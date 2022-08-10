@@ -6,13 +6,9 @@ library QueueStorage {
      *  LAYOUT
      ***********************************************/
     struct Layout {
-        // @notice
         address vault;
-        // @notice
         uint64 epoch;
-        // @notice
         uint256 maxTVL;
-        // @notice maps claim token id to claim token price
         mapping(uint256 => uint256) pricePerShare;
     }
 
@@ -38,16 +34,16 @@ library QueueStorage {
         return layout().epoch;
     }
 
-    function _getMaxTVL(Layout storage l) internal view returns (uint256) {
-        return l.maxTVL;
+    function _getMaxTVL() internal view returns (uint256) {
+        return layout().maxTVL;
     }
 
-    function _getPricePerShare(Layout storage l, uint256 tokenId)
+    function _getPricePerShare(uint256 tokenId)
         internal
         view
         returns (uint256)
     {
-        return l.pricePerShare[tokenId];
+        return layout().pricePerShare[tokenId];
     }
 
     /************************************************

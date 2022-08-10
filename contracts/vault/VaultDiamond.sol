@@ -19,17 +19,15 @@ contract VaultDiamond is SolidStateDiamond {
     using VaultStorage for VaultStorage.Layout;
 
     constructor(VaultStorage.InitProxy memory initProxy) {
-        // require(_initProps.pricer != address(0), "address not provided");
+        require(
+            initProxy.delta64x64 >= 0x00000000000000000,
+            "exceeds minimum allowable value"
+        );
 
-        // require(
-        //     _initParams.delta64x64 >= 0x00000000000000000,
-        //     "Exceeds minimum allowable value"
-        // );
-
-        // require(
-        //     _initParams.delta64x64 <= 0x010000000000000000,
-        //     "Exceeds maximum allowable value"
-        // );
+        require(
+            initProxy.delta64x64 <= 0x010000000000000000,
+            "exceeds maximum allowable value"
+        );
 
         address asset;
 
