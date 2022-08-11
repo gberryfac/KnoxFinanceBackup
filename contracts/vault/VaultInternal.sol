@@ -382,8 +382,8 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
 
         if (l.isCall) {
             // denominates price in collateral asset
-            maxPrice64x64.div(spot64x64);
-            minPrice64x64.div(spot64x64);
+            maxPrice64x64 = maxPrice64x64.div(spot64x64);
+            minPrice64x64 = minPrice64x64.div(spot64x64);
         }
 
         l.Auction.setAuctionPrices(l.epoch, maxPrice64x64, minPrice64x64);
