@@ -353,18 +353,24 @@ contract AuctionInternal is IAuctionEvents {
      * @dev sender must approve contract
      * @param epoch epoch id
      * @param size amount of contracts
+     * @param maxCost max cost of buyer is willing to pay
      */
-    function _addMarketOrder(uint64 epoch, uint256 size) internal {
+    function _addMarketOrder(
+        uint64 epoch,
+        uint256 size,
+        uint256 maxCost
+    ) internal {
         AuctionStorage.Layout storage l = AuctionStorage.layout();
-        AuctionStorage.Auction storage auction = l.auctions[epoch];
 
         require(size >= l.minSize, "size < minimum");
 
         int128 price64x64 = _priceCurve64x64(epoch);
         uint256 cost = price64x64.mulu(size);
+
+        require(maxCost >= cost, "cost > maxCost");
+
         ERC20.safeTransferFrom(msg.sender, address(this), cost);
 
-        auction.lastPrice64x64 = price64x64;
         l.epochsByBuyer[msg.sender].add(epoch);
 
         uint256 id = l.orderbooks[epoch]._insert(price64x64, size, msg.sender);

@@ -394,7 +394,11 @@ export function describeBehaviorOfVaultAdmin(
 
         await auction
           .connect(signers.buyer1)
-          .addMarketOrder(epoch, await auction.getTotalContracts(epoch));
+          .addMarketOrder(
+            epoch,
+            await auction.getTotalContracts(epoch),
+            ethers.constants.MaxUint256
+          );
 
         // process auction 0
         await vault.connect(signers.keeper).processAuction();
@@ -486,7 +490,11 @@ export function describeBehaviorOfVaultAdmin(
 
         await auction
           .connect(signers.buyer1)
-          .addMarketOrder(epoch, await auction.getTotalContracts(epoch));
+          .addMarketOrder(
+            epoch,
+            await auction.getTotalContracts(epoch),
+            ethers.constants.MaxUint256
+          );
 
         // process auction 0
         const tx = await vault.connect(signers.keeper).processAuction();
@@ -591,7 +599,11 @@ export function describeBehaviorOfVaultAdmin(
 
         await auction
           .connect(signers.buyer1)
-          .addMarketOrder(epoch, await auction.getTotalContracts(epoch));
+          .addMarketOrder(
+            epoch,
+            await auction.getTotalContracts(epoch),
+            ethers.constants.MaxUint256
+          );
 
         // process auction 0
         await vault.connect(signers.keeper).processAuction();

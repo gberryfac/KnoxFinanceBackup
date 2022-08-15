@@ -84,8 +84,13 @@ interface IAuction is IAuctionEvents, IERC1155Receiver {
      * @dev sender must approve contract
      * @param epoch epoch id
      * @param size amount of contracts
+     * @param maxCost max cost of buyer is willing to pay
      */
-    function addMarketOrder(uint64 epoch, uint256 size) external;
+    function addMarketOrder(
+        uint64 epoch,
+        uint256 size,
+        uint256 maxCost
+    ) external;
 
     /************************************************
      *  WITHDRAW

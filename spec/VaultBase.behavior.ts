@@ -160,7 +160,11 @@ export function describeBehaviorOfVaultBase(
 
         await auction
           .connect(signers.buyer1)
-          .addMarketOrder(epoch, await auction.getTotalContracts(epoch));
+          .addMarketOrder(
+            epoch,
+            await auction.getTotalContracts(epoch),
+            ethers.constants.MaxUint256
+          );
 
         // process auction 0
         await vault.connect(signers.keeper).processAuction();
@@ -479,7 +483,11 @@ export function describeBehaviorOfVaultBase(
 
         await auction
           .connect(signers.buyer1)
-          .addMarketOrder(epoch, await auction.getTotalContracts(epoch));
+          .addMarketOrder(
+            epoch,
+            await auction.getTotalContracts(epoch),
+            ethers.constants.MaxUint256
+          );
 
         // process auction 0
         await vault.connect(signers.keeper).processAuction();

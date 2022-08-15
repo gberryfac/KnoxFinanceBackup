@@ -102,14 +102,18 @@ contract Auction is AuctionInternal, IAuction, ReentrancyGuard {
     /**
      * @inheritdoc IAuction
      */
-    function addMarketOrder(uint64 epoch, uint256 size)
+    function addMarketOrder(
+        uint64 epoch,
+        uint256 size,
+        uint256 maxCost
+    )
         external
         auctionNotFinalizedOrProcessed(epoch)
         auctionHasStarted(epoch)
         auctionHasNotEnded(epoch)
         nonReentrant
     {
-        return _addMarketOrder(epoch, size);
+        return _addMarketOrder(epoch, size, maxCost);
     }
 
     /************************************************

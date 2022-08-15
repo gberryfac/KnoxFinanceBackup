@@ -146,7 +146,7 @@ export function describeBehaviorOfAuction(
 
       const marketOrder = await auction
         .connect(signers.buyer3)
-        .addMarketOrder(epoch, buyer3OrderSize);
+        .addMarketOrder(epoch, buyer3OrderSize, ethers.constants.MaxUint256);
 
       if (processAuction) {
         await vault.connect(signers.keeper).processAuction();
@@ -173,7 +173,12 @@ export function describeBehaviorOfAuction(
         .connect(signers.buyer1)
         .approve(addresses.auction, ethers.constants.MaxUint256);
 
-      const tx1 = await auction.addMarketOrder(epoch, size);
+      const tx1 = await auction.addMarketOrder(
+        epoch,
+        size,
+        ethers.constants.MaxUint256
+      );
+
       await time.increase(100);
 
       await asset
@@ -182,7 +187,7 @@ export function describeBehaviorOfAuction(
 
       const tx2 = await auction
         .connect(signers.buyer2)
-        .addMarketOrder(epoch, size);
+        .addMarketOrder(epoch, size, ethers.constants.MaxUint256);
       await time.increase(100);
 
       await asset
@@ -191,7 +196,7 @@ export function describeBehaviorOfAuction(
 
       const tx3 = await auction
         .connect(signers.buyer3)
-        .addMarketOrder(epoch, size);
+        .addMarketOrder(epoch, size, ethers.constants.MaxUint256);
 
       return [[tx1, tx2, tx3], totalContracts];
     };
@@ -857,7 +862,7 @@ export function describeBehaviorOfAuction(
       describe("if not initialized", () => {
         it("should revert", async () => {
           await expect(
-            auction.addMarketOrder(0, params.size)
+            auction.addMarketOrder(0, params.size, ethers.constants.MaxUint256)
           ).to.be.revertedWith("start time is not set");
         });
       });
@@ -871,7 +876,7 @@ export function describeBehaviorOfAuction(
 
         it("should revert", async () => {
           await expect(
-            auction.addMarketOrder(0, params.size)
+            auction.addMarketOrder(0, params.size, ethers.constants.MaxUint256)
           ).to.be.revertedWith("auction not started");
         });
       });
@@ -893,7 +898,11 @@ export function describeBehaviorOfAuction(
             await time.increaseTo(endTime);
 
             await expect(
-              auction.addMarketOrder(0, params.size)
+              auction.addMarketOrder(
+                0,
+                params.size,
+                ethers.constants.MaxUint256
+              )
             ).to.be.revertedWith("auction has ended");
           });
         });
@@ -902,7 +911,8 @@ export function describeBehaviorOfAuction(
           await expect(
             auction.addMarketOrder(
               epoch,
-              parseUnits("1", params.collateral.decimals - 2)
+              parseUnits("1", params.collateral.decimals - 2),
+              ethers.constants.MaxUint256
             )
           ).to.be.revertedWith("size < minimum");
         });
@@ -914,7 +924,11 @@ export function describeBehaviorOfAuction(
             .connect(signers.buyer1)
             .approve(addresses.auction, ethers.constants.MaxUint256);
 
-          await auction.addMarketOrder(epoch, params.size);
+          await auction.addMarketOrder(
+            epoch,
+            params.size,
+            ethers.constants.MaxUint256
+          );
           const data = await auction.getAuction(epoch);
           await assert.bnEqual(data.totalContracts, totalContracts);
         });
@@ -924,7 +938,11 @@ export function describeBehaviorOfAuction(
             .connect(signers.buyer1)
             .approve(addresses.auction, ethers.constants.MaxUint256);
 
-          const tx = await auction.addMarketOrder(epoch, params.size);
+          const tx = await auction.addMarketOrder(
+            epoch,
+            params.size,
+            ethers.constants.MaxUint256
+          );
           const args = await getEventArgs(tx, "OrderAdded");
 
           await expect(tx).to.emit(auction, "OrderAdded").withArgs(
@@ -946,7 +964,11 @@ export function describeBehaviorOfAuction(
             .connect(signers.buyer1)
             .approve(addresses.auction, ethers.constants.MaxUint256);
 
-          const tx = await auction.addMarketOrder(epoch, params.size);
+          const tx = await auction.addMarketOrder(
+            epoch,
+            params.size,
+            ethers.constants.MaxUint256
+          );
           const args = await getEventArgs(tx, "OrderAdded");
           const cost = math.bnToNumber(
             params.size
@@ -973,7 +995,11 @@ export function describeBehaviorOfAuction(
             .connect(signers.buyer1)
             .approve(addresses.auction, ethers.constants.MaxUint256);
 
-          const tx = await auction.addMarketOrder(epoch, params.size);
+          const tx = await auction.addMarketOrder(
+            epoch,
+            params.size,
+            ethers.constants.MaxUint256
+          );
           const args = await getEventArgs(tx, "OrderAdded");
 
           const order = await auction.getOrderById(epoch, args.id);
@@ -992,7 +1018,11 @@ export function describeBehaviorOfAuction(
             .connect(signers.buyer1)
             .approve(addresses.auction, ethers.constants.MaxUint256);
 
-          await auction.addMarketOrder(epoch, params.size);
+          await auction.addMarketOrder(
+            epoch,
+            params.size,
+            ethers.constants.MaxUint256
+          );
 
           const epochByBuyer = await auction.epochsByBuyer(addresses.buyer1);
 
@@ -1023,7 +1053,7 @@ export function describeBehaviorOfAuction(
 
         it("should revert", async () => {
           await expect(
-            auction.addMarketOrder(0, params.size)
+            auction.addMarketOrder(0, params.size, ethers.constants.MaxUint256)
           ).to.be.revertedWith("auction finalized");
         });
       });
@@ -1035,7 +1065,7 @@ export function describeBehaviorOfAuction(
 
         it("should revert", async () => {
           await expect(
-            auction.addMarketOrder(0, params.size)
+            auction.addMarketOrder(0, params.size, ethers.constants.MaxUint256)
           ).to.be.revertedWith("auction processed");
         });
       });
