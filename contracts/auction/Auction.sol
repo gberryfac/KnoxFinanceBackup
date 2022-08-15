@@ -144,8 +144,12 @@ contract Auction is AuctionInternal, IAuction, ReentrancyGuard {
     ) external payable marketOrdersAllowed(epoch) nonReentrant {
         AuctionStorage.Layout storage l = AuctionStorage.layout();
 
-        (int128 price64x64, uint256 cost) =
-            _validateMarketOrder(l, epoch, size, maxCost);
+        (int128 price64x64, uint256 cost) = _validateMarketOrder(
+            l,
+            epoch,
+            size,
+            maxCost
+        );
 
         uint256 credited = _wrapNativeToken(cost);
         // an approve() by the msg.sender is required beforehand
@@ -164,8 +168,12 @@ contract Auction is AuctionInternal, IAuction, ReentrancyGuard {
     ) external payable marketOrdersAllowed(epoch) nonReentrant {
         AuctionStorage.Layout storage l = AuctionStorage.layout();
 
-        (int128 price64x64, uint256 cost) =
-            _validateMarketOrder(l, epoch, size, maxCost);
+        (int128 price64x64, uint256 cost) = _validateMarketOrder(
+            l,
+            epoch,
+            size,
+            maxCost
+        );
 
         uint256 credited = _swapForPoolTokens(l.Exchange, s, address(ERC20));
         _transferAssets(credited, cost, msg.sender);

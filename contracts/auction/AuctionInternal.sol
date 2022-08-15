@@ -349,13 +349,20 @@ contract AuctionInternal is IAuctionEvents, OwnableInternal {
     function _withdraw(uint64 epoch) internal {
         AuctionStorage.Layout storage l = AuctionStorage.layout();
 
-        (uint256 refund, uint256 fill) =
-            _previewWithdraw(l, false, epoch, msg.sender);
+        (uint256 refund, uint256 fill) = _previewWithdraw(
+            l,
+            false,
+            epoch,
+            msg.sender
+        );
 
         l.epochsByBuyer[msg.sender].remove(epoch);
 
-        (bool expired, uint256 exercisedAmount) =
-            _getExerciseAmount(l, epoch, fill);
+        (bool expired, uint256 exercisedAmount) = _getExerciseAmount(
+            l,
+            epoch,
+            fill
+        );
 
         if (expired) {
             // If expired ITM, adjust refund
@@ -428,8 +435,8 @@ contract AuctionInternal is IAuctionEvents, OwnableInternal {
                     if (
                         totalContractsSold + data.size >= auction.totalContracts
                     ) {
-                        uint256 remainder =
-                            auction.totalContracts - totalContractsSold;
+                        uint256 remainder = auction.totalContracts -
+                            totalContractsSold;
 
                         cost = lastPrice64x64.mulu(remainder);
                         fill += remainder;
@@ -530,8 +537,9 @@ contract AuctionInternal is IAuctionEvents, OwnableInternal {
 
         require(auction.totalPremiums <= 0, "premiums transferred");
 
-        uint256 totalPremiums =
-            _lastPrice64x64(epoch).mulu(auction.totalContractsSold);
+        uint256 totalPremiums = _lastPrice64x64(epoch).mulu(
+            auction.totalContractsSold
+        );
 
         auction.totalPremiums = totalPremiums;
         ERC20.safeTransfer(address(Vault), totalPremiums);
@@ -552,8 +560,10 @@ contract AuctionInternal is IAuctionEvents, OwnableInternal {
         if (totalContractsSold > 0) {
             uint256 longTokenId = auction.longTokenId;
 
-            uint256 longTokenBalance =
-                Pool.balanceOf(address(this), longTokenId);
+            uint256 longTokenBalance = Pool.balanceOf(
+                address(this),
+                longTokenId
+            );
 
             require(auction.totalPremiums > 0, "premiums not transferred");
 
@@ -695,8 +705,9 @@ contract AuctionInternal is IAuctionEvents, OwnableInternal {
 
             if (msg.value > amount) {
                 unchecked {
-                    (bool success, ) =
-                        payable(msg.sender).call{value: msg.value - amount}("");
+                    (bool success, ) = payable(msg.sender).call{
+                        value: msg.value - amount
+                    }("");
 
                     require(success, "ETH refund failed");
 
@@ -731,16 +742,15 @@ contract AuctionInternal is IAuctionEvents, OwnableInternal {
             );
         }
 
-        uint256 amountCredited =
-            Exchange.swapWithToken(
-                s.tokenIn,
-                tokenOut,
-                s.amountInMax + msg.value,
-                s.callee,
-                s.allowanceTarget,
-                s.data,
-                s.refundAddress
-            );
+        uint256 amountCredited = Exchange.swapWithToken(
+            s.tokenIn,
+            tokenOut,
+            s.amountInMax + msg.value,
+            s.callee,
+            s.allowanceTarget,
+            s.data,
+            s.refundAddress
+        );
 
         require(
             amountCredited >= s.amountOutMin,
