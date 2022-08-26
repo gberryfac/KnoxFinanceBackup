@@ -134,6 +134,7 @@ export const LINK_SPOT_PRICE = 1000000000;
 
 /**
  * Premia Pools
+ * https://github.com/Premian-Labs/premia-contracts/blob/master/docs/deployments
  */
 export const WETH_DAI_POOL = {
   [CHAINID.ETH_MAINNET]: "0xa4492fcDa2520cB68657d220f4D4aE3116359C10",
@@ -150,7 +151,6 @@ export const LINK_DAI_POOL = {
   [CHAINID.ARB_MAINNET]: "0xf87Ca9EB60c2E40A6C5Ab14ca291934a95F845Ff",
 };
 
-// https://github.com/Premian-Labs/premia-contracts/blob/master/docs/deployments
 export const PREMIA_VOLATILITY_SURFACE_ORACLE = {
   [CHAINID.ETH_MAINNET]: "0x9b0EfA67e8112d8EA2eB3C86C798B2bb88467335",
   [CHAINID.ETH_RINKEBY]: "",
@@ -164,4 +164,15 @@ export const PREMIA_MULTISIG = {
 
 export const PREMIA_DIAMOND = {
   [CHAINID.ARB_MAINNET]: "0x89b36CE3491f2258793C7408Bd46aac725973BA2",
+};
+
+/**
+ * Uniswap V2
+ */
+export const UNISWAP_V2_FACTORY = {
+  [CHAINID.ARB_MAINNET]: "0xc35DADB65012eC5796536bD9864eD8773aBc74C4",
+};
+
+export const UNISWAP_V2_ROUTER02 = {
+  [CHAINID.ARB_MAINNET]: "0x1b02dA8Cb0d097eB8D57A175b88c7D8b47997506",
 };

@@ -14,6 +14,10 @@ contract MockERC20 is ERC20Base, ERC20Metadata {
         _mint(msg.sender, 10**(decimals + 7));
     }
 
+    function deposit() public payable {
+        _mint(msg.sender, msg.value);
+    }
+
     function mint(address _account, uint256 _amount) public {
         _mint(_account, _amount);
     }
