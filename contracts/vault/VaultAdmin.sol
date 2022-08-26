@@ -142,8 +142,8 @@ contract VaultAdmin is IVaultAdmin, VaultInternal {
     /**
      * @inheritdoc IVaultAdmin
      */
-    function initalizeNextEpoch() external onlyKeeper {
-        _initalizeNextEpoch();
+    function initializeNextEpoch() external onlyKeeper {
+        _initializeNextEpoch();
     }
 
     /************************************************

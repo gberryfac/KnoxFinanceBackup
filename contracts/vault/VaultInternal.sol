@@ -326,7 +326,7 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
     /**
      * @notice initializes the next epoch
      */
-    function _initalizeNextEpoch() internal {
+    function _initializeNextEpoch() internal {
         VaultStorage.Layout storage l = VaultStorage.layout();
         l.totalShortContracts = 0;
         l.Queue.processDeposits();
