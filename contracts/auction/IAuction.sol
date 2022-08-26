@@ -3,10 +3,22 @@ pragma solidity ^0.8.0;
 
 import "@solidstate/contracts/token/ERC1155/IERC1155Receiver.sol";
 
+import "../exchange/IExchangeHelper.sol";
+
 import "./AuctionStorage.sol";
 import "./IAuctionEvents.sol";
 
 interface IAuction is IAuctionEvents, IERC1155Receiver {
+    /************************************************
+     *  ADMIN
+     ***********************************************/
+
+    /**
+     * @notice sets a new Exchange Helper contract
+     * @param newExchangeHelper is the new Exchange Helper contract address
+     */
+    function setExchangeHelper(address newExchangeHelper) external;
+
     /************************************************
      *  INITIALIZE AUCTION
      ***********************************************/
@@ -60,6 +72,7 @@ interface IAuction is IAuctionEvents, IERC1155Receiver {
 
     /**
      * @notice adds an order specified by the price and size
+     * @dev sent ETH will be wrapped as wETH
      * @dev sender must approve contract
      * @param epoch epoch id
      * @param price64x64 max price as 64x64 fixed point number
@@ -69,7 +82,23 @@ interface IAuction is IAuctionEvents, IERC1155Receiver {
         uint64 epoch,
         int128 price64x64,
         uint256 size
-    ) external;
+    ) external payable;
+
+    /**
+     * @notice swaps into the collateral asset and adds an order specified by the price and size
+     * @dev sent ETH will be wrapped as wETH
+     * @dev sender must approve contract
+     * @param s swap arguments
+     * @param epoch epoch id
+     * @param price64x64 max price as 64x64 fixed point number
+     * @param size amount of contracts
+     */
+    function swapAndAddLimitOrder(
+        IExchangeHelper.SwapArgs calldata s,
+        uint64 epoch,
+        int128 price64x64,
+        uint256 size
+    ) external payable;
 
     /**
      * @notice cancels an order
@@ -81,6 +110,7 @@ interface IAuction is IAuctionEvents, IERC1155Receiver {
 
     /**
      * @notice adds an order specified by size only
+     * @dev sent ETH will be wrapped as wETH
      * @dev sender must approve contract
      * @param epoch epoch id
      * @param size amount of contracts
@@ -90,7 +120,23 @@ interface IAuction is IAuctionEvents, IERC1155Receiver {
         uint64 epoch,
         uint256 size,
         uint256 maxCost
-    ) external;
+    ) external payable;
+
+    /**
+     * @notice swaps into the collateral asset and adds an order specified by size only
+     * @dev sent ETH will be wrapped as wETH
+     * @dev sender must approve contract
+     * @param s swap arguments
+     * @param epoch epoch id
+     * @param size amount of contracts
+     * @param maxCost max cost of buyer is willing to pay
+     */
+    function swapAndAddMarketOrder(
+        IExchangeHelper.SwapArgs calldata s,
+        uint64 epoch,
+        uint256 size,
+        uint256 maxCost
+    ) external payable;
 
     /************************************************
      *  WITHDRAW

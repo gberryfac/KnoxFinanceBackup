@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+import "@solidstate/contracts/access/ownable/OwnableInternal.sol";
 import "@solidstate/contracts/token/ERC1155/IERC1155.sol";
 import "@solidstate/contracts/token/ERC20/IERC20.sol";
 import "@solidstate/contracts/token/ERC20/metadata/IERC20Metadata.sol";
+import "@solidstate/contracts/utils/IWETH.sol";
 import "@solidstate/contracts/utils/SafeERC20.sol";
 
 import "../interfaces/IPremiaPool.sol";
@@ -18,7 +20,7 @@ import "./IAuctionEvents.sol";
 
 import "hardhat/console.sol";
 
-contract AuctionInternal is IAuctionEvents {
+contract AuctionInternal is IAuctionEvents, OwnableInternal {
     using ABDKMath64x64 for int128;
     using ABDKMath64x64 for uint256;
     using ABDKMath64x64Token for int128;
@@ -36,11 +38,13 @@ contract AuctionInternal is IAuctionEvents {
     IERC20 public immutable ERC20;
     IPremiaPool public immutable Pool;
     IVault public immutable Vault;
+    IWETH public immutable WETH;
 
     constructor(
         bool _isCall,
         address pool,
-        address vault
+        address vault,
+        address weth
     ) {
         isCall = _isCall;
 
@@ -53,6 +57,7 @@ contract AuctionInternal is IAuctionEvents {
 
         ERC20 = IERC20(asset);
         Vault = IVault(vault);
+        WETH = IWETH(weth);
     }
 
     /************************************************
@@ -80,53 +85,21 @@ contract AuctionInternal is IAuctionEvents {
     }
 
     /**
-     * @dev Throws if auction has ended
+     * @dev Throws if auction status does not match function's required status
      */
-    modifier auctionHasNotEnded(uint64 epoch) {
+    modifier auctionStatus(AuctionStorage.Status status, uint64 epoch) {
         AuctionStorage.Layout storage l = AuctionStorage.layout();
         AuctionStorage.Auction storage auction = l.auctions[epoch];
-        require(auction.endTime > 0, "end time is not set");
-        require(block.timestamp <= auction.endTime, "auction has ended");
+        require(status == auction.status, "restricted");
         _;
     }
 
-    /**
-     * @dev Throws if auction status is not "INITIALIZED"
-     */
-    modifier auctionInitialized(uint64 epoch) {
-        AuctionStorage.Layout storage l = AuctionStorage.layout();
-        AuctionStorage.Auction storage auction = l.auctions[epoch];
-        require(
-            AuctionStorage.Status.INITIALIZED == auction.status,
-            "auction !initialized"
-        );
-        _;
-    }
-
-    /**
-     * @dev Throws if auction status is not "FINALIZED"
-     */
-    modifier auctionFinalized(uint64 epoch) {
-        AuctionStorage.Layout storage l = AuctionStorage.layout();
-        AuctionStorage.Auction storage auction = l.auctions[epoch];
-        require(
-            AuctionStorage.Status.FINALIZED == auction.status,
-            "auction !finalized"
-        );
-        _;
-    }
-
-    /**
-     * @dev Throws if auction status is not "PROCESSED"
-     */
-    modifier auctionProcessed(uint64 epoch) {
-        AuctionStorage.Layout storage l = AuctionStorage.layout();
-        AuctionStorage.Auction storage auction = l.auctions[epoch];
-        require(
-            AuctionStorage.Status.PROCESSED == auction.status,
-            "auction !processed"
-        );
-        _;
+    function _auctionNotFinalizedOrProcessed(AuctionStorage.Status status)
+        internal
+        pure
+    {
+        require(AuctionStorage.Status.FINALIZED != status, "auction finalized");
+        require(AuctionStorage.Status.PROCESSED != status, "auction processed");
     }
 
     /**
@@ -135,17 +108,65 @@ contract AuctionInternal is IAuctionEvents {
     modifier auctionNotFinalizedOrProcessed(uint64 epoch) {
         AuctionStorage.Layout storage l = AuctionStorage.layout();
         AuctionStorage.Auction storage auction = l.auctions[epoch];
-
-        require(
-            AuctionStorage.Status.FINALIZED != auction.status,
-            "auction finalized"
-        );
-
-        require(
-            AuctionStorage.Status.PROCESSED != auction.status,
-            "auction processed"
-        );
+        _auctionNotFinalizedOrProcessed(auction.status);
         _;
+    }
+
+    /**
+     * @dev Throws if auction ended
+     */
+    modifier limitOrdersAllowed(uint64 epoch) {
+        AuctionStorage.Layout storage l = AuctionStorage.layout();
+        AuctionStorage.Auction storage auction = l.auctions[epoch];
+
+        _auctionNotFinalizedOrProcessed(auction.status);
+
+        require(auction.endTime > 0, "end time is not set");
+        require(block.timestamp <= auction.endTime, "auction has ended");
+        _;
+    }
+
+    /**
+     * @dev Throws if auction is not in progress
+     */
+    modifier marketOrdersAllowed(uint64 epoch) {
+        AuctionStorage.Layout storage l = AuctionStorage.layout();
+        AuctionStorage.Auction storage auction = l.auctions[epoch];
+
+        _auctionNotFinalizedOrProcessed(auction.status);
+
+        require(auction.startTime > 0, "start time is not set");
+        require(block.timestamp >= auction.startTime, "auction not started");
+
+        require(auction.endTime > 0, "end time is not set");
+        require(block.timestamp <= auction.endTime, "auction has ended");
+        _;
+    }
+
+    /************************************************
+     *  ADMIN
+     ***********************************************/
+
+    /**
+     * @notice sets a new Exchange Helper contract
+     * @param newExchangeHelper is the new Exchange Helper contract address
+     */
+    function _setExchangeHelper(address newExchangeHelper) internal {
+        AuctionStorage.Layout storage l = AuctionStorage.layout();
+
+        require(newExchangeHelper != address(0), "address not provided");
+        require(
+            newExchangeHelper != address(l.Exchange),
+            "new address equals old"
+        );
+
+        emit ExchangeHelperSet(
+            address(l.Exchange),
+            newExchangeHelper,
+            msg.sender
+        );
+
+        l.Exchange = IExchangeHelper(newExchangeHelper);
     }
 
     /************************************************
@@ -287,37 +308,6 @@ contract AuctionInternal is IAuctionEvents {
      ***********************************************/
 
     /**
-     * @notice adds an order specified by the price and size
-     * @dev sender must approve contract
-     * @param epoch epoch id
-     * @param price64x64 max price as 64x64 fixed point number
-     * @param size amount of contracts
-     */
-    function _addLimitOrder(
-        uint64 epoch,
-        int128 price64x64,
-        uint256 size
-    ) internal {
-        AuctionStorage.Layout storage l = AuctionStorage.layout();
-        AuctionStorage.Auction storage auction = l.auctions[epoch];
-
-        require(price64x64 > 0, "price <= 0");
-        require(size > l.minSize, "size < minimum");
-
-        uint256 cost = price64x64.mulu(size);
-        ERC20.safeTransferFrom(msg.sender, address(this), cost);
-        l.epochsByBuyer[msg.sender].add(epoch);
-
-        uint256 id = l.orderbooks[epoch]._insert(price64x64, size, msg.sender);
-
-        if (block.timestamp >= auction.startTime) {
-            _finalizeAuction(epoch);
-        }
-
-        emit OrderAdded(epoch, id, msg.sender, price64x64, size, true);
-    }
-
-    /**
      * @notice cancels an order
      * @dev sender must approve contract
      * @param epoch epoch id
@@ -346,38 +336,6 @@ contract AuctionInternal is IAuctionEvents {
         ERC20.safeTransfer(msg.sender, cost);
 
         emit OrderCanceled(epoch, id, msg.sender);
-    }
-
-    /**
-     * @notice adds an order specified by size only
-     * @dev sender must approve contract
-     * @param epoch epoch id
-     * @param size amount of contracts
-     * @param maxCost max cost of buyer is willing to pay
-     */
-    function _addMarketOrder(
-        uint64 epoch,
-        uint256 size,
-        uint256 maxCost
-    ) internal {
-        AuctionStorage.Layout storage l = AuctionStorage.layout();
-
-        require(size >= l.minSize, "size < minimum");
-
-        int128 price64x64 = _priceCurve64x64(epoch);
-        uint256 cost = price64x64.mulu(size);
-
-        require(maxCost >= cost, "cost > maxCost");
-
-        ERC20.safeTransferFrom(msg.sender, address(this), cost);
-
-        l.epochsByBuyer[msg.sender].add(epoch);
-
-        uint256 id = l.orderbooks[epoch]._insert(price64x64, size, msg.sender);
-
-        _finalizeAuction(epoch);
-
-        emit OrderAdded(epoch, id, msg.sender, price64x64, size, false);
     }
 
     /************************************************
@@ -659,6 +617,137 @@ contract AuctionInternal is IAuctionEvents {
         }
 
         return auction.totalContracts;
+    }
+
+    /************************************************
+     *  PURCHASE HELPERS
+     ***********************************************/
+
+    function _validateLimitOrder(
+        AuctionStorage.Layout storage l,
+        int128 price64x64,
+        uint256 size
+    ) internal view returns (uint256) {
+        require(price64x64 > 0, "price <= 0");
+        require(size >= l.minSize, "size < minimum");
+
+        uint256 cost = price64x64.mulu(size);
+        return cost;
+    }
+
+    function _validateMarketOrder(
+        AuctionStorage.Layout storage l,
+        uint64 epoch,
+        uint256 size,
+        uint256 maxCost
+    ) internal view returns (int128, uint256) {
+        require(size >= l.minSize, "size < minimum");
+
+        int128 price64x64 = _priceCurve64x64(epoch);
+        uint256 cost = price64x64.mulu(size);
+
+        require(maxCost >= cost, "cost > maxCost");
+        return (price64x64, cost);
+    }
+
+    function _transferAssets(
+        uint256 credited,
+        uint256 cost,
+        address receiver
+    ) internal {
+        if (credited > cost) {
+            // refund buyer1 the amount overpaid
+            ERC20.safeTransfer(receiver, credited - cost);
+        } else if (cost > credited) {
+            // an approve() by the msg.sender is required beforehand
+            ERC20.safeTransferFrom(receiver, address(this), cost - credited);
+        }
+    }
+
+    function _addOrder(
+        AuctionStorage.Layout storage l,
+        uint64 epoch,
+        int128 price64x64,
+        uint256 size,
+        bool isLimitOrder
+    ) internal {
+        AuctionStorage.Auction storage auction = l.auctions[epoch];
+
+        l.epochsByBuyer[msg.sender].add(epoch);
+
+        uint256 id = l.orderbooks[epoch]._insert(price64x64, size, msg.sender);
+
+        if (block.timestamp >= auction.startTime) {
+            _finalizeAuction(epoch);
+        }
+
+        emit OrderAdded(epoch, id, msg.sender, price64x64, size, isLimitOrder);
+    }
+
+    function _wrapNativeToken(uint256 amount) internal returns (uint256) {
+        uint256 credit;
+
+        if (msg.value > 0) {
+            require(
+                address(ERC20) == address(WETH),
+                "collateral token != wETH"
+            );
+
+            if (msg.value > amount) {
+                unchecked {
+                    (bool success, ) =
+                        payable(msg.sender).call{value: msg.value - amount}("");
+
+                    require(success, "ETH refund failed");
+
+                    credit = amount;
+                }
+            } else {
+                credit = msg.value;
+            }
+
+            WETH.deposit{value: credit}();
+        }
+
+        return credit;
+    }
+
+    function _swapForPoolTokens(
+        IExchangeHelper Exchange,
+        IExchangeHelper.SwapArgs calldata s,
+        address tokenOut
+    ) internal returns (uint256) {
+        if (msg.value > 0) {
+            require(s.tokenIn == address(WETH), "tokenIn != wETH");
+            WETH.deposit{value: msg.value}();
+            WETH.transfer(address(Exchange), msg.value);
+        }
+
+        if (s.amountInMax > 0) {
+            IERC20(s.tokenIn).safeTransferFrom(
+                msg.sender,
+                address(Exchange),
+                s.amountInMax
+            );
+        }
+
+        uint256 amountCredited =
+            Exchange.swapWithToken(
+                s.tokenIn,
+                tokenOut,
+                s.amountInMax + msg.value,
+                s.callee,
+                s.allowanceTarget,
+                s.data,
+                s.refundAddress
+            );
+
+        require(
+            amountCredited >= s.amountOutMin,
+            "not enough output from trade"
+        );
+
+        return amountCredited;
     }
 
     /************************************************

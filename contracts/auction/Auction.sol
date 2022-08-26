@@ -4,18 +4,34 @@ pragma solidity ^0.8.0;
 import "@solidstate/contracts/introspection/ERC165Storage.sol";
 import "@solidstate/contracts/utils/ReentrancyGuard.sol";
 
+import "../libraries/Helpers.sol";
+
 import "./AuctionInternal.sol";
 import "./IAuction.sol";
 
 contract Auction is AuctionInternal, IAuction, ReentrancyGuard {
+    using ABDKMath64x64 for int128;
     using AuctionStorage for AuctionStorage.Layout;
     using ERC165Storage for ERC165Storage.Layout;
+    using SafeERC20 for IERC20;
 
     constructor(
         bool isCall,
         address pool,
-        address vault
-    ) AuctionInternal(isCall, pool, vault) {}
+        address vault,
+        address weth
+    ) AuctionInternal(isCall, pool, vault, weth) {}
+
+    /************************************************
+     *  ADMIN
+     ***********************************************/
+
+    /**
+     * @inheritdoc IAuction
+     */
+    function setExchangeHelper(address newExchangeHelper) external onlyOwner {
+        _setExchangeHelper(newExchangeHelper);
+    }
 
     /************************************************
      *  INITIALIZE AUCTION
@@ -38,7 +54,11 @@ contract Auction is AuctionInternal, IAuction, ReentrancyGuard {
         uint64 epoch,
         int128 maxPrice64x64,
         int128 minPrice64x64
-    ) external auctionInitialized(epoch) onlyVault {
+    )
+        external
+        auctionStatus(AuctionStorage.Status.INITIALIZED, epoch)
+        onlyVault
+    {
         _setAuctionPrices(epoch, maxPrice64x64, minPrice64x64);
     }
 
@@ -78,13 +98,29 @@ contract Auction is AuctionInternal, IAuction, ReentrancyGuard {
         uint64 epoch,
         int128 price64x64,
         uint256 size
-    )
-        external
-        auctionNotFinalizedOrProcessed(epoch)
-        auctionHasNotEnded(epoch)
-        nonReentrant
-    {
-        return _addLimitOrder(epoch, price64x64, size);
+    ) external payable limitOrdersAllowed(epoch) nonReentrant {
+        AuctionStorage.Layout storage l = AuctionStorage.layout();
+        uint256 cost = _validateLimitOrder(l, price64x64, size);
+        uint256 credited = _wrapNativeToken(cost);
+        // an approve() by the msg.sender is required beforehand
+        ERC20.safeTransferFrom(msg.sender, address(this), cost - credited);
+        _addOrder(l, epoch, price64x64, size, true);
+    }
+
+    /**
+     * @inheritdoc IAuction
+     */
+    function swapAndAddLimitOrder(
+        IExchangeHelper.SwapArgs calldata s,
+        uint64 epoch,
+        int128 price64x64,
+        uint256 size
+    ) external payable limitOrdersAllowed(epoch) nonReentrant {
+        AuctionStorage.Layout storage l = AuctionStorage.layout();
+        uint256 cost = _validateLimitOrder(l, price64x64, size);
+        uint256 credited = _swapForPoolTokens(l.Exchange, s, address(ERC20));
+        _transferAssets(credited, cost, msg.sender);
+        _addOrder(l, epoch, price64x64, size, true);
     }
 
     /**
@@ -92,8 +128,7 @@ contract Auction is AuctionInternal, IAuction, ReentrancyGuard {
      */
     function cancelLimitOrder(uint64 epoch, uint256 id)
         external
-        auctionNotFinalizedOrProcessed(epoch)
-        auctionHasNotEnded(epoch)
+        limitOrdersAllowed(epoch)
         nonReentrant
     {
         _cancelLimitOrder(epoch, id);
@@ -106,14 +141,35 @@ contract Auction is AuctionInternal, IAuction, ReentrancyGuard {
         uint64 epoch,
         uint256 size,
         uint256 maxCost
-    )
-        external
-        auctionNotFinalizedOrProcessed(epoch)
-        auctionHasStarted(epoch)
-        auctionHasNotEnded(epoch)
-        nonReentrant
-    {
-        return _addMarketOrder(epoch, size, maxCost);
+    ) external payable marketOrdersAllowed(epoch) nonReentrant {
+        AuctionStorage.Layout storage l = AuctionStorage.layout();
+
+        (int128 price64x64, uint256 cost) =
+            _validateMarketOrder(l, epoch, size, maxCost);
+
+        uint256 credited = _wrapNativeToken(cost);
+        // an approve() by the msg.sender is required beforehand
+        ERC20.safeTransferFrom(msg.sender, address(this), cost - credited);
+        _addOrder(l, epoch, price64x64, size, false);
+    }
+
+    /**
+     * @inheritdoc IAuction
+     */
+    function swapAndAddMarketOrder(
+        IExchangeHelper.SwapArgs calldata s,
+        uint64 epoch,
+        uint256 size,
+        uint256 maxCost
+    ) external payable marketOrdersAllowed(epoch) nonReentrant {
+        AuctionStorage.Layout storage l = AuctionStorage.layout();
+
+        (int128 price64x64, uint256 cost) =
+            _validateMarketOrder(l, epoch, size, maxCost);
+
+        uint256 credited = _swapForPoolTokens(l.Exchange, s, address(ERC20));
+        _transferAssets(credited, cost, msg.sender);
+        _addOrder(l, epoch, price64x64, size, false);
     }
 
     /************************************************
@@ -125,7 +181,7 @@ contract Auction is AuctionInternal, IAuction, ReentrancyGuard {
      */
     function withdraw(uint64 epoch)
         external
-        auctionProcessed(epoch)
+        auctionStatus(AuctionStorage.Status.PROCESSED, epoch)
         nonReentrant
     {
         _withdraw(epoch);
@@ -168,7 +224,7 @@ contract Auction is AuctionInternal, IAuction, ReentrancyGuard {
      */
     function transferPremium(uint64 epoch)
         external
-        auctionFinalized(epoch)
+        auctionStatus(AuctionStorage.Status.FINALIZED, epoch)
         onlyVault
         returns (uint256)
     {
@@ -180,7 +236,7 @@ contract Auction is AuctionInternal, IAuction, ReentrancyGuard {
      */
     function processAuction(uint64 epoch)
         external
-        auctionFinalized(epoch)
+        auctionStatus(AuctionStorage.Status.FINALIZED, epoch)
         onlyVault
     {
         _processAuction(epoch);

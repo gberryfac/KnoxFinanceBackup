@@ -12,6 +12,12 @@ interface IAuctionEvents {
         int128 minPrice64x64
     );
 
+    event ExchangeHelperSet(
+        address oldExchangeHelper,
+        address newExchangeHelper,
+        address caller
+    );
+
     event OrderAdded(
         uint64 indexed epoch,
         uint256 id,

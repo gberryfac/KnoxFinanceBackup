@@ -1,9 +1,9 @@
 import { ethers } from "hardhat";
 import { BigNumber, ContractTransaction } from "ethers";
-const { parseUnits } = ethers.utils;
-
-import { fixedFromFloat, fixedToBn, fixedToNumber } from "@premia/utils";
+import { parseUnits } from "ethers/lib/utils";
+const { provider } = ethers;
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
+import { fixedFromFloat, fixedToBn, fixedToNumber } from "@premia/utils";
 
 import chai, { expect } from "chai";
 import chaiAlmost from "chai-almost";
@@ -13,10 +13,17 @@ chai.use(chaiAlmost());
 import moment from "moment-timezone";
 moment.tz.setDefault("UTC");
 
-import { Auction, IPremiaPool, IVault, MockERC20 } from "../types";
+import {
+  Auction,
+  ExchangeHelper,
+  IPremiaPool,
+  IVault,
+  MockERC20,
+} from "../types";
 
 import {
   accounts,
+  almost,
   assert,
   math,
   time,
@@ -24,6 +31,7 @@ import {
   KnoxUtil,
   PoolUtil,
   getEventArgs,
+  uniswap,
 } from "../test/utils";
 
 interface AuctionBehaviorArgs {
@@ -38,6 +46,8 @@ enum Status {
   PROCESSED,
 }
 
+const gasPrice = parseUnits("0.1", "gwei");
+
 export function describeBehaviorOfAuction(
   { getKnoxUtil, getParams }: AuctionBehaviorArgs,
   skips?: string[]
@@ -51,11 +61,16 @@ export function describeBehaviorOfAuction(
     let asset: MockERC20;
     let auction: Auction;
     let vault: IVault;
+    let exchange: ExchangeHelper;
     let pool: IPremiaPool;
+    let weth: MockERC20;
 
     // Contract Utilities
     let knoxUtil: KnoxUtil;
     let poolUtil: PoolUtil;
+
+    // Pool Utilities
+    let uni: uniswap.IUniswap;
 
     const params = getParams();
 
@@ -77,13 +92,20 @@ export function describeBehaviorOfAuction(
       vault = knoxUtil.vaultUtil.vault;
       pool = knoxUtil.poolUtil.pool;
       auction = knoxUtil.auction;
+      exchange = knoxUtil.exchange;
 
       poolUtil = knoxUtil.poolUtil;
+      weth = poolUtil.weth;
+      uni = knoxUtil.uni;
 
       await asset.connect(signers.buyer1).mint(addresses.buyer1, params.mint);
       await asset.connect(signers.buyer2).mint(addresses.buyer2, params.mint);
       await asset.connect(signers.buyer3).mint(addresses.buyer3, params.mint);
       await asset.connect(signers.vault).mint(addresses.vault, params.mint);
+
+      await uni.tokenIn
+        .connect(signers.buyer1)
+        .mint(addresses.buyer1, params.mint);
 
       signers.vault = await accounts.impersonateVault(signers, addresses);
     });
@@ -220,6 +242,7 @@ export function describeBehaviorOfAuction(
       it("should initialize Auction with correct state", async () => {
         await assert.equal(await auction.ERC20(), asset.address);
         await assert.equal(await auction.Vault(), addresses.vault);
+        await assert.equal(await auction.WETH(), poolUtil.weth.address);
         await assert.bnEqual(await auction.getMinSize(), params.minSize);
       });
     });
@@ -359,7 +382,7 @@ export function describeBehaviorOfAuction(
             auction
               .connect(signers.vault)
               .setAuctionPrices(0, maxPrice64x64, minPrice64x64)
-          ).to.be.revertedWith("auction !initialized");
+          ).to.be.revertedWith("restricted");
         });
       });
 
@@ -426,6 +449,38 @@ export function describeBehaviorOfAuction(
       });
     });
 
+    describe("#setExchangeHelper(address)", () => {
+      time.revertToSnapshotAfterEach(async () => {});
+
+      it("should revert if !owner", async () => {
+        await expect(
+          auction.setExchangeHelper(addresses.lp1)
+        ).to.be.revertedWith("Ownable: sender must be owner");
+      });
+
+      it("should revert if address is 0x0", async () => {
+        await expect(
+          auction
+            .connect(signers.deployer)
+            .setExchangeHelper(ethers.constants.AddressZero)
+        ).to.be.revertedWith("address not provided");
+      });
+
+      it("should revert if new address == old address", async () => {
+        await expect(
+          auction.connect(signers.deployer).setExchangeHelper(exchange.address)
+        ).to.be.revertedWith("new address equals old");
+      });
+
+      it("should set new exchange helper address", async () => {
+        await expect(
+          auction.connect(signers.deployer).setExchangeHelper(addresses.lp1)
+        )
+          .to.emit(auction, "ExchangeHelperSet")
+          .withArgs(addresses.exchange, addresses.lp1, addresses.deployer);
+      });
+    });
+
     describe("#priceCurve64x64(uint64)", () => {
       describe("if not initialized", () => {
         it("should revert", async () => {
@@ -469,7 +524,7 @@ export function describeBehaviorOfAuction(
       });
     });
 
-    describe("#addLimitOrder(uint64,uint256,uint256)", () => {
+    describe("#addLimitOrder(uint64,int128,uint256)", () => {
       describe("if not initialized", () => {
         it("should revert", async () => {
           await expect(
@@ -595,6 +650,152 @@ export function describeBehaviorOfAuction(
           assert.equal(epochByBuyer.length, 1);
           assert.bnEqual(epochByBuyer[0], epoch);
         });
+
+        if (params.collateral.name === "wETH") {
+          it("should send credit to buyer if they send too much ETH", async () => {
+            let order = await auction.getOrderById(epoch, 1);
+            assert.equal(order.buyer, ethers.constants.AddressZero);
+
+            const auctionWETHBalanceBefore = await weth.balanceOf(
+              addresses.auction
+            );
+
+            const buyer1WETHBalanceBefore = await weth.balanceOf(
+              addresses.buyer1
+            );
+
+            const buyer1ETHBalanceBefore = await provider.getBalance(
+              addresses.buyer1
+            );
+
+            await asset
+              .connect(signers.buyer1)
+              .approve(addresses.auction, ethers.constants.MaxUint256);
+
+            const expectedCost = parseUnits(
+              (math.bnToNumber(params.size) * params.price.max).toString()
+            );
+
+            const ethSent = expectedCost.mul(2);
+
+            const tx = await auction.addLimitOrder(
+              epoch,
+              fixedFromFloat(params.price.max),
+              params.size,
+              { value: ethSent, gasPrice }
+            );
+            const receipt = await tx.wait();
+            const gasFee = receipt.gasUsed.mul(gasPrice);
+
+            order = await auction.getOrderById(epoch, 1);
+            assert.equal(order.buyer, addresses.buyer1);
+
+            const auctionWETHBalanceAfter = await weth.balanceOf(
+              addresses.auction
+            );
+
+            const buyer1WETHBalanceAfter = await weth.balanceOf(
+              addresses.buyer1
+            );
+
+            const buyer1ETHBalanceAfter = await provider.getBalance(
+              addresses.buyer1
+            );
+
+            almost(
+              auctionWETHBalanceAfter.sub(auctionWETHBalanceBefore),
+              expectedCost
+            );
+
+            almost(buyer1WETHBalanceAfter, buyer1WETHBalanceBefore);
+
+            almost(
+              buyer1ETHBalanceBefore.sub(buyer1ETHBalanceAfter).sub(gasFee),
+              expectedCost
+            );
+          });
+
+          it("should transfer remainder if buyer does not send enough ETH", async () => {
+            let order = await auction.getOrderById(epoch, 1);
+            assert.equal(order.buyer, ethers.constants.AddressZero);
+
+            const auctionWETHBalanceBefore = await weth.balanceOf(
+              addresses.auction
+            );
+
+            const buyer1WETHBalanceBefore = await weth.balanceOf(
+              addresses.buyer1
+            );
+
+            const buyer1ETHBalanceBefore = await provider.getBalance(
+              addresses.buyer1
+            );
+
+            await asset
+              .connect(signers.buyer1)
+              .approve(addresses.auction, ethers.constants.MaxUint256);
+
+            const expectedCost = parseUnits(
+              (math.bnToNumber(params.size) * params.price.max).toString()
+            );
+
+            const ethSent = expectedCost.div(2);
+
+            const tx = await auction.addLimitOrder(
+              epoch,
+              fixedFromFloat(params.price.max),
+              params.size,
+              { value: ethSent, gasPrice }
+            );
+            const receipt = await tx.wait();
+            const gasFee = receipt.gasUsed.mul(gasPrice);
+
+            order = await auction.getOrderById(epoch, 1);
+            assert.equal(order.buyer, addresses.buyer1);
+
+            const auctionWETHBalanceAfter = await weth.balanceOf(
+              addresses.auction
+            );
+
+            const buyer1WETHBalanceAfter = await weth.balanceOf(
+              addresses.buyer1
+            );
+
+            const buyer1ETHBalanceAfter = await provider.getBalance(
+              addresses.buyer1
+            );
+
+            almost(
+              auctionWETHBalanceAfter.sub(auctionWETHBalanceBefore),
+              expectedCost
+            );
+
+            almost(
+              buyer1WETHBalanceBefore.sub(buyer1WETHBalanceAfter),
+              expectedCost.sub(ethSent)
+            );
+
+            almost(
+              buyer1ETHBalanceBefore.sub(buyer1ETHBalanceAfter).sub(gasFee),
+              ethSent
+            );
+          });
+        } else {
+          it("should revert if collateral token != wETH", async () => {
+            await asset
+              .connect(signers.buyer1)
+              .approve(addresses.auction, ethers.constants.MaxUint256);
+
+            await expect(
+              auction.addLimitOrder(
+                epoch,
+                fixedFromFloat(params.price.max),
+                params.size,
+                { value: params.size }
+              )
+            ).to.be.revertedWith("collateral token != wETH");
+          });
+        }
       });
 
       describe("else if auction has started", () => {
@@ -660,6 +861,367 @@ export function describeBehaviorOfAuction(
               params.size
             )
           ).to.be.revertedWith("auction processed");
+        });
+      });
+    });
+
+    describe("#swapAndAddLimitOrder(SwapArgs,uint64,int128,uint256)", () => {
+      describe("else if auction has not started", () => {
+        let epoch: BigNumber;
+        let tokenIn: MockERC20;
+        let tokenOut: MockERC20;
+        let path: string[];
+
+        time.revertToSnapshotAfterEach(async () => {
+          [, , epoch] = await knoxUtil.setAndInitializeAuction();
+
+          tokenIn = uni.tokenIn;
+
+          tokenOut = params.isCall
+            ? poolUtil.underlyingAsset
+            : poolUtil.baseAsset;
+
+          path =
+            tokenOut.address === weth.address
+              ? [tokenIn.address, weth.address]
+              : [tokenIn.address, weth.address, tokenOut.address];
+        });
+
+        it("should revert if buyer sends ETH and tokenIn !== wETH", async () => {
+          let order = await auction.getOrderById(epoch, 1);
+          assert.equal(order.buyer, ethers.constants.AddressZero);
+
+          const expectedCost = parseUnits(
+            (math.bnToNumber(params.size) * params.price.max).toString()
+          );
+
+          const amountOutMin = expectedCost;
+
+          const [amountIn] = await uni.router.getAmountsIn(amountOutMin, path);
+
+          const iface = new ethers.utils.Interface(uniswap.abi);
+
+          const data = iface.encodeFunctionData("swapExactTokensForTokens", [
+            amountIn,
+            amountOutMin,
+            path,
+            exchange.address,
+            (await time.now()) + 86400,
+          ]);
+
+          await tokenIn
+            .connect(signers.buyer1)
+            .approve(addresses.auction, ethers.constants.MaxUint256);
+
+          // buyer1 sends partial amount of tokenIn needed to execute order, remaining collateral tokens are transferred to auction
+          const tx = auction.connect(signers.buyer1).swapAndAddLimitOrder(
+            {
+              tokenIn: tokenIn.address,
+              amountInMax: amountIn,
+              amountOutMin: amountOutMin,
+              callee: uni.router.address,
+              allowanceTarget: uni.router.address,
+              data,
+              refundAddress: addresses.buyer1,
+            },
+            epoch,
+            fixedFromFloat(params.price.max),
+            params.size,
+            { value: amountIn }
+          );
+
+          await expect(tx).to.be.revertedWith("tokenIn != wETH");
+        });
+
+        if (params.collateral.name !== "wETH") {
+          it("should execute limit order using ETH only", async () => {
+            let order = await auction.getOrderById(epoch, 1);
+            assert.equal(order.buyer, ethers.constants.AddressZero);
+
+            const expectedCost = parseUnits(
+              (math.bnToNumber(params.size) * params.price.max).toString()
+            );
+
+            path = [weth.address, tokenOut.address];
+
+            const [amountOut] = await uni.router.getAmountsIn(
+              expectedCost,
+              path
+            );
+
+            const amountInMax = amountOut.mul(120).div(100);
+
+            const iface = new ethers.utils.Interface(uniswap.abi);
+
+            const data = iface.encodeFunctionData("swapTokensForExactTokens", [
+              amountOut,
+              amountInMax,
+              path,
+              exchange.address,
+              (await time.now()) + 86400,
+            ]);
+
+            const auctionETHBalanceBefore = await provider.getBalance(
+              addresses.auction
+            );
+
+            const auctionTokenOutBalanceBefore = await tokenOut.balanceOf(
+              addresses.auction
+            );
+
+            const buyer1ETHBalanceBefore = await provider.getBalance(
+              addresses.buyer1
+            );
+
+            const buyer1TokenOutBalanceBefore = await tokenOut.balanceOf(
+              addresses.buyer1
+            );
+
+            await auction.connect(signers.buyer1).swapAndAddLimitOrder(
+              {
+                tokenIn: weth.address,
+                amountInMax: 0,
+                amountOutMin: amountOut,
+                callee: uni.router.address,
+                allowanceTarget: uni.router.address,
+                data,
+                refundAddress: addresses.buyer1,
+              },
+              epoch,
+              fixedFromFloat(params.price.max),
+              params.size,
+              { value: amountInMax }
+            );
+
+            order = await auction.getOrderById(epoch, 1);
+            assert.equal(order.buyer, addresses.buyer1);
+
+            const auctionETHBalanceAfter = await provider.getBalance(
+              addresses.auction
+            );
+
+            const auctionTokenOutBalanceAfter = await tokenOut.balanceOf(
+              addresses.auction
+            );
+
+            const buyer1ETHBalanceAfter = await provider.getBalance(
+              addresses.buyer1
+            );
+
+            const buyer1TokenOutBalanceAfter = await tokenOut.balanceOf(
+              addresses.buyer1
+            );
+
+            almost(auctionETHBalanceAfter, auctionETHBalanceBefore);
+
+            almost(
+              auctionTokenOutBalanceAfter.sub(auctionTokenOutBalanceBefore),
+              expectedCost
+            );
+
+            almost(
+              buyer1ETHBalanceBefore.sub(buyer1ETHBalanceAfter),
+              amountInMax
+            );
+
+            almost(buyer1TokenOutBalanceAfter, buyer1TokenOutBalanceBefore);
+          });
+        }
+
+        it("should execute limit order using collateral and non-collateral ERC20 token", async () => {
+          let order = await auction.getOrderById(epoch, 1);
+          assert.equal(order.buyer, ethers.constants.AddressZero);
+
+          const expectedCost = parseUnits(
+            (math.bnToNumber(params.size) * params.price.max).toString()
+          );
+
+          const amountOutMin = expectedCost.div(2);
+
+          const [amountIn] = await uni.router.getAmountsIn(amountOutMin, path);
+
+          const iface = new ethers.utils.Interface(uniswap.abi);
+
+          const data = iface.encodeFunctionData("swapExactTokensForTokens", [
+            amountIn,
+            amountOutMin,
+            path,
+            exchange.address,
+            (await time.now()) + 86400,
+          ]);
+
+          const auctionTokenInBalanceBefore = await tokenIn.balanceOf(
+            addresses.auction
+          );
+
+          const auctionTokenOutBalanceBefore = await tokenOut.balanceOf(
+            addresses.auction
+          );
+
+          const buyer1TokenInBalanceBefore = await tokenIn.balanceOf(
+            addresses.buyer1
+          );
+
+          const buyer1TokenOutBalanceBefore = await tokenOut.balanceOf(
+            addresses.buyer1
+          );
+
+          await tokenIn
+            .connect(signers.buyer1)
+            .approve(addresses.auction, ethers.constants.MaxUint256);
+
+          await tokenOut
+            .connect(signers.buyer1)
+            .approve(addresses.auction, ethers.constants.MaxUint256);
+
+          // buyer1 sends partial amount of tokenIn needed to execute order, remaining collateral tokens are transferred to auction
+          await auction.connect(signers.buyer1).swapAndAddLimitOrder(
+            {
+              tokenIn: tokenIn.address,
+              amountInMax: amountIn,
+              amountOutMin: amountOutMin,
+              callee: uni.router.address,
+              allowanceTarget: uni.router.address,
+              data,
+              refundAddress: addresses.buyer1,
+            },
+            epoch,
+            fixedFromFloat(params.price.max),
+            params.size
+          );
+
+          order = await auction.getOrderById(epoch, 1);
+          assert.equal(order.buyer, addresses.buyer1);
+
+          const auctionTokenInBalanceAfter = await tokenIn.balanceOf(
+            addresses.auction
+          );
+
+          const auctionTokenOutBalanceAfter = await tokenOut.balanceOf(
+            addresses.auction
+          );
+
+          const buyer1TokenInBalanceAfter = await tokenIn.balanceOf(
+            addresses.buyer1
+          );
+
+          const buyer1TokenOutBalanceAfter = await tokenOut.balanceOf(
+            addresses.buyer1
+          );
+
+          almost(auctionTokenInBalanceAfter, auctionTokenInBalanceBefore);
+
+          almost(
+            auctionTokenOutBalanceAfter.sub(auctionTokenOutBalanceBefore),
+            expectedCost
+          );
+
+          almost(
+            buyer1TokenInBalanceBefore.sub(buyer1TokenInBalanceAfter),
+            amountIn
+          );
+
+          // buyer1 should only send amount remaining in collateral tokens after swapping
+          almost(
+            buyer1TokenOutBalanceBefore.sub(buyer1TokenOutBalanceAfter),
+            expectedCost.sub(amountOutMin)
+          );
+        });
+
+        it("should execute limit order using non-collateral ERC20 token only", async () => {
+          let order = await auction.getOrderById(epoch, 1);
+          assert.equal(order.buyer, ethers.constants.AddressZero);
+
+          const expectedCost = parseUnits(
+            (math.bnToNumber(params.size) * params.price.max).toString()
+          );
+
+          const amountOutMin = expectedCost.mul(2);
+
+          const [amountIn] = await uni.router.getAmountsIn(amountOutMin, path);
+
+          const iface = new ethers.utils.Interface(uniswap.abi);
+
+          const data = iface.encodeFunctionData("swapExactTokensForTokens", [
+            amountIn,
+            amountOutMin,
+            path,
+            exchange.address,
+            (await time.now()) + 86400,
+          ]);
+
+          const auctionTokenInBalanceBefore = await tokenIn.balanceOf(
+            addresses.auction
+          );
+
+          const auctionTokenOutBalanceBefore = await tokenOut.balanceOf(
+            addresses.auction
+          );
+
+          const buyer1TokenInBalanceBefore = await tokenIn.balanceOf(
+            addresses.buyer1
+          );
+
+          const buyer1TokenOutBalanceBefore = await tokenOut.balanceOf(
+            addresses.buyer1
+          );
+
+          await tokenIn
+            .connect(signers.buyer1)
+            .approve(addresses.auction, ethers.constants.MaxUint256);
+
+          // buyer1 sends double the amount of tokenIn needed to execute order
+          await auction.connect(signers.buyer1).swapAndAddLimitOrder(
+            {
+              tokenIn: tokenIn.address,
+              amountInMax: amountIn,
+              amountOutMin: amountOutMin,
+              callee: uni.router.address,
+              allowanceTarget: uni.router.address,
+              data,
+              refundAddress: addresses.buyer1,
+            },
+            epoch,
+            fixedFromFloat(params.price.max),
+            params.size
+          );
+
+          order = await auction.getOrderById(epoch, 1);
+          assert.equal(order.buyer, addresses.buyer1);
+
+          const auctionTokenInBalanceAfter = await tokenIn.balanceOf(
+            addresses.auction
+          );
+
+          const auctionTokenOutBalanceAfter = await tokenOut.balanceOf(
+            addresses.auction
+          );
+
+          const buyer1TokenInBalanceAfter = await tokenIn.balanceOf(
+            addresses.buyer1
+          );
+
+          const buyer1TokenOutBalanceAfter = await tokenOut.balanceOf(
+            addresses.buyer1
+          );
+
+          almost(auctionTokenInBalanceAfter, auctionTokenInBalanceBefore);
+
+          almost(
+            auctionTokenOutBalanceAfter.sub(auctionTokenOutBalanceBefore),
+            expectedCost
+          );
+
+          almost(
+            buyer1TokenInBalanceBefore.sub(buyer1TokenInBalanceAfter),
+            amountIn
+          );
+
+          // buyer1 should receive amount overpaid
+          almost(
+            buyer1TokenOutBalanceAfter.sub(buyer1TokenOutBalanceBefore),
+            amountOutMin.sub(expectedCost)
+          );
         });
       });
     });
@@ -1029,6 +1591,141 @@ export function describeBehaviorOfAuction(
           assert.equal(epochByBuyer.length, 1);
           assert.bnEqual(epochByBuyer[0], epoch);
         });
+
+        if (params.collateral.name === "wETH") {
+          it("should send credit to buyer if they send too much ETH", async () => {
+            let order = await auction.getOrderById(epoch, 1);
+            assert.equal(order.buyer, ethers.constants.AddressZero);
+
+            const auctionWETHBalanceBefore = await weth.balanceOf(
+              addresses.auction
+            );
+
+            const buyer1ETHBalanceBefore = await provider.getBalance(
+              addresses.buyer1
+            );
+
+            await asset
+              .connect(signers.buyer1)
+              .approve(addresses.auction, ethers.constants.MaxUint256);
+
+            const estimatedCost = parseUnits(
+              (math.bnToNumber(params.size) * params.price.max).toString()
+            );
+
+            const ethSent = estimatedCost.mul(2);
+
+            const tx = await auction.addMarketOrder(
+              epoch,
+              params.size,
+              ethers.constants.MaxUint256,
+              { value: ethSent, gasPrice }
+            );
+
+            const args = await getEventArgs(tx, "OrderAdded");
+            const expectedCost = params.size
+              .mul(fixedToBn(args.price64x64))
+              .div((10 ** params.collateral.decimals).toString());
+
+            const receipt = await tx.wait();
+            const gasFee = receipt.gasUsed.mul(gasPrice);
+
+            order = await auction.getOrderById(epoch, 1);
+            assert.equal(order.buyer, addresses.buyer1);
+
+            const auctionWETHBalanceAfter = await weth.balanceOf(
+              addresses.auction
+            );
+
+            const buyer1ETHBalanceAfter = await provider.getBalance(
+              addresses.buyer1
+            );
+
+            almost(
+              auctionWETHBalanceAfter.sub(auctionWETHBalanceBefore),
+              expectedCost
+            );
+
+            almost(
+              buyer1ETHBalanceBefore.sub(buyer1ETHBalanceAfter).sub(gasFee),
+              expectedCost
+            );
+          });
+
+          it("should transfer remainder if buyer does not send enough ETH", async () => {
+            let order = await auction.getOrderById(epoch, 1);
+            assert.equal(order.buyer, ethers.constants.AddressZero);
+
+            const auctionWETHBalanceBefore = await weth.balanceOf(
+              addresses.auction
+            );
+
+            const buyer1ETHBalanceBefore = await provider.getBalance(
+              addresses.buyer1
+            );
+
+            await asset
+              .connect(signers.buyer1)
+              .approve(addresses.auction, ethers.constants.MaxUint256);
+
+            const estimatedCost = parseUnits(
+              (math.bnToNumber(params.size) * params.price.max).toString()
+            );
+
+            const ethSent = estimatedCost.div(2);
+
+            const tx = await auction.addMarketOrder(
+              epoch,
+              params.size,
+              ethers.constants.MaxUint256,
+              { value: ethSent, gasPrice }
+            );
+
+            const args = await getEventArgs(tx, "OrderAdded");
+            const expectedCost = params.size
+              .mul(fixedToBn(args.price64x64))
+              .div((10 ** params.collateral.decimals).toString());
+
+            const receipt = await tx.wait();
+            const gasFee = receipt.gasUsed.mul(gasPrice);
+
+            order = await auction.getOrderById(epoch, 1);
+            assert.equal(order.buyer, addresses.buyer1);
+
+            const auctionWETHBalanceAfter = await weth.balanceOf(
+              addresses.auction
+            );
+
+            const buyer1ETHBalanceAfter = await provider.getBalance(
+              addresses.buyer1
+            );
+
+            almost(
+              auctionWETHBalanceAfter.sub(auctionWETHBalanceBefore),
+              expectedCost
+            );
+
+            almost(
+              buyer1ETHBalanceBefore.sub(buyer1ETHBalanceAfter).sub(gasFee),
+              ethSent
+            );
+          });
+        } else {
+          it("should revert if collateral token != wETH", async () => {
+            await asset
+              .connect(signers.buyer1)
+              .approve(addresses.auction, ethers.constants.MaxUint256);
+
+            await expect(
+              auction.addMarketOrder(
+                epoch,
+                params.size,
+                ethers.constants.MaxUint256,
+                { value: params.size }
+              )
+            ).to.be.revertedWith("collateral token != wETH");
+          });
+        }
       });
 
       describe("else if finalized", () => {
@@ -1067,6 +1764,396 @@ export function describeBehaviorOfAuction(
           await expect(
             auction.addMarketOrder(0, params.size, ethers.constants.MaxUint256)
           ).to.be.revertedWith("auction processed");
+        });
+      });
+    });
+
+    describe("#swapAndAddMarketOrder(SwapArgs,uint64,uint256,uint256)", () => {
+      describe("else if auction has started", () => {
+        let startTime: BigNumber;
+        let epoch: BigNumber;
+        let tokenIn: MockERC20;
+        let tokenOut: MockERC20;
+        let path: string[];
+
+        time.revertToSnapshotAfterEach(async () => {
+          [startTime, , epoch] = await knoxUtil.setAndInitializeAuction();
+          await time.fastForwardToFriday8AM();
+          await knoxUtil.initializeNextEpoch();
+          await time.increaseTo(startTime);
+
+          tokenIn = uni.tokenIn;
+
+          tokenOut = params.isCall
+            ? poolUtil.underlyingAsset
+            : poolUtil.baseAsset;
+
+          path =
+            tokenOut.address === weth.address
+              ? [tokenIn.address, weth.address]
+              : [tokenIn.address, weth.address, tokenOut.address];
+        });
+
+        it("should revert if buyer sends ETH and tokenIn !== wETH", async () => {
+          let order = await auction.getOrderById(epoch, 1);
+          assert.equal(order.buyer, ethers.constants.AddressZero);
+
+          const expectedCost = parseUnits(
+            (math.bnToNumber(params.size) * params.price.max).toString()
+          );
+
+          const [expectedInputAmount] = await uni.router.getAmountsIn(
+            expectedCost,
+            path
+          );
+
+          const iface = new ethers.utils.Interface(uniswap.abi);
+
+          const data = iface.encodeFunctionData("swapExactTokensForTokens", [
+            expectedInputAmount,
+            expectedCost,
+            path,
+            exchange.address,
+            (await time.now()) + 86400,
+          ]);
+
+          await tokenIn
+            .connect(signers.buyer1)
+            .approve(addresses.auction, ethers.constants.MaxUint256);
+
+          // buyer1 sends partial amount of tokenIn needed to execute order, remaining collateral tokens are transferred to auction
+          const tx = auction.connect(signers.buyer1).swapAndAddMarketOrder(
+            {
+              tokenIn: tokenIn.address,
+              amountInMax: expectedInputAmount,
+              amountOutMin: expectedCost,
+              callee: uni.router.address,
+              allowanceTarget: uni.router.address,
+              data,
+              refundAddress: addresses.buyer1,
+            },
+            epoch,
+            params.size,
+            ethers.constants.MaxUint256,
+            { value: expectedInputAmount }
+          );
+
+          await expect(tx).to.be.revertedWith("tokenIn != wETH");
+        });
+
+        if (params.collateral.name !== "wETH") {
+          it("should execute limit order using ETH only", async () => {
+            let order = await auction.getOrderById(epoch, 1);
+            assert.equal(order.buyer, ethers.constants.AddressZero);
+
+            const maxCost = parseUnits(
+              (math.bnToNumber(params.size) * params.price.max).toString()
+            );
+
+            path = [weth.address, tokenOut.address];
+
+            const [amountOut] = await uni.router.getAmountsIn(maxCost, path);
+
+            const amountInMax = amountOut.mul(120).div(100);
+
+            const iface = new ethers.utils.Interface(uniswap.abi);
+
+            const data = iface.encodeFunctionData("swapTokensForExactTokens", [
+              amountOut,
+              amountInMax,
+              path,
+              exchange.address,
+              (await time.now()) + 86400,
+            ]);
+
+            const auctionETHBalanceBefore = await provider.getBalance(
+              addresses.auction
+            );
+
+            const auctionTokenOutBalanceBefore = await tokenOut.balanceOf(
+              addresses.auction
+            );
+
+            const buyer1ETHBalanceBefore = await provider.getBalance(
+              addresses.buyer1
+            );
+
+            const buyer1TokenOutBalanceBefore = await tokenOut.balanceOf(
+              addresses.buyer1
+            );
+
+            const tx = await auction
+              .connect(signers.buyer1)
+              .swapAndAddMarketOrder(
+                {
+                  tokenIn: weth.address,
+                  amountInMax: 0,
+                  amountOutMin: amountOut,
+                  callee: uni.router.address,
+                  allowanceTarget: uni.router.address,
+                  data,
+                  refundAddress: addresses.buyer1,
+                },
+                epoch,
+                params.size,
+                ethers.constants.MaxUint256,
+                { value: amountInMax }
+              );
+
+            const args = await getEventArgs(tx, "OrderAdded");
+            const expectedCost = params.size
+              .mul(fixedToBn(args.price64x64))
+              .div((10 ** params.collateral.decimals).toString());
+
+            order = await auction.getOrderById(epoch, 1);
+            assert.equal(order.buyer, addresses.buyer1);
+
+            const auctionETHBalanceAfter = await provider.getBalance(
+              addresses.auction
+            );
+
+            const auctionTokenOutBalanceAfter = await tokenOut.balanceOf(
+              addresses.auction
+            );
+
+            const buyer1ETHBalanceAfter = await provider.getBalance(
+              addresses.buyer1
+            );
+
+            const buyer1TokenOutBalanceAfter = await tokenOut.balanceOf(
+              addresses.buyer1
+            );
+
+            almost(auctionETHBalanceAfter, auctionETHBalanceBefore);
+
+            almost(
+              auctionTokenOutBalanceAfter.sub(auctionTokenOutBalanceBefore),
+              expectedCost
+            );
+
+            almost(
+              buyer1ETHBalanceBefore.sub(buyer1ETHBalanceAfter),
+              amountInMax
+            );
+
+            almost(buyer1TokenOutBalanceAfter, buyer1TokenOutBalanceBefore);
+          });
+        }
+
+        it("should execute limit order using collateral and non-collateral ERC20 token", async () => {
+          let order = await auction.getOrderById(epoch, 1);
+          assert.equal(order.buyer, ethers.constants.AddressZero);
+
+          const maxCost = parseUnits(
+            (math.bnToNumber(params.size) * params.price.max).toString()
+          );
+
+          const swapAmountOut = maxCost.div(2);
+
+          const [expectedInputAmount] = await uni.router.getAmountsIn(
+            swapAmountOut,
+            path
+          );
+
+          const iface = new ethers.utils.Interface(uniswap.abi);
+
+          const data = iface.encodeFunctionData("swapExactTokensForTokens", [
+            expectedInputAmount,
+            swapAmountOut,
+            path,
+            exchange.address,
+            (await time.now()) + 86400,
+          ]);
+
+          const auctionTokenInBalanceBefore = await tokenIn.balanceOf(
+            addresses.auction
+          );
+
+          const auctionTokenOutBalanceBefore = await tokenOut.balanceOf(
+            addresses.auction
+          );
+
+          const buyer1TokenInBalanceBefore = await tokenIn.balanceOf(
+            addresses.buyer1
+          );
+
+          const buyer1TokenOutBalanceBefore = await tokenOut.balanceOf(
+            addresses.buyer1
+          );
+
+          await tokenIn
+            .connect(signers.buyer1)
+            .approve(addresses.auction, ethers.constants.MaxUint256);
+
+          await tokenOut
+            .connect(signers.buyer1)
+            .approve(addresses.auction, ethers.constants.MaxUint256);
+
+          // buyer1 sends partial amount of tokenIn needed to execute order, remaining collateral tokens are transferred to auction
+          const tx = await auction
+            .connect(signers.buyer1)
+            .swapAndAddMarketOrder(
+              {
+                tokenIn: tokenIn.address,
+                amountInMax: expectedInputAmount,
+                amountOutMin: swapAmountOut,
+                callee: uni.router.address,
+                allowanceTarget: uni.router.address,
+                data,
+                refundAddress: addresses.buyer1,
+              },
+              epoch,
+              params.size,
+              ethers.constants.MaxUint256
+            );
+
+          const args = await getEventArgs(tx, "OrderAdded");
+          const expectedCost = params.size
+            .mul(fixedToBn(args.price64x64))
+            .div((10 ** params.collateral.decimals).toString());
+
+          order = await auction.getOrderById(epoch, 1);
+          assert.equal(order.buyer, addresses.buyer1);
+
+          const auctionTokenInBalanceAfter = await tokenIn.balanceOf(
+            addresses.auction
+          );
+
+          const auctionTokenOutBalanceAfter = await tokenOut.balanceOf(
+            addresses.auction
+          );
+
+          const buyer1TokenInBalanceAfter = await tokenIn.balanceOf(
+            addresses.buyer1
+          );
+
+          const buyer1TokenOutBalanceAfter = await tokenOut.balanceOf(
+            addresses.buyer1
+          );
+
+          almost(auctionTokenInBalanceAfter, auctionTokenInBalanceBefore);
+
+          almost(
+            auctionTokenOutBalanceAfter.sub(auctionTokenOutBalanceBefore),
+            expectedCost
+          );
+
+          almost(
+            buyer1TokenInBalanceBefore.sub(buyer1TokenInBalanceAfter),
+            expectedInputAmount
+          );
+
+          // buyer1 should only send amount remaining in collateral tokens after swapping
+          almost(
+            buyer1TokenOutBalanceBefore.sub(buyer1TokenOutBalanceAfter),
+            expectedCost.sub(swapAmountOut)
+          );
+        });
+
+        it("should execute limit order using non-collateral ERC20 token only", async () => {
+          let order = await auction.getOrderById(epoch, 1);
+          assert.equal(order.buyer, ethers.constants.AddressZero);
+
+          const maxCost = parseUnits(
+            (math.bnToNumber(params.size) * params.price.max).toString()
+          );
+
+          const swapAmountOut = maxCost.mul(2);
+
+          const [expectedInputAmount] = await uni.router.getAmountsIn(
+            swapAmountOut,
+            path
+          );
+
+          const iface = new ethers.utils.Interface(uniswap.abi);
+
+          const data = iface.encodeFunctionData("swapExactTokensForTokens", [
+            expectedInputAmount,
+            swapAmountOut,
+            path,
+            exchange.address,
+            (await time.now()) + 86400,
+          ]);
+
+          const auctionTokenInBalanceBefore = await tokenIn.balanceOf(
+            addresses.auction
+          );
+
+          const auctionTokenOutBalanceBefore = await tokenOut.balanceOf(
+            addresses.auction
+          );
+
+          const buyer1TokenInBalanceBefore = await tokenIn.balanceOf(
+            addresses.buyer1
+          );
+
+          const buyer1TokenOutBalanceBefore = await tokenOut.balanceOf(
+            addresses.buyer1
+          );
+
+          await tokenIn
+            .connect(signers.buyer1)
+            .approve(addresses.auction, ethers.constants.MaxUint256);
+
+          // buyer1 sends double the amount of tokenIn needed to execute order
+          const tx = await auction
+            .connect(signers.buyer1)
+            .swapAndAddMarketOrder(
+              {
+                tokenIn: tokenIn.address,
+                amountInMax: expectedInputAmount,
+                amountOutMin: swapAmountOut,
+                callee: uni.router.address,
+                allowanceTarget: uni.router.address,
+                data,
+                refundAddress: addresses.buyer1,
+              },
+              epoch,
+              params.size,
+              ethers.constants.MaxUint256
+            );
+
+          const args = await getEventArgs(tx, "OrderAdded");
+          const expectedCost = params.size
+            .mul(fixedToBn(args.price64x64))
+            .div((10 ** params.collateral.decimals).toString());
+
+          order = await auction.getOrderById(epoch, 1);
+          assert.equal(order.buyer, addresses.buyer1);
+
+          const auctionTokenInBalanceAfter = await tokenIn.balanceOf(
+            addresses.auction
+          );
+
+          const auctionTokenOutBalanceAfter = await tokenOut.balanceOf(
+            addresses.auction
+          );
+
+          const buyer1TokenInBalanceAfter = await tokenIn.balanceOf(
+            addresses.buyer1
+          );
+
+          const buyer1TokenOutBalanceAfter = await tokenOut.balanceOf(
+            addresses.buyer1
+          );
+
+          almost(auctionTokenInBalanceAfter, auctionTokenInBalanceBefore);
+
+          almost(
+            auctionTokenOutBalanceAfter.sub(auctionTokenOutBalanceBefore),
+            expectedCost
+          );
+
+          almost(
+            buyer1TokenInBalanceBefore.sub(buyer1TokenInBalanceAfter),
+            expectedInputAmount
+          );
+
+          // buyer1 should receive amount overpaid
+          almost(
+            buyer1TokenOutBalanceAfter.sub(buyer1TokenOutBalanceBefore),
+            swapAmountOut.sub(expectedCost)
+          );
         });
       });
     });
@@ -1159,7 +2246,7 @@ export function describeBehaviorOfAuction(
         it("should revert", async () => {
           await expect(
             auction.connect(signers.vault).transferPremium(0)
-          ).to.be.revertedWith("!finalized");
+          ).to.be.revertedWith("restricted");
         });
       });
 
@@ -1210,7 +2297,7 @@ export function describeBehaviorOfAuction(
         it("should revert", async () => {
           await expect(
             auction.connect(signers.vault).transferPremium(0)
-          ).to.be.revertedWith("!finalized");
+          ).to.be.revertedWith("restricted");
         });
       });
     });
@@ -1220,7 +2307,7 @@ export function describeBehaviorOfAuction(
         it("should revert", async () => {
           await expect(
             auction.connect(signers.vault).transferPremium(0)
-          ).to.be.revertedWith("!finalized");
+          ).to.be.revertedWith("restricted");
         });
       });
 
@@ -1282,7 +2369,7 @@ export function describeBehaviorOfAuction(
         it("should revert", async () => {
           await expect(
             auction.connect(signers.vault).transferPremium(0)
-          ).to.be.revertedWith("!finalized");
+          ).to.be.revertedWith("restricted");
         });
       });
     });
@@ -1356,7 +2443,7 @@ export function describeBehaviorOfAuction(
         it("should revert", async () => {
           await expect(
             auction.connect(signers.buyer1).withdraw(0)
-          ).to.be.revertedWith("auction !processed");
+          ).to.be.revertedWith("restricted");
         });
       });
 

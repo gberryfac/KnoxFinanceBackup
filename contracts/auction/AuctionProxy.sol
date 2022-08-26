@@ -12,8 +12,13 @@ contract AuctionProxy is UpgradeableProxyOwnable {
     using OwnableStorage for OwnableStorage.Layout;
     using UpgradeableProxyStorage for UpgradeableProxyStorage.Layout;
 
-    constructor(uint256 minSize, address implementation) {
+    constructor(
+        uint256 minSize,
+        address exchange,
+        address implementation
+    ) {
         AuctionStorage.Layout storage l = AuctionStorage.layout();
+        l.Exchange = IExchangeHelper(exchange);
         l.minSize = minSize;
 
         OwnableStorage.layout().setOwner(msg.sender);

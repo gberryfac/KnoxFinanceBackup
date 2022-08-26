@@ -3,6 +3,8 @@ pragma solidity ^0.8.0;
 
 import "@solidstate/contracts/utils/EnumerableSet.sol";
 
+import "../exchange/IExchangeHelper.sol";
+
 import "./OrderBook.sol";
 
 library AuctionStorage {
@@ -36,6 +38,7 @@ library AuctionStorage {
     }
 
     struct Layout {
+        IExchangeHelper Exchange;
         uint256 minSize;
         mapping(uint64 => Auction) auctions;
         mapping(uint64 => OrderBook.Index) orderbooks;
