@@ -1,5 +1,10 @@
-import { assert as _assert } from "chai";
 import { BigNumber } from "ethers";
+import chai, { expect, assert as _assert } from "chai";
+import chaiAlmost from "chai-almost";
+
+chai.use(chaiAlmost());
+
+import * as math from "./math";
 
 /**
  *  Convenience method to assert that two BN.js instances are equal.
@@ -86,3 +91,16 @@ export const assert = {
   bnGt: assertBNGreaterThan,
   bnGte: assertBNGreaterEqualThan,
 };
+
+export function almost(
+  expected: number | BigNumber,
+  actual: number | BigNumber
+) {
+  if (expected instanceof BigNumber) expected = math.bnToNumber(expected);
+  if (actual instanceof BigNumber) actual = math.bnToNumber(actual);
+
+  // actual value should be within 0.01% of expected
+  const tolerance = expected * 0.0001;
+
+  expect(expected).to.almost(actual, tolerance);
+}
