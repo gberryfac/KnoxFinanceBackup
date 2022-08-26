@@ -101,7 +101,7 @@ interface IVaultAdmin {
     /**
      * @notice initializes the next epoch
      */
-    function initalizeNextEpoch() external;
+    function initializeNextEpoch() external;
 
     /************************************************
      *  SET AUCTION PRICES
