@@ -27,7 +27,14 @@ import {
   VaultDiamond__factory,
 } from "../types";
 
-import { assert, math, time, types, KnoxUtil, PoolUtil } from "../test/utils";
+import {
+  assert,
+  time,
+  types,
+  KnoxUtil,
+  PoolUtil,
+  getEventArgs,
+} from "../test/utils";
 
 import { diamondCut } from "../scripts/diamond";
 
@@ -482,9 +489,9 @@ export function describeBehaviorOfVaultAdmin(
           .addMarketOrder(epoch, await auction.getTotalContracts(epoch));
 
         // process auction 0
-        await vault.connect(signers.keeper).processAuction();
-
-        totalPremiums = await vault.totalPremiums();
+        const tx = await vault.connect(signers.keeper).processAuction();
+        const args = await getEventArgs(tx, "AuctionProcessed");
+        totalPremiums = args.totalPremiums;
 
         // init auction 1
         await knoxUtil.setAndInitializeAuction();
@@ -497,14 +504,6 @@ export function describeBehaviorOfVaultAdmin(
         await expect(vault.collectPerformanceFee()).to.be.revertedWith(
           "!keeper"
         );
-      });
-
-      it("should set totalPremiums to 0", async () => {
-        // process epoch 0
-        await knoxUtil.processExpiredOptions();
-        await vault.connect(signers.keeper).withdrawReservedLiquidity();
-        await vault.connect(signers.keeper).collectPerformanceFee();
-        assert.bnEqual(await vault.totalPremiums(), BigNumber.from(0));
       });
 
       it("should not collect performance fees if option expires far-ITM", async () => {
@@ -534,12 +533,7 @@ export function describeBehaviorOfVaultAdmin(
           addresses.feeRecipient
         );
 
-        assert.equal(
-          math.bnToNumber(
-            feeRecipientBalanceAfter.sub(feeRecipientBalanceBefore)
-          ),
-          0
-        );
+        assert.bnEqual(feeRecipientBalanceAfter, feeRecipientBalanceBefore);
       });
 
       it("should collect performance fees if option expires ATM", async () => {
@@ -557,11 +551,9 @@ export function describeBehaviorOfVaultAdmin(
           addresses.feeRecipient
         );
 
-        assert.equal(
-          math.bnToNumber(
-            feeRecipientBalanceAfter.sub(feeRecipientBalanceBefore)
-          ),
-          math.bnToNumber(totalPremiums.div(5))
+        assert.bnEqual(
+          feeRecipientBalanceAfter.sub(feeRecipientBalanceBefore),
+          totalPremiums.div(5)
         );
       });
     });

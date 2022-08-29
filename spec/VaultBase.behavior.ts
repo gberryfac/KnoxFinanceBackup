@@ -325,11 +325,8 @@ export function describeBehaviorOfVaultBase(
         const lpCollateralBalanceBefore = await asset.balanceOf(addresses.lp1);
 
         const totalCollateral = await vault.totalCollateral();
-        const totalPremiums = await vault.totalPremiums();
 
-        let totalDistributionInCollateral = math.bnToNumber(
-          totalCollateral.add(totalPremiums)
-        );
+        let totalDistributionInCollateral = math.bnToNumber(totalCollateral);
 
         const feeInCollateral = totalDistributionInCollateral * 0.02;
         totalDistributionInCollateral =
@@ -405,11 +402,8 @@ export function describeBehaviorOfVaultBase(
         const lpCollateralBalanceBefore = await asset.balanceOf(addresses.lp1);
 
         const totalCollateral = await vault.totalCollateral();
-        const totalPremiums = await vault.totalPremiums();
 
-        let totalDistributionInCollateral = math.bnToNumber(
-          totalCollateral.add(totalPremiums)
-        );
+        let totalDistributionInCollateral = math.bnToNumber(totalCollateral);
 
         const totalShortContracts = await vault.totalShortAsContracts();
 
@@ -650,11 +644,8 @@ export function describeBehaviorOfVaultBase(
         const lpCollateralBalanceBefore = await asset.balanceOf(addresses.lp1);
 
         const totalCollateral = await vault.totalCollateral();
-        const totalPremiums = await vault.totalPremiums();
 
-        let totalDistributionInCollateral = math.bnToNumber(
-          totalCollateral.add(totalPremiums)
-        );
+        let totalDistributionInCollateral = math.bnToNumber(totalCollateral);
 
         const feeInCollateral = totalDistributionInCollateral * 0.02;
         totalDistributionInCollateral =
@@ -730,11 +721,8 @@ export function describeBehaviorOfVaultBase(
         const lpCollateralBalanceBefore = await asset.balanceOf(addresses.lp1);
 
         const totalCollateral = await vault.totalCollateral();
-        const totalPremiums = await vault.totalPremiums();
 
-        let totalDistributionInCollateral = math.bnToNumber(
-          totalCollateral.add(totalPremiums)
-        );
+        let totalDistributionInCollateral = math.bnToNumber(totalCollateral);
 
         const totalShortContracts = await vault.totalShortAsContracts();
 

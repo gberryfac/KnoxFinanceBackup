@@ -65,7 +65,6 @@ library VaultStorage {
          * VAULT STATE
          ***********************************************/
         uint64 epoch;
-        uint256 totalPremiums;
         uint256 totalWithdrawals;
         uint256 lastTotalAssets;
         /************************************************

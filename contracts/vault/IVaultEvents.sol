@@ -5,7 +5,8 @@ interface IVaultEvents {
     event AuctionProcessed(
         uint64 indexed epoch,
         uint256 totalCollateralUsed,
-        uint256 totalContractsSold
+        uint256 totalContractsSold,
+        uint256 totalPremiums
     );
 
     event AuctionWindowOffsetsSet(

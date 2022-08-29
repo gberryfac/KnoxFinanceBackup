@@ -26,12 +26,6 @@ interface IVaultView {
     function totalCollateral() external view returns (uint256);
 
     /**
-     * @notice gets the total premiums of the epoch
-     * @return total premiums
-     */
-    function totalPremiums() external view returns (uint256);
-
-    /**
      * @notice gets the short position value denominated in the collateral asset
      * @return total short position in collateral amount
      */

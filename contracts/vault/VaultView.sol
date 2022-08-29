@@ -36,13 +36,6 @@ contract VaultView is IVaultView, VaultInternal {
     /**
      * @inheritdoc IVaultView
      */
-    function totalPremiums() external view returns (uint256) {
-        return _totalPremiums();
-    }
-
-    /**
-     * @inheritdoc IVaultView
-     */
     function totalShortAsCollateral() external view returns (uint256) {
         return _totalShortAsCollateral();
     }
