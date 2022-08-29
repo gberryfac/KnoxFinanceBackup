@@ -182,6 +182,7 @@ contract AuctionInternal is IAuctionEvents {
         );
 
         auction.status = AuctionStorage.Status.INITIALIZED;
+        auction.expiry = initAuction.expiry;
         auction.strike64x64 = initAuction.strike64x64;
         auction.startTime = initAuction.startTime;
         auction.endTime = initAuction.endTime;
@@ -390,7 +391,7 @@ contract AuctionInternal is IAuctionEvents {
         l.epochsByBuyer[msg.sender].remove(epoch);
 
         (bool expired, uint256 exercisedAmount) =
-            Vault.getExerciseAmount(epoch, fill);
+            _getExerciseAmount(l, epoch, fill);
 
         if (expired) {
             // If expired ITM, adjust refund
@@ -652,5 +653,44 @@ contract AuctionInternal is IAuctionEvents {
         }
 
         return auction.totalContracts;
+    }
+
+    /************************************************
+     * HELPERS
+     ***********************************************/
+
+    /**
+     * @notice calculates the expected proceeds of the option if it has expired
+     * @param epoch epoch id
+     * @param size amount of contracts
+     * @return true if the option has expired, the exercise amount.
+     */
+    function _getExerciseAmount(
+        AuctionStorage.Layout storage l,
+        uint64 epoch,
+        uint256 size
+    ) private view returns (bool, uint256) {
+        AuctionStorage.Auction storage auction = l.auctions[epoch];
+
+        uint64 expiry = auction.expiry;
+        int128 strike64x64 = auction.strike64x64;
+
+        if (block.timestamp < expiry) return (false, 0);
+
+        int128 spot64x64 = Pool.getPriceAfter64x64(expiry);
+        uint256 amount;
+
+        if (isCall && spot64x64 > strike64x64) {
+            amount = spot64x64.sub(strike64x64).div(spot64x64).mulu(size);
+        } else if (!isCall && strike64x64 > spot64x64) {
+            uint256 value = strike64x64.sub(spot64x64).mulu(size);
+            amount = ABDKMath64x64Token.toBaseTokenAmount(
+                underlyingDecimals,
+                baseDecimals,
+                value
+            );
+        }
+
+        return (true, amount);
     }
 }

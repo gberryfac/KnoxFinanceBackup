@@ -244,6 +244,7 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
         l.Auction.initialize(
             AuctionStorage.InitAuction(
                 l.epoch,
+                option.expiry,
                 option.strike64x64,
                 option.longTokenId,
                 startTime,
@@ -729,41 +730,6 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
                 ""
             );
         }
-    }
-
-    /**
-     * @notice calculates the exercise amount
-     * @param epoch epoch id
-     * @param size amount of contracts
-     */
-    function _getExerciseAmount(uint64 epoch, uint256 size)
-        internal
-        view
-        returns (bool, uint256)
-    {
-        VaultStorage.Layout storage l = VaultStorage.layout();
-        VaultStorage.Option memory option = l.options[epoch];
-
-        uint64 expiry = option.expiry;
-        int128 strike64x64 = option.strike64x64;
-
-        if (block.timestamp < expiry) return (false, 0);
-
-        int128 spot64x64 = Pool.getPriceAfter64x64(expiry);
-        uint256 amount;
-
-        if (l.isCall && spot64x64 > strike64x64) {
-            amount = spot64x64.sub(strike64x64).div(spot64x64).mulu(size);
-        } else if (!l.isCall && strike64x64 > spot64x64) {
-            uint256 value = strike64x64.sub(spot64x64).mulu(size);
-            amount = ABDKMath64x64Token.toBaseTokenAmount(
-                l.underlyingDecimals,
-                l.baseDecimals,
-                value
-            );
-        }
-
-        return (true, amount);
     }
 
     enum TokenType {

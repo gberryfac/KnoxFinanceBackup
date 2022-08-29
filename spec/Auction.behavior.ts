@@ -236,6 +236,7 @@ export function describeBehaviorOfAuction(
         await expect(
           auction.initialize({
             epoch: 0,
+            expiry: await time.getFriday8AM(timestamp),
             strike64x64: strike64x64,
             longTokenId: BigNumber.from("1"),
             startTime: BigNumber.from(timestamp + 60),
@@ -247,6 +248,7 @@ export function describeBehaviorOfAuction(
       it("should revert if auction is already initialized", async () => {
         const initAuction = {
           epoch: 0,
+          expiry: await time.getFriday8AM(timestamp),
           strike64x64: strike64x64,
           longTokenId: BigNumber.from("1"),
           startTime: BigNumber.from(timestamp + 60),
@@ -264,6 +266,7 @@ export function describeBehaviorOfAuction(
         await expect(
           auction.connect(signers.vault).initialize({
             epoch: 0,
+            expiry: await time.getFriday8AM(timestamp),
             strike64x64: strike64x64,
             longTokenId: BigNumber.from("1"),
             startTime: BigNumber.from(timestamp + 60),
@@ -276,6 +279,7 @@ export function describeBehaviorOfAuction(
         await expect(
           auction.connect(signers.vault).initialize({
             epoch: 0,
+            expiry: await time.getFriday8AM(timestamp),
             strike64x64: strike64x64,
             longTokenId: BigNumber.from("1"),
             startTime: BigNumber.from(timestamp),
@@ -288,6 +292,7 @@ export function describeBehaviorOfAuction(
         await expect(
           auction.connect(signers.vault).initialize({
             epoch: 0,
+            expiry: await time.getFriday8AM(timestamp),
             strike64x64: BigNumber.from("0"),
             longTokenId: BigNumber.from("1"),
             startTime: BigNumber.from(timestamp + 60),
@@ -300,6 +305,7 @@ export function describeBehaviorOfAuction(
         await expect(
           auction.connect(signers.vault).initialize({
             epoch: 0,
+            expiry: await time.getFriday8AM(timestamp),
             strike64x64: strike64x64,
             longTokenId: BigNumber.from("0"),
             startTime: BigNumber.from(timestamp + 60),
@@ -311,6 +317,7 @@ export function describeBehaviorOfAuction(
       it("should initialize new auction with correct state", async () => {
         const initAuction = {
           epoch: 0,
+          expiry: await time.getFriday8AM(timestamp),
           strike64x64: strike64x64,
           longTokenId: BigNumber.from("1"),
           startTime: BigNumber.from(timestamp + 60),
@@ -1767,6 +1774,7 @@ export function describeBehaviorOfAuction(
 
           await auction.connect(signers.vault).initialize({
             epoch: epoch,
+            expiry: await time.getFriday8AM(timestamp),
             strike64x64: strike64x64,
             longTokenId: BigNumber.from("1"),
             startTime: startTime,

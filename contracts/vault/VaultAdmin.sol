@@ -167,19 +167,4 @@ contract VaultAdmin is IVaultAdmin, VaultInternal {
     function processAuction() external onlyKeeper {
         _processAuction();
     }
-
-    /************************************************
-     * HELPERS
-     ***********************************************/
-
-    /**
-     * @inheritdoc IVaultAdmin
-     */
-    function getExerciseAmount(uint64 epoch, uint256 size)
-        external
-        view
-        returns (bool, uint256)
-    {
-        return _getExerciseAmount(epoch, size);
-    }
 }

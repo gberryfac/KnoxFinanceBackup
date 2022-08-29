@@ -10,6 +10,7 @@ library AuctionStorage {
 
     struct InitAuction {
         uint64 epoch;
+        uint64 expiry;
         int128 strike64x64;
         uint256 longTokenId;
         uint256 startTime;
@@ -20,6 +21,7 @@ library AuctionStorage {
 
     struct Auction {
         Status status;
+        uint64 expiry;
         int128 strike64x64;
         int128 maxPrice64x64;
         int128 minPrice64x64;
