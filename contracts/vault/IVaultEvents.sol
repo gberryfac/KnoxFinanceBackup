@@ -48,8 +48,6 @@ interface IVaultEvents {
     event PerformanceFeeCollected(
         uint64 indexed epoch,
         uint256 netIncome,
-        uint256 totalPremiums,
-        uint256 exerciseAmount,
         uint256 feeInCollateral
     );
 

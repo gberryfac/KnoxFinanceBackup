@@ -278,7 +278,9 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
                     : BASE_RESERVED_LIQ_TOKEN_ID
             );
 
-        Pool.withdraw(reservedLiquidity, l.isCall);
+        if (reservedLiquidity > 0) {
+            Pool.withdraw(reservedLiquidity, l.isCall);
+        }
 
         emit ReservedLiquidityWithdrawn(l.epoch, reservedLiquidity);
     }
@@ -289,32 +291,23 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
     function _collectPerformanceFee() internal {
         VaultStorage.Layout storage l = VaultStorage.layout();
 
-        uint64 lastEpoch = _lastEpoch(l);
-
-        (, uint256 exerciseAmount) =
-            _getExerciseAmount(lastEpoch, l.totalShortContracts);
-
         uint256 netIncome;
         uint256 feeInCollateral;
 
-        if (l.totalPremiums > exerciseAmount) {
+        uint256 totalAssets = _totalAssets() + l.totalWithdrawals;
+
+        if (totalAssets > l.lastTotalAssets) {
             /**
-             * Take performance fee ONLY if premium remaining after the option expires is positive.
-             * If it is negative, last week's option expired ITM past breakeven, and the vault took
-             * a loss so we do not collect performance fee for last week.
+             * Take performance fee ONLY if the vault returns a positive net income.
+             * If the net income is negative, last week's option expired ITM past breakeven,
+             * and the vault took a loss so we do not collect performance fee for last week.
              */
-            netIncome = l.totalPremiums - exerciseAmount;
+            netIncome = totalAssets - l.lastTotalAssets;
             feeInCollateral = l.performanceFee64x64.mulu(netIncome);
             ERC20.safeTransfer(l.feeRecipient, feeInCollateral);
         }
 
-        emit PerformanceFeeCollected(
-            lastEpoch,
-            netIncome,
-            l.totalPremiums,
-            exerciseAmount,
-            feeInCollateral
-        );
+        emit PerformanceFeeCollected(_lastEpoch(l), netIncome, feeInCollateral);
 
         l.totalPremiums = 0;
     }
@@ -397,6 +390,8 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
      */
     function _processAuction() internal {
         VaultStorage.Layout storage l = VaultStorage.layout();
+
+        l.lastTotalAssets = _totalAssets();
 
         uint64 lastEpoch = _lastEpoch(l);
         VaultStorage.Option memory lastOption = _lastOption(l);
@@ -610,6 +605,11 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
         _beforeWithdraw(owner, assetAmount, shareAmount);
 
         _burn(owner, shareAmount);
+
+        l.totalWithdrawals += assetAmount;
+
+        // removes any reserved liquidty from pool in the event an option has been exercised
+        _withdrawReservedLiquidity();
 
         (
             uint256 collateralAmount,
