@@ -308,6 +308,8 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
             ERC20.safeTransfer(l.feeRecipient, feeInCollateral);
         }
 
+        l.totalWithdrawals = 0;
+
         emit PerformanceFeeCollected(_lastEpoch(l), netIncome, feeInCollateral);
     }
 
