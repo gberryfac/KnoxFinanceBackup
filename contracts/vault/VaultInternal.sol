@@ -328,7 +328,6 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
      */
     function _initializeNextEpoch() internal {
         VaultStorage.Layout storage l = VaultStorage.layout();
-        l.totalShortContracts = 0;
         l.Queue.processDeposits();
 
         l.epoch = l.epoch + 1;
@@ -431,13 +430,12 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
         uint64 divestmentTimestamp = uint64(block.timestamp + 24 hours);
         Pool.setDivestmentTimestamp(divestmentTimestamp, l.isCall);
 
-        l.totalShortContracts = totalContractsSold;
         l.Auction.processAuction(lastEpoch);
 
         emit AuctionProcessed(
             lastEpoch,
             totalCollateralUsed,
-            l.totalShortContracts
+            _totalShortAsContracts()
         );
     }
 
@@ -490,7 +488,8 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
      */
     function _totalShortAsContracts() internal view returns (uint256) {
         VaultStorage.Layout storage l = VaultStorage.layout();
-        return l.totalShortContracts;
+        uint256 shortTokenId = l.options[_lastEpoch(l)].shortTokenId;
+        return Pool.balanceOf(address(this), shortTokenId);
     }
 
     /**
@@ -619,7 +618,6 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
         ) = _calculateDistributions(l, assetAmount);
 
         l.totalPremiums -= premiumAmount;
-        l.totalShortContracts -= shortContracts;
 
         (uint256 collateralAmountSansFee, uint256 shortContractsSansFee) =
             _collectWithdrawalFee(
@@ -682,8 +680,9 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
         VaultStorage.Option memory lastOption = _lastOption(l);
 
         // calculates the short position value denominated in the collateral asset
+        uint256 totalShortContracts = _totalShortAsContracts();
         uint256 shortPositionValue =
-            l.totalShortContracts._fromContractsToCollateral(
+            totalShortContracts._fromContractsToCollateral(
                 l.isCall,
                 l.underlyingDecimals,
                 l.baseDecimals,

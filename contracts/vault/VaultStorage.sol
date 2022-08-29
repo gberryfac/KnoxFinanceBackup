@@ -65,7 +65,6 @@ library VaultStorage {
          * VAULT STATE
          ***********************************************/
         uint64 epoch;
-        uint256 totalShortContracts;
         uint256 totalPremiums;
         /************************************************
          * VAULT PROPERTIES

@@ -407,6 +407,9 @@ export function describeBehaviorOfVaultAdmin(
 
       it("should withdraw reserved liquidity from pool", async () => {
         // process epoch 0
+        const totalCollateralInShortPosition =
+          await vault.totalShortAsCollateral();
+
         await knoxUtil.processExpiredOptions();
 
         const reservedLiquidityTokenId = params.isCall
@@ -417,9 +420,6 @@ export function describeBehaviorOfVaultAdmin(
           addresses.vault,
           reservedLiquidityTokenId
         );
-
-        const totalCollateralInShortPosition =
-          await vault.totalShortAsCollateral();
 
         assert.bnEqual(reservedLiquidityBefore, totalCollateralInShortPosition);
 
