@@ -6,7 +6,6 @@ library QueueStorage {
      *  LAYOUT
      ***********************************************/
     struct Layout {
-        address vault;
         uint64 epoch;
         uint256 maxTVL;
         mapping(uint256 => uint256) pricePerShare;

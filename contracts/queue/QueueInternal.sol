@@ -54,7 +54,7 @@ contract QueueInternal is
      */
     modifier onlyVault() {
         QueueStorage.Layout storage l = QueueStorage.layout();
-        require(msg.sender == l.vault, "!vault");
+        require(msg.sender == address(Vault), "!vault");
         _;
     }
 

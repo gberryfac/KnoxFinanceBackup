@@ -64,7 +64,7 @@ contract AuctionInternal is IAuctionEvents {
      */
     modifier onlyVault() {
         AuctionStorage.Layout storage l = AuctionStorage.layout();
-        require(msg.sender == l.vault, "!vault");
+        require(msg.sender == address(Vault), "!vault");
         _;
     }
 
