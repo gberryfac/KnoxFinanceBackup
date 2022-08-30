@@ -6,6 +6,7 @@ import "@solidstate/contracts/security/PausableInternal.sol";
 import "@solidstate/contracts/token/ERC20/IERC20.sol";
 import "@solidstate/contracts/token/ERC1155/base/ERC1155BaseInternal.sol";
 import "@solidstate/contracts/token/ERC1155/enumerable/ERC1155EnumerableInternal.sol";
+import "@solidstate/contracts/utils/IWETH.sol";
 import "@solidstate/contracts/utils/SafeERC20.sol";
 
 import "../interfaces/IPremiaPool.sol";
@@ -31,11 +32,13 @@ contract QueueInternal is
 
     IERC20 public immutable ERC20;
     IVault public immutable Vault;
+    IWETH public immutable WETH;
 
     constructor(
         bool isCall,
         address pool,
-        address vault
+        address vault,
+        address weth
     ) {
         IPremiaPool.PoolSettings memory settings =
             IPremiaPool(pool).getPoolSettings();
@@ -43,6 +46,7 @@ contract QueueInternal is
 
         ERC20 = IERC20(asset);
         Vault = IVault(vault);
+        WETH = IWETH(weth);
     }
 
     /************************************************
@@ -73,6 +77,28 @@ contract QueueInternal is
         emit MaxTVLSet(l.epoch, l.maxTVL, newMaxTVL, msg.sender);
     }
 
+    /**
+     * @notice sets a new Exchange Helper contract
+     * @param newExchangeHelper is the new Exchange Helper contract address
+     */
+    function _setExchangeHelper(address newExchangeHelper) internal {
+        QueueStorage.Layout storage l = QueueStorage.layout();
+
+        require(newExchangeHelper != address(0), "address not provided");
+        require(
+            newExchangeHelper != address(l.Exchange),
+            "new address equals old"
+        );
+
+        emit ExchangeHelperSet(
+            address(l.Exchange),
+            newExchangeHelper,
+            msg.sender
+        );
+
+        l.Exchange = IExchangeHelper(newExchangeHelper);
+    }
+
     /************************************************
      *  DEPOSIT
      ***********************************************/
@@ -84,9 +110,33 @@ contract QueueInternal is
      */
     function _deposit(uint256 amount, address receiver) internal {
         QueueStorage.Layout storage l = QueueStorage.layout();
+        uint256 credited = _wrapNativeToken(amount);
+        // an approve() by the msg.sender is required beforehand
+        ERC20.safeTransferFrom(receiver, address(this), amount - credited);
+        _deposit(l, amount, receiver);
+    }
 
+    /**
+     * @notice swaps into the collateral asset and deposits the proceeds
+     * @param s exchange arguments
+     * @param receiver claim token recipient
+     */
+    function _swapAndDeposit(
+        IExchangeHelper.SwapArgs calldata s,
+        address receiver
+    ) internal {
+        QueueStorage.Layout storage l = QueueStorage.layout();
+        uint256 credited = _swapForPoolTokens(l.Exchange, s, address(ERC20));
+        _deposit(l, credited, receiver);
+    }
+
+    function _deposit(
+        QueueStorage.Layout storage l,
+        uint256 amount,
+        address receiver
+    ) private {
         uint256 totalWithDepositedAmount =
-            Vault.totalAssets() + ERC20.balanceOf(address(this)) + amount;
+            Vault.totalAssets() + ERC20.balanceOf(address(this));
 
         require(totalWithDepositedAmount <= l.maxTVL, "maxTVL exceeded");
         require(amount > 0, "value exceeds minimum");
@@ -96,9 +146,6 @@ contract QueueInternal is
 
         uint256 currentTokenId = QueueStorage._getCurrentTokenId();
         _mint(receiver, currentTokenId, amount, "");
-
-        // an approve() by the msg.sender is required beforehand
-        ERC20.safeTransferFrom(msg.sender, address(this), amount);
 
         emit Deposit(l.epoch, receiver, msg.sender, amount);
     }
@@ -234,6 +281,76 @@ contract QueueInternal is
         QueueStorage.Layout storage l = QueueStorage.layout();
         uint256 balance = _balanceOf(account, tokenId);
         return (balance * l.pricePerShare[tokenId]) / ONE_SHARE;
+    }
+
+    /************************************************
+     *  DEPOSIT HELPERS
+     ***********************************************/
+
+    function _wrapNativeToken(uint256 amount) private returns (uint256) {
+        uint256 credit;
+
+        if (msg.value > 0) {
+            require(
+                address(ERC20) == address(WETH),
+                "collateral token != wETH"
+            );
+
+            if (msg.value > amount) {
+                unchecked {
+                    (bool success, ) =
+                        payable(msg.sender).call{value: msg.value - amount}("");
+
+                    require(success, "ETH refund failed");
+
+                    credit = amount;
+                }
+            } else {
+                credit = msg.value;
+            }
+
+            WETH.deposit{value: credit}();
+        }
+
+        return credit;
+    }
+
+    function _swapForPoolTokens(
+        IExchangeHelper Exchange,
+        IExchangeHelper.SwapArgs calldata s,
+        address tokenOut
+    ) private returns (uint256) {
+        if (msg.value > 0) {
+            require(s.tokenIn == address(WETH), "tokenIn != wETH");
+            WETH.deposit{value: msg.value}();
+            WETH.transfer(address(Exchange), msg.value);
+        }
+
+        if (s.amountInMax > 0) {
+            IERC20(s.tokenIn).safeTransferFrom(
+                msg.sender,
+                address(Exchange),
+                s.amountInMax
+            );
+        }
+
+        uint256 amountCredited =
+            Exchange.swapWithToken(
+                s.tokenIn,
+                tokenOut,
+                s.amountInMax + msg.value,
+                s.callee,
+                s.allowanceTarget,
+                s.data,
+                s.refundAddress
+            );
+
+        require(
+            amountCredited >= s.amountOutMin,
+            "not enough output from trade"
+        );
+
+        return amountCredited;
     }
 
     /************************************************

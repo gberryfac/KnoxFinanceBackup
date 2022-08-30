@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+import "../exchange/IExchangeHelper.sol";
+
 library QueueStorage {
     /************************************************
      *  LAYOUT
      ***********************************************/
     struct Layout {
+        IExchangeHelper Exchange;
         uint64 epoch;
         uint256 maxTVL;
         mapping(uint256 => uint256) pricePerShare;

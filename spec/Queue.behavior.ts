@@ -1,21 +1,28 @@
 import { ethers } from "hardhat";
 import { BigNumber, ContractTransaction } from "ethers";
+import { parseEther, parseUnits } from "ethers/lib/utils";
+const { provider } = ethers;
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 
 import { describeBehaviorOfERC1155Enumerable } from "@solidstate/spec";
 
-import { expect } from "chai";
+import chai, { expect } from "chai";
+import chaiAlmost from "chai-almost";
 
-import { IVault, MockERC20, Queue } from "../types";
+chai.use(chaiAlmost());
+
+import { ExchangeHelper, IVault, MockERC20, Queue } from "../types";
 
 import {
+  almost,
   assert,
   time,
   types,
+  uniswap,
   KnoxUtil,
+  PoolUtil,
   formatClaimTokenId,
 } from "../test/utils";
-import { parseUnits } from "ethers/lib/utils";
 
 interface QueueBehaviorArgs {
   getKnoxUtil: () => Promise<KnoxUtil>;
@@ -39,6 +46,8 @@ interface QueueBehaviorArgs {
   tokenIdERC1155?: BigNumber;
 }
 
+const gasPrice = parseUnits("0.1", "gwei");
+
 export async function describeBehaviorOfQueue(
   {
     getKnoxUtil,
@@ -59,9 +68,15 @@ export async function describeBehaviorOfQueue(
     let asset: MockERC20;
     let queue: Queue;
     let vault: IVault;
+    let exchange: ExchangeHelper;
+    let weth: MockERC20;
+    let poolUtil: PoolUtil;
 
     // Contract Utilities
     let knoxUtil: KnoxUtil;
+
+    // Pool Utilities
+    let uni: uniswap.IUniswap;
 
     // Test Suite Globals
     const params = getParams();
@@ -75,6 +90,11 @@ export async function describeBehaviorOfQueue(
       asset = knoxUtil.asset;
       vault = knoxUtil.vaultUtil.vault;
       queue = knoxUtil.queue;
+      exchange = knoxUtil.exchange;
+
+      poolUtil = knoxUtil.poolUtil;
+      weth = poolUtil.weth;
+      uni = knoxUtil.uni;
 
       await asset
         .connect(signers.deployer)
@@ -82,6 +102,8 @@ export async function describeBehaviorOfQueue(
       await asset.connect(signers.lp1).mint(addresses.lp1, params.mint);
       await asset.connect(signers.lp2).mint(addresses.lp2, params.mint);
       await asset.connect(signers.lp3).mint(addresses.lp3, params.mint);
+
+      await uni.tokenIn.connect(signers.lp1).mint(addresses.lp1, params.mint);
     });
 
     describeBehaviorOfERC1155Enumerable(
@@ -101,6 +123,7 @@ export async function describeBehaviorOfQueue(
       it("should initialize Queue with correct state", async () => {
         await assert.equal(await queue.ERC20(), asset.address);
         await assert.equal(await queue.Vault(), addresses.vault);
+        await assert.equal(await queue.WETH(), poolUtil.weth.address);
         await assert.bnEqual(await queue.getEpoch(), ethers.constants.Zero);
         await assert.bnEqual(await queue.getMaxTVL(), params.maxTVL);
       });
@@ -127,6 +150,38 @@ export async function describeBehaviorOfQueue(
       });
     });
 
+    describe("#setExchangeHelper(address)", () => {
+      time.revertToSnapshotAfterEach(async () => {});
+
+      it("should revert if !owner", async () => {
+        await expect(queue.setExchangeHelper(addresses.lp1)).to.be.revertedWith(
+          "Ownable: sender must be owner"
+        );
+      });
+
+      it("should revert if address is 0x0", async () => {
+        await expect(
+          queue
+            .connect(signers.deployer)
+            .setExchangeHelper(ethers.constants.AddressZero)
+        ).to.be.revertedWith("address not provided");
+      });
+
+      it("should revert if new address == old address", async () => {
+        await expect(
+          queue.connect(signers.deployer).setExchangeHelper(exchange.address)
+        ).to.be.revertedWith("new address equals old");
+      });
+
+      it("should set new exchange helper address", async () => {
+        await expect(
+          queue.connect(signers.deployer).setExchangeHelper(addresses.lp1)
+        )
+          .to.emit(queue, "ExchangeHelperSet")
+          .withArgs(addresses.exchange, addresses.lp1, addresses.deployer);
+      });
+    });
+
     describe("#deposit(uint256)", () => {
       time.revertToSnapshotAfterEach(async () => {});
 
@@ -139,6 +194,7 @@ export async function describeBehaviorOfQueue(
 
       it("should revert if maxTVL is exceeded", async () => {
         const deposit = params.maxTVL.add(BigNumber.from("1"));
+        await asset.connect(signers.lp3).mint(addresses.lp3, deposit);
         await asset.connect(signers.lp3).approve(addresses.queue, deposit);
         await expect(
           queue.connect(signers.lp3)["deposit(uint256)"](deposit)
@@ -231,6 +287,320 @@ export async function describeBehaviorOfQueue(
         lpBalance = await vault.balanceOf(addresses.lp1);
         assert.bnEqual(lpBalance, params.deposit);
       });
+
+      if (params.collateral.name === "wETH") {
+        it("should send credit to buyer if they send too much ETH", async () => {
+          const queueWETHBalanceBefore = await weth.balanceOf(addresses.queue);
+          const lp1WETHBalanceBefore = await weth.balanceOf(addresses.lp1);
+          const lp1ETHBalanceBefore = await provider.getBalance(addresses.lp1);
+
+          await asset
+            .connect(signers.lp1)
+            .approve(addresses.queue, ethers.constants.MaxUint256);
+
+          const ethSent = params.deposit.mul(2);
+
+          const tx = await queue["deposit(uint256)"](params.deposit, {
+            value: ethSent,
+            gasPrice,
+          });
+          const receipt = await tx.wait();
+          const gasFee = receipt.gasUsed.mul(gasPrice);
+
+          const queueWETHBalanceAfter = await weth.balanceOf(addresses.queue);
+          const lp1WETHBalanceAfter = await weth.balanceOf(addresses.lp1);
+          const lp1ETHBalanceAfter = await provider.getBalance(addresses.lp1);
+
+          assert.bnEqual(
+            await queue["balanceOf(address,uint256)"](
+              addresses.lp1,
+              await queue.getCurrentTokenId()
+            ),
+            await asset.balanceOf(addresses.queue)
+          );
+
+          almost(
+            queueWETHBalanceAfter.sub(queueWETHBalanceBefore),
+            params.deposit
+          );
+
+          almost(lp1WETHBalanceBefore, lp1WETHBalanceAfter);
+
+          almost(
+            lp1ETHBalanceBefore.sub(lp1ETHBalanceAfter).sub(gasFee),
+            params.deposit
+          );
+        });
+        it("should transfer remainder if buyer does not send enough ETH", async () => {
+          const queueWETHBalanceBefore = await weth.balanceOf(addresses.queue);
+          const lp1WETHBalanceBefore = await weth.balanceOf(addresses.lp1);
+          const lp1ETHBalanceBefore = await provider.getBalance(addresses.lp1);
+
+          await asset
+            .connect(signers.lp1)
+            .approve(addresses.queue, ethers.constants.MaxUint256);
+
+          const ethSent = params.deposit.div(2);
+
+          const tx = await queue["deposit(uint256)"](params.deposit, {
+            value: ethSent,
+            gasPrice,
+          });
+          const receipt = await tx.wait();
+          const gasFee = receipt.gasUsed.mul(gasPrice);
+
+          const queueWETHBalanceAfter = await weth.balanceOf(addresses.queue);
+          const lp1WETHBalanceAfter = await weth.balanceOf(addresses.lp1);
+          const lp1ETHBalanceAfter = await provider.getBalance(addresses.lp1);
+
+          assert.bnEqual(
+            await queue["balanceOf(address,uint256)"](
+              addresses.lp1,
+              await queue.getCurrentTokenId()
+            ),
+            await asset.balanceOf(addresses.queue)
+          );
+
+          almost(
+            queueWETHBalanceAfter.sub(queueWETHBalanceBefore),
+            params.deposit
+          );
+
+          almost(
+            lp1WETHBalanceBefore.sub(lp1WETHBalanceAfter),
+            params.deposit.sub(ethSent)
+          );
+
+          almost(
+            lp1ETHBalanceBefore.sub(lp1ETHBalanceAfter).sub(gasFee),
+            ethSent
+          );
+        });
+      } else {
+        it("should revert if collateral token != wETH", async () => {
+          await asset
+            .connect(signers.lp1)
+            .approve(addresses.queue, ethers.constants.MaxUint256);
+          await expect(
+            queue["deposit(uint256)"](params.deposit, {
+              value: params.deposit,
+              gasPrice,
+            })
+          ).to.be.revertedWith("collateral token != wETH");
+        });
+      }
+    });
+
+    describe("#swapAndDeposit(uint256)", () => {
+      let tokenIn: MockERC20;
+      let tokenOut: MockERC20;
+      let path: string[];
+
+      time.revertToSnapshotAfterEach(async () => {
+        tokenIn = uni.tokenIn;
+
+        tokenOut = params.isCall
+          ? poolUtil.underlyingAsset
+          : poolUtil.baseAsset;
+
+        path =
+          tokenOut.address === weth.address
+            ? [tokenIn.address, weth.address]
+            : [tokenIn.address, weth.address, tokenOut.address];
+      });
+
+      it("should revert if buyer sends ETH and tokenIn !== wETH", async () => {
+        const amountOutMin = params.deposit;
+
+        const [expectedInputAmount] = await uni.router.getAmountsIn(
+          amountOutMin,
+          path
+        );
+
+        const iface = new ethers.utils.Interface(uniswap.abi);
+
+        const data = iface.encodeFunctionData("swapExactTokensForTokens", [
+          expectedInputAmount,
+          amountOutMin,
+          path,
+          exchange.address,
+          (await time.now()) + 86400,
+        ]);
+
+        await tokenIn
+          .connect(signers.lp1)
+          .approve(addresses.queue, ethers.constants.MaxUint256);
+
+        await expect(
+          queue[
+            "swapAndDeposit((address,uint256,uint256,address,address,bytes,address))"
+          ](
+            {
+              tokenIn: tokenIn.address,
+              amountInMax: expectedInputAmount,
+              amountOutMin,
+              callee: uni.router.address,
+              allowanceTarget: uni.router.address,
+              data,
+              refundAddress: addresses.lp1,
+            },
+            { value: expectedInputAmount }
+          )
+        ).to.be.revertedWith("tokenIn != wETH");
+      });
+
+      if (params.collateral.name !== "wETH") {
+        it("should deposit using ETH only", async () => {
+          const amountOutMin = parseEther("10");
+
+          path = [weth.address, tokenOut.address];
+
+          const [amountOut] = await uni.router.getAmountsIn(amountOutMin, path);
+
+          const amountInMax = amountOut.mul(120).div(100);
+
+          const iface = new ethers.utils.Interface(uniswap.abi);
+
+          const data = iface.encodeFunctionData("swapTokensForExactTokens", [
+            amountOut,
+            amountInMax,
+            path,
+            exchange.address,
+            (await time.now()) + 86400,
+          ]);
+
+          const queueWETHBalanceBefore = await weth.balanceOf(addresses.queue);
+          const queueTokenOutBalanceBefore = await tokenOut.balanceOf(
+            addresses.queue
+          );
+          const lp1ETHBalanceBefore = await provider.getBalance(addresses.lp1);
+
+          const tx = await queue[
+            "swapAndDeposit((address,uint256,uint256,address,address,bytes,address))"
+          ](
+            {
+              tokenIn: weth.address,
+              amountInMax: 0,
+              amountOutMin: 0,
+              callee: uni.router.address,
+              allowanceTarget: uni.router.address,
+              data,
+              refundAddress: addresses.lp1,
+            },
+            { value: amountInMax, gasPrice }
+          );
+
+          const receipt = await tx.wait();
+          const gasFee = receipt.gasUsed.mul(gasPrice);
+
+          const queueWETHBalanceAfter = await weth.balanceOf(addresses.queue);
+          const queueTokenOutBalanceAfter = await tokenOut.balanceOf(
+            addresses.queue
+          );
+          const lp1ETHBalanceAfter = await provider.getBalance(addresses.lp1);
+
+          assert.bnEqual(
+            await queue["balanceOf(address,uint256)"](
+              addresses.lp1,
+              await queue.getCurrentTokenId()
+            ),
+            amountOut
+          );
+
+          almost(queueWETHBalanceAfter, queueWETHBalanceBefore);
+
+          almost(
+            queueTokenOutBalanceAfter.sub(queueTokenOutBalanceBefore),
+            amountOut
+          );
+
+          almost(
+            lp1ETHBalanceBefore.sub(lp1ETHBalanceAfter).sub(gasFee),
+            amountInMax
+          );
+        });
+
+        it("should deposit using non-collateral ERC20 token only", async () => {
+          const amountOutMin = params.deposit;
+
+          const [amountIn] = await uni.router.getAmountsIn(amountOutMin, path);
+
+          const iface = new ethers.utils.Interface(uniswap.abi);
+
+          const data = iface.encodeFunctionData("swapExactTokensForTokens", [
+            amountIn,
+            amountOutMin,
+            path,
+            exchange.address,
+            (await time.now()) + 86400,
+          ]);
+
+          const queueTokenInBalanceBefore = await tokenIn.balanceOf(
+            addresses.queue
+          );
+
+          const lp1TokenInBalanceBefore = await tokenIn.balanceOf(
+            addresses.lp1
+          );
+
+          const queueTokenOutBalanceBefore = await tokenOut.balanceOf(
+            addresses.queue
+          );
+
+          const lp1TokenOutBalanceBefore = await tokenOut.balanceOf(
+            addresses.lp1
+          );
+
+          await tokenIn
+            .connect(signers.lp1)
+            .approve(addresses.queue, ethers.constants.MaxUint256);
+
+          await queue[
+            "swapAndDeposit((address,uint256,uint256,address,address,bytes,address))"
+          ]({
+            tokenIn: tokenIn.address,
+            amountInMax: amountIn,
+            amountOutMin: amountOutMin,
+            callee: uni.router.address,
+            allowanceTarget: uni.router.address,
+            data,
+            refundAddress: addresses.lp1,
+          });
+
+          const queueTokenInBalanceAfter = await tokenIn.balanceOf(
+            addresses.queue
+          );
+
+          const lp1TokenInBalanceAfter = await tokenIn.balanceOf(addresses.lp1);
+
+          const queueTokenOutBalanceAfter = await tokenOut.balanceOf(
+            addresses.queue
+          );
+
+          const lp1TokenOutBalanceAfter = await tokenOut.balanceOf(
+            addresses.lp1
+          );
+
+          assert.bnEqual(
+            await queue["balanceOf(address,uint256)"](
+              addresses.lp1,
+              await queue.getCurrentTokenId()
+            ),
+            amountOutMin
+          );
+
+          almost(queueTokenInBalanceAfter, queueTokenInBalanceBefore);
+
+          almost(lp1TokenInBalanceBefore.sub(lp1TokenInBalanceAfter), amountIn);
+
+          almost(
+            queueTokenOutBalanceAfter.sub(queueTokenOutBalanceBefore),
+            amountOutMin
+          );
+
+          almost(lp1TokenOutBalanceAfter, lp1TokenOutBalanceBefore);
+        });
+      }
     });
 
     describe("#withdraw(uint256)", () => {

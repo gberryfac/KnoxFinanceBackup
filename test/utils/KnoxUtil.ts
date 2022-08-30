@@ -106,11 +106,9 @@ export class KnoxUtil {
     addresses.vault = vault.address;
 
     // deploy ExchangeHelper
-    const exchange = await new ExchangeHelper__factory(signers.deployer).deploy(
-      params.minSize,
-      auction.address,
-      addresses.vault
-    );
+    const exchange = await new ExchangeHelper__factory(
+      signers.deployer
+    ).deploy();
 
     addresses.exchange = exchange.address;
 
@@ -155,8 +153,7 @@ export class KnoxUtil {
     const queueProxy = await new QueueProxy__factory(signers.deployer).deploy(
       params.maxTVL,
       addresses.exchange,
-      queue.address,
-      addresses.vault
+      queue.address
     );
 
     queue = Queue__factory.connect(queueProxy.address, signers.lp1);
@@ -173,12 +170,7 @@ export class KnoxUtil {
 
     const auctionProxy = await new AuctionProxy__factory(
       signers.deployer
-    ).deploy(
-      params.minSize,
-      addresses.exchange,
-      auction.address,
-      addresses.vault
-    );
+    ).deploy(params.minSize, addresses.exchange, auction.address);
 
     auction = Auction__factory.connect(auctionProxy.address, signers.buyer1);
     addresses.auction = auction.address;
@@ -186,6 +178,7 @@ export class KnoxUtil {
     // inititialize Vault
     const initImpl = {
       auction: addresses.auction,
+      exchange: addresses.exchange,
       queue: addresses.queue,
       pricer: addresses.pricer,
     };
@@ -196,6 +189,39 @@ export class KnoxUtil {
 
     // gets vault signer
     signers.vault = await accounts.impersonateVault(signers, addresses);
+
+    // setup Uniswap Pools
+    const uni = await uniswap.createUniswap(signers.deployer, weth.address);
+
+    const pairTokenIn = await uniswap.createUniswapPair(
+      signers.deployer,
+      uni.factory,
+      uni.tokenIn.address,
+      weth.address
+    );
+
+    await uniswap.depositUniswapLiquidity(
+      signers.deployer,
+      pairTokenIn,
+      params.mint.div(10),
+      params.mint.div(10)
+    );
+
+    if (asset.address !== weth.address) {
+      const pairTokenOut = await uniswap.createUniswapPair(
+        signers.deployer,
+        uni.factory,
+        asset.address, // vault collateral asset
+        weth.address
+      );
+
+      await uniswap.depositUniswapLiquidity(
+        signers.deployer,
+        pairTokenOut,
+        params.mint.div(10),
+        params.mint.div(10)
+      );
+    }
 
     return new KnoxUtil({
       params,
