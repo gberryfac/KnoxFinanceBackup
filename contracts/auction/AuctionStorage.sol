@@ -34,7 +34,6 @@ library AuctionStorage {
     }
 
     struct Layout {
-        address vault;
         uint256 minSize;
         mapping(uint64 => Auction) auctions;
         mapping(uint64 => OrderBook.Index) orderbooks;

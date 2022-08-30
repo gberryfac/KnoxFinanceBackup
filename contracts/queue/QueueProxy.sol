@@ -17,14 +17,9 @@ contract QueueProxy is UpgradeableProxyOwnable {
     using QueueStorage for QueueStorage.Layout;
     using UpgradeableProxyStorage for UpgradeableProxyStorage.Layout;
 
-    constructor(
-        uint256 maxTVL,
-        address implementation,
-        address vault
-    ) {
+    constructor(uint256 maxTVL, address implementation) {
         {
             QueueStorage.Layout storage l = QueueStorage.layout();
-            l.vault = vault;
             l.maxTVL = maxTVL;
         }
 

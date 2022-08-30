@@ -106,8 +106,7 @@ export class KnoxUtil {
 
     const queueProxy = await new QueueProxy__factory(signers.deployer).deploy(
       params.maxTVL,
-      queue.address,
-      addresses.vault
+      queue.address
     );
 
     queue = Queue__factory.connect(queueProxy.address, signers.lp1);
@@ -122,7 +121,7 @@ export class KnoxUtil {
 
     const auctionProxy = await new AuctionProxy__factory(
       signers.deployer
-    ).deploy(params.minSize, auction.address, addresses.vault);
+    ).deploy(params.minSize, auction.address);
 
     auction = Auction__factory.connect(auctionProxy.address, signers.buyer1);
     addresses.auction = auction.address;
