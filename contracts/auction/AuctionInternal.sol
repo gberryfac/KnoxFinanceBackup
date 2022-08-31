@@ -422,9 +422,10 @@ contract AuctionInternal is IAuctionEvents, OwnableInternal {
 
         for (uint256 i = 1; i <= length; i++) {
             OrderBook.Data memory data = orderbook._getOrderById(next);
+            next = orderbook._getNextOrder(next);
 
             if (data.buyer == buyer) {
-                // if lastPrice64x64 > type(int128).max, auction is cancelled, only send refund
+                // if lastPrice64x64 == type(int128).max, auction is cancelled, only send refund
                 if (
                     lastPrice64x64 < type(int128).max &&
                     data.price64x64 >= lastPrice64x64
@@ -453,7 +454,6 @@ contract AuctionInternal is IAuctionEvents, OwnableInternal {
             }
 
             totalContractsSold += data.size;
-            next = orderbook._getNextOrder(next);
         }
 
         return (refund, fill);

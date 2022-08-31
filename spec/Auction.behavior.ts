@@ -5,10 +5,7 @@ const { provider } = ethers;
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { fixedFromFloat, fixedToBn, fixedToNumber } from "@premia/utils";
 
-import chai, { expect } from "chai";
-import chaiAlmost from "chai-almost";
-
-chai.use(chaiAlmost());
+import { expect } from "chai";
 
 import moment from "moment-timezone";
 moment.tz.setDefault("UTC");
@@ -129,11 +126,16 @@ export function describeBehaviorOfAuction(
 
       const clearingPrice64x64 = await auction.clearingPrice64x64(epoch);
 
-      return { txs, totalContractsSold, buyerOrderSize, clearingPrice64x64 };
+      return {
+        txs,
+        totalContractsSold,
+        buyerOrderSize,
+        clearingPrice64x64: fixedToNumber(clearingPrice64x64),
+      };
     };
 
     const setupAdvancedAuction = async (processAuction: boolean) => {
-      const [startTime, endTime] = await knoxUtil.setAndInitializeAuction();
+      const [startTime] = await knoxUtil.setAndInitializeAuction();
 
       let epoch = await vault.getEpoch();
 
@@ -181,7 +183,7 @@ export function describeBehaviorOfAuction(
         buyer1OrderSize,
         buyer2OrderSize,
         buyer3OrderSize,
-        clearingPrice64x64,
+        clearingPrice64x64: fixedToNumber(clearingPrice64x64),
       };
     };
 
@@ -2375,11 +2377,17 @@ export function describeBehaviorOfAuction(
     });
 
     describe("#withdraw(uint64)", () => {
+      let buyer1OrderSize1 = 40;
+      let buyer1OrderSize2 = 1;
+      let buyer2OrderSize = 20;
+      let buyer3OrderSize = 10;
+
       const verifyBalancesAfterWithdraw = async (
         buyer: SignerWithAddress,
         estimatedRefund: BigNumber,
         estimatedFill: BigNumber,
-        longTokenId: BigNumber
+        longTokenId: BigNumber,
+        tolerance?: BigNumber
       ) => {
         const auctionERC20BalanceBefore = await asset.balanceOf(
           addresses.auction
@@ -2414,24 +2422,28 @@ export function describeBehaviorOfAuction(
           longTokenId
         );
 
-        expect(math.bnToNumber(auctionERC20BalanceAfter)).to.almost(
-          math.bnToNumber(auctionERC20BalanceBefore.sub(estimatedRefund)),
-          1
+        almost(
+          auctionERC20BalanceBefore.sub(auctionERC20BalanceAfter),
+          estimatedRefund,
+          tolerance
         );
 
-        expect(math.bnToNumber(buyerERC20BalanceAfter)).to.almost(
-          math.bnToNumber(buyerERC20BalanceBefore.add(estimatedRefund)),
-          1
+        almost(
+          buyerERC20BalanceAfter.sub(buyerERC20BalanceBefore),
+          estimatedRefund,
+          tolerance
         );
 
-        expect(math.bnToNumber(auctionERC1155BalanceAfter)).to.almost(
-          math.bnToNumber(auctionERC1155BalanceBefore.sub(estimatedFill)),
-          1
+        almost(
+          auctionERC1155BalanceBefore.sub(auctionERC1155BalanceAfter),
+          estimatedFill,
+          tolerance
         );
 
-        expect(math.bnToNumber(buyerERC1155BalanceAfter)).to.almost(
-          math.bnToNumber(buyerERC1155BalanceBefore.add(estimatedFill)),
-          1
+        almost(
+          buyerERC1155BalanceAfter.sub(buyerERC1155BalanceBefore),
+          estimatedFill,
+          tolerance
         );
       };
 
@@ -2448,26 +2460,28 @@ export function describeBehaviorOfAuction(
       });
 
       describe("else if cancelled", () => {
-        let buyer1OrderSize1 = math.toUnits(40);
-        let buyer1OrderSize2 = math.toUnits(1);
-        let buyer2OrderSize = math.toUnits(20);
-        let buyer3OrderSize = math.toUnits(10);
-
-        let endTime: BigNumber;
         let epoch: BigNumber;
 
         let longTokenId: BigNumber;
 
         time.revertToSnapshotAfterEach(async () => {
-          [, endTime, epoch] = await knoxUtil.setAndInitializeAuction();
+          [, , epoch] = await knoxUtil.setAndInitializeAuction();
           [, , longTokenId] = await vault.getOption(epoch);
 
           await asset
             .connect(signers.buyer1)
             .approve(addresses.auction, ethers.constants.MaxUint256);
 
-          await auction.addLimitOrder(epoch, maxPrice64x64, buyer1OrderSize1);
-          await auction.addLimitOrder(epoch, minPrice64x64, buyer1OrderSize2);
+          await auction.addLimitOrder(
+            epoch,
+            maxPrice64x64,
+            math.toUnits(buyer1OrderSize1)
+          );
+          await auction.addLimitOrder(
+            epoch,
+            minPrice64x64,
+            math.toUnits(buyer1OrderSize2)
+          );
 
           await asset
             .connect(signers.buyer2)
@@ -2475,7 +2489,7 @@ export function describeBehaviorOfAuction(
 
           await auction
             .connect(signers.buyer2)
-            .addLimitOrder(epoch, minPrice64x64, buyer2OrderSize);
+            .addLimitOrder(epoch, minPrice64x64, math.toUnits(buyer2OrderSize));
 
           await asset
             .connect(signers.buyer3)
@@ -2483,7 +2497,7 @@ export function describeBehaviorOfAuction(
 
           await auction
             .connect(signers.buyer3)
-            .addLimitOrder(epoch, maxPrice64x64, buyer3OrderSize);
+            .addLimitOrder(epoch, maxPrice64x64, math.toUnits(buyer3OrderSize));
 
           await time.fastForwardToFriday8AM();
 
@@ -2496,8 +2510,8 @@ export function describeBehaviorOfAuction(
 
         it("should send buyer1 refund, only", async () => {
           const estimatedRefund = math.toUnits(
-            params.price.max * math.bnToNumber(buyer1OrderSize1) +
-              params.price.min * math.bnToNumber(buyer1OrderSize2)
+            params.price.max * buyer1OrderSize1 +
+              params.price.min * buyer1OrderSize2
           );
 
           await verifyBalancesAfterWithdraw(
@@ -2510,7 +2524,7 @@ export function describeBehaviorOfAuction(
 
         it("should send buyer2 refund, only", async () => {
           const estimatedRefund = math.toUnits(
-            params.price.min * math.bnToNumber(buyer2OrderSize)
+            params.price.min * buyer2OrderSize
           );
 
           await verifyBalancesAfterWithdraw(
@@ -2523,7 +2537,7 @@ export function describeBehaviorOfAuction(
 
         it("should send buyer3 refund, only", async () => {
           const estimatedRefund = math.toUnits(
-            params.price.max * math.bnToNumber(buyer3OrderSize)
+            params.price.max * buyer3OrderSize
           );
 
           await verifyBalancesAfterWithdraw(
@@ -2550,7 +2564,7 @@ export function describeBehaviorOfAuction(
             advancedAuction.buyer1OrderSize,
             advancedAuction.buyer1OrderSize,
             params.price.max,
-            fixedToNumber(advancedAuction.clearingPrice64x64)
+            advancedAuction.clearingPrice64x64
           );
 
           const estimatedFill = advancedAuction.buyer1OrderSize;
@@ -2587,7 +2601,7 @@ export function describeBehaviorOfAuction(
             advancedAuction.buyer3OrderSize,
             estimatedFill,
             fixedToNumber(args.price64x64),
-            fixedToNumber(advancedAuction.clearingPrice64x64)
+            advancedAuction.clearingPrice64x64
           );
 
           await verifyBalancesAfterWithdraw(
@@ -2616,7 +2630,7 @@ export function describeBehaviorOfAuction(
             simpleAuction.buyerOrderSize,
             simpleAuction.buyerOrderSize,
             fixedToNumber(args.price64x64),
-            fixedToNumber(simpleAuction.clearingPrice64x64)
+            simpleAuction.clearingPrice64x64
           );
 
           const estimatedFill = simpleAuction.buyerOrderSize;
@@ -2636,7 +2650,7 @@ export function describeBehaviorOfAuction(
             simpleAuction.buyerOrderSize,
             simpleAuction.buyerOrderSize,
             fixedToNumber(args.price64x64),
-            fixedToNumber(simpleAuction.clearingPrice64x64)
+            simpleAuction.clearingPrice64x64
           );
 
           const estimatedFill = simpleAuction.buyerOrderSize;
@@ -2657,7 +2671,8 @@ export function describeBehaviorOfAuction(
             signers.buyer3,
             estimatedRefund,
             estimatedFill,
-            longTokenId
+            longTokenId,
+            parseUnits("1", params.collateral.decimals - 3) // min tolerance
           );
         });
       });
@@ -2690,17 +2705,28 @@ export function describeBehaviorOfAuction(
         });
 
         it("should send buyer1 exercised amount for fill and refund", async () => {
-          let estimatedRefund = math.toUnits(
+          const estimatedFill = advancedAuction.buyer1OrderSize;
+
+          let estimatedRefund = estimateRefund(
+            advancedAuction.buyer1OrderSize,
+            advancedAuction.buyer1OrderSize,
+            params.price.max,
+            advancedAuction.clearingPrice64x64
+          );
+
+          let exercisedAmount = math.toUnits(
             math.bnToNumber(BigNumber.from(intrinsicValue), 8) *
-              math.bnToNumber(advancedAuction.buyer1OrderSize)
+              math.bnToNumber(estimatedFill)
           );
 
           if (params.isCall) {
             // convert to underlying amount
-            estimatedRefund = estimatedRefund.div(
+            exercisedAmount = exercisedAmount.div(
               math.bnToNumber(BigNumber.from(spot), 8)
             );
           }
+
+          estimatedRefund = estimatedRefund.add(exercisedAmount);
 
           await verifyBalancesAfterWithdraw(
             signers.buyer1,
@@ -2729,8 +2755,8 @@ export function describeBehaviorOfAuction(
           let estimatedRefund = estimateRefund(
             advancedAuction.buyer3OrderSize,
             estimatedFill,
-            params.price.max,
-            fixedToNumber(advancedAuction.clearingPrice64x64)
+            advancedAuction.clearingPrice64x64,
+            advancedAuction.clearingPrice64x64
           );
 
           let exercisedAmount = math.toUnits(
@@ -2776,7 +2802,7 @@ export function describeBehaviorOfAuction(
             advancedAuction.buyer1OrderSize,
             advancedAuction.buyer1OrderSize,
             params.price.max,
-            fixedToNumber(advancedAuction.clearingPrice64x64)
+            advancedAuction.clearingPrice64x64
           );
 
           await verifyBalancesAfterWithdraw(
@@ -2811,7 +2837,7 @@ export function describeBehaviorOfAuction(
             advancedAuction.buyer3OrderSize,
             estimatedFill,
             fixedToNumber(args.price64x64),
-            fixedToNumber(advancedAuction.clearingPrice64x64)
+            advancedAuction.clearingPrice64x64
           );
 
           await verifyBalancesAfterWithdraw(
@@ -2870,17 +2896,17 @@ export function describeBehaviorOfAuction(
     });
 
     describe("#previewWithdraw(uint64)", () => {
+      let buyer1OrderSize1 = 40;
+      let buyer1OrderSize2 = 1;
+      let buyer2OrderSize = 20;
+      let buyer3OrderSize = 10;
+
       describe("if cancelled", () => {
         const underlyingPrice = params.underlying.oracle.price;
         const basePrice = params.base.oracle.price;
 
         const strike = underlyingPrice / basePrice;
         const strike64x64 = fixedFromFloat(strike);
-
-        let buyer1OrderSize1 = math.toUnits(40);
-        let buyer1OrderSize2 = math.toUnits(1);
-        let buyer2OrderSize = math.toUnits(20);
-        let buyer3OrderSize = math.toUnits(10);
 
         let epoch = BigNumber.from(0);
 
@@ -2902,8 +2928,16 @@ export function describeBehaviorOfAuction(
             .connect(signers.buyer1)
             .approve(addresses.auction, ethers.constants.MaxUint256);
 
-          await auction.addLimitOrder(epoch, maxPrice64x64, buyer1OrderSize1);
-          await auction.addLimitOrder(epoch, minPrice64x64, buyer1OrderSize2);
+          await auction.addLimitOrder(
+            epoch,
+            maxPrice64x64,
+            math.toUnits(buyer1OrderSize1)
+          );
+          await auction.addLimitOrder(
+            epoch,
+            minPrice64x64,
+            math.toUnits(buyer1OrderSize2)
+          );
 
           await asset
             .connect(signers.buyer2)
@@ -2911,7 +2945,7 @@ export function describeBehaviorOfAuction(
 
           await auction
             .connect(signers.buyer2)
-            .addLimitOrder(epoch, minPrice64x64, buyer2OrderSize);
+            .addLimitOrder(epoch, minPrice64x64, math.toUnits(buyer2OrderSize));
 
           await asset
             .connect(signers.buyer3)
@@ -2919,7 +2953,7 @@ export function describeBehaviorOfAuction(
 
           await auction
             .connect(signers.buyer3)
-            .addLimitOrder(epoch, maxPrice64x64, buyer3OrderSize);
+            .addLimitOrder(epoch, maxPrice64x64, math.toUnits(buyer3OrderSize));
 
           // auction prices are unset, auction is cancelled
           await auction.connect(signers.vault).setAuctionPrices(epoch, 0, 0);
@@ -2927,8 +2961,8 @@ export function describeBehaviorOfAuction(
 
         it("should preview buyer1 refund, only", async () => {
           const estimatedRefund =
-            params.price.max * math.bnToNumber(buyer1OrderSize1) +
-            params.price.min * math.bnToNumber(buyer1OrderSize2);
+            params.price.max * buyer1OrderSize1 +
+            params.price.min * buyer1OrderSize2;
 
           const [refund, fill] = await auction.callStatic[
             "previewWithdraw(uint64)"
@@ -2939,8 +2973,7 @@ export function describeBehaviorOfAuction(
         });
 
         it("should preview buyer2 refund, only", async () => {
-          const estimatedRefund =
-            params.price.min * math.bnToNumber(buyer2OrderSize);
+          const estimatedRefund = params.price.min * buyer2OrderSize;
 
           const [refund, fill] = await auction
             .connect(signers.buyer2)
@@ -2951,8 +2984,7 @@ export function describeBehaviorOfAuction(
         });
 
         it("should preview buyer3 refund, only", async () => {
-          const estimatedRefund =
-            params.price.max * math.bnToNumber(buyer3OrderSize);
+          const estimatedRefund = params.price.max * buyer3OrderSize;
 
           const [refund, fill] = await auction
             .connect(signers.buyer3)
@@ -2977,7 +3009,7 @@ export function describeBehaviorOfAuction(
           );
 
           const cost = math.toUnits(
-            fixedToNumber(advancedAuction.clearingPrice64x64) *
+            advancedAuction.clearingPrice64x64 *
               math.bnToNumber(advancedAuction.buyer1OrderSize)
           );
 
@@ -2987,15 +3019,8 @@ export function describeBehaviorOfAuction(
             .connect(signers.buyer1)
             .callStatic["previewWithdraw(uint64)"](epoch);
 
-          expect(math.bnToNumber(refund)).to.almost(
-            math.bnToNumber(estimatedRefund),
-            1
-          );
-
-          expect(math.bnToNumber(fill)).to.almost(
-            math.bnToNumber(advancedAuction.buyer1OrderSize),
-            1
-          );
+          almost(refund, estimatedRefund);
+          almost(fill, advancedAuction.buyer1OrderSize);
         });
 
         it("should preview buyer2 with refund only", async () => {
@@ -3007,7 +3032,7 @@ export function describeBehaviorOfAuction(
             .callStatic["previewWithdraw(uint64)"](epoch);
 
           assert.isTrue(fill.isZero());
-          expect(math.bnToNumber(refund)).to.almost(estimatedRefund, 1);
+          almost(refund, estimatedRefund);
         });
 
         it("should preview buyer3 with partial fill and refund", async () => {
@@ -3015,17 +3040,19 @@ export function describeBehaviorOfAuction(
           const remainder = math.bnToNumber(
             advancedAuction.buyer3OrderSize.sub(estimatedFill)
           );
-          const estimatedRefund = params.price.max * remainder;
+
+          const price = advancedAuction.clearingPrice64x64;
+          const paid = price * math.bnToNumber(advancedAuction.buyer3OrderSize);
+          const cost = price * remainder;
+
+          const estimatedRefund = paid - cost;
 
           const [refund, fill] = await auction
             .connect(signers.buyer3)
             .callStatic["previewWithdraw(uint64)"](epoch);
 
-          expect(math.bnToNumber(fill)).to.almost(
-            math.bnToNumber(estimatedFill),
-            1
-          );
-          expect(math.bnToNumber(refund)).to.almost(estimatedRefund, 1);
+          almost(fill, estimatedFill);
+          almost(refund, estimatedRefund);
         });
       });
 
@@ -3044,21 +3071,15 @@ export function describeBehaviorOfAuction(
             simpleAuction.buyerOrderSize,
             simpleAuction.buyerOrderSize,
             fixedToNumber(args.price64x64),
-            fixedToNumber(simpleAuction.clearingPrice64x64)
+            simpleAuction.clearingPrice64x64
           );
 
           const [refund, fill] = await auction.callStatic[
             "previewWithdraw(uint64)"
           ](epoch);
 
-          expect(math.bnToNumber(refund)).to.almost(
-            math.bnToNumber(estimatedRefund),
-            1
-          );
-          expect(math.bnToNumber(fill)).to.almost(
-            math.bnToNumber(simpleAuction.buyerOrderSize),
-            1
-          );
+          almost(refund, estimatedRefund);
+          almost(fill, simpleAuction.buyerOrderSize);
         });
 
         it("should preview buyer2 with fill and refund", async () => {
@@ -3068,21 +3089,15 @@ export function describeBehaviorOfAuction(
             simpleAuction.buyerOrderSize,
             simpleAuction.buyerOrderSize,
             fixedToNumber(args.price64x64),
-            fixedToNumber(simpleAuction.clearingPrice64x64)
+            simpleAuction.clearingPrice64x64
           );
 
           const [refund, fill] = await auction
             .connect(signers.buyer2)
             .callStatic["previewWithdraw(uint64)"](epoch);
 
-          expect(math.bnToNumber(refund)).to.almost(
-            math.bnToNumber(estimatedRefund),
-            1
-          );
-          expect(math.bnToNumber(fill)).to.almost(
-            math.bnToNumber(simpleAuction.buyerOrderSize),
-            1
-          );
+          almost(refund, estimatedRefund);
+          almost(fill, simpleAuction.buyerOrderSize);
         });
 
         it("should preview buyer3 with fill only", async () => {
@@ -3090,11 +3105,8 @@ export function describeBehaviorOfAuction(
             .connect(signers.buyer3)
             .callStatic["previewWithdraw(uint64)"](epoch);
 
-          expect(math.bnToNumber(refund)).to.almost(0, 1);
-          expect(math.bnToNumber(fill)).to.almost(
-            math.bnToNumber(simpleAuction.buyerOrderSize),
-            1
-          );
+          almost(refund, 0, parseUnits("1", params.collateral.decimals - 3)); // min tolerance
+          almost(fill, simpleAuction.buyerOrderSize);
         });
       });
 
