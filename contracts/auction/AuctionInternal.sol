@@ -18,8 +18,6 @@ import "../vault/IVault.sol";
 import "./AuctionStorage.sol";
 import "./IAuctionEvents.sol";
 
-import "hardhat/console.sol";
-
 contract AuctionInternal is IAuctionEvents, OwnableInternal {
     using ABDKMath64x64 for int128;
     using ABDKMath64x64 for uint256;

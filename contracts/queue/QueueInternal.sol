@@ -16,8 +16,6 @@ import "../vault/IVault.sol";
 import "./IQueueEvents.sol";
 import "./QueueStorage.sol";
 
-import "hardhat/console.sol";
-
 contract QueueInternal is
     ERC1155BaseInternal,
     ERC1155EnumerableInternal,

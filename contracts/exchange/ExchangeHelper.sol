@@ -9,8 +9,6 @@ import "@solidstate/contracts/utils/SafeERC20.sol";
 
 import "./IExchangeHelper.sol";
 
-import "hardhat/console.sol";
-
 /**
  * @dev do NOT set additional approval to this contract!
  */

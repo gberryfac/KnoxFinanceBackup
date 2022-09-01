@@ -13,8 +13,6 @@ import "./IVault.sol";
 import "./IVaultEvents.sol";
 import "./VaultStorage.sol";
 
-import "hardhat/console.sol";
-
 contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
     using ABDKMath64x64 for int128;
     using ABDKMath64x64 for uint256;
