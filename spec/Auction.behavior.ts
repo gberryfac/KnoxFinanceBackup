@@ -289,7 +289,7 @@ export function describeBehaviorOfAuction(
 
         await expect(
           auction.connect(signers.vault).initialize(initAuction)
-        ).to.be.revertedWith("auction !uninitialized");
+        ).to.be.revertedWith("status != uninitialized");
       });
 
       it("should revert if endTime <= startTime", async () => {
@@ -384,7 +384,7 @@ export function describeBehaviorOfAuction(
             auction
               .connect(signers.vault)
               .setAuctionPrices(0, maxPrice64x64, minPrice64x64)
-          ).to.be.revertedWith("restricted");
+          ).to.be.revertedWith("status != initialized");
         });
       });
 
@@ -635,7 +635,7 @@ export function describeBehaviorOfAuction(
         });
 
         it("should add epoch to buyer if successful", async () => {
-          assert.isEmpty(await auction.epochsByBuyer(addresses.buyer1));
+          assert.isEmpty(await auction.getEpochsByBuyer(addresses.buyer1));
 
           await asset
             .connect(signers.buyer1)
@@ -647,7 +647,7 @@ export function describeBehaviorOfAuction(
             params.size
           );
 
-          const epochByBuyer = await auction.epochsByBuyer(addresses.buyer1);
+          const epochByBuyer = await auction.getEpochsByBuyer(addresses.buyer1);
 
           assert.equal(epochByBuyer.length, 1);
           assert.bnEqual(epochByBuyer[0], epoch);
@@ -846,7 +846,7 @@ export function describeBehaviorOfAuction(
               fixedFromFloat(params.price.max),
               params.size
             )
-          ).to.be.revertedWith("auction finalized");
+          ).to.be.revertedWith("status == finalized");
         });
       });
 
@@ -862,7 +862,7 @@ export function describeBehaviorOfAuction(
               fixedFromFloat(params.price.max),
               params.size
             )
-          ).to.be.revertedWith("auction processed");
+          ).to.be.revertedWith("status == processed");
         });
       });
     });
@@ -1327,12 +1327,12 @@ export function describeBehaviorOfAuction(
             params.size
           );
 
-          let epochByBuyer = await auction.epochsByBuyer(addresses.buyer1);
+          let epochByBuyer = await auction.getEpochsByBuyer(addresses.buyer1);
           assert.equal(epochByBuyer.length, 1);
 
           await auction.cancelLimitOrder(epoch, 1);
 
-          epochByBuyer = await auction.epochsByBuyer(addresses.buyer1);
+          epochByBuyer = await auction.getEpochsByBuyer(addresses.buyer1);
           assert.isEmpty(epochByBuyer);
         });
       });
@@ -1404,7 +1404,7 @@ export function describeBehaviorOfAuction(
 
         it("should revert", async () => {
           await expect(auction.cancelLimitOrder(0, 1)).to.be.revertedWith(
-            "auction finalized"
+            "status == finalized"
           );
         });
       });
@@ -1416,7 +1416,7 @@ export function describeBehaviorOfAuction(
 
         it("should revert", async () => {
           await expect(auction.cancelLimitOrder(0, 1)).to.be.revertedWith(
-            "auction processed"
+            "status == processed"
           );
         });
       });
@@ -1576,7 +1576,7 @@ export function describeBehaviorOfAuction(
         });
 
         it("should add epoch to buyer if successful", async () => {
-          assert.isEmpty(await auction.epochsByBuyer(addresses.buyer1));
+          assert.isEmpty(await auction.getEpochsByBuyer(addresses.buyer1));
 
           await asset
             .connect(signers.buyer1)
@@ -1588,7 +1588,7 @@ export function describeBehaviorOfAuction(
             ethers.constants.MaxUint256
           );
 
-          const epochByBuyer = await auction.epochsByBuyer(addresses.buyer1);
+          const epochByBuyer = await auction.getEpochsByBuyer(addresses.buyer1);
 
           assert.equal(epochByBuyer.length, 1);
           assert.bnEqual(epochByBuyer[0], epoch);
@@ -1753,7 +1753,7 @@ export function describeBehaviorOfAuction(
         it("should revert", async () => {
           await expect(
             auction.addMarketOrder(0, params.size, ethers.constants.MaxUint256)
-          ).to.be.revertedWith("auction finalized");
+          ).to.be.revertedWith("status == finalized");
         });
       });
 
@@ -1765,7 +1765,7 @@ export function describeBehaviorOfAuction(
         it("should revert", async () => {
           await expect(
             auction.addMarketOrder(0, params.size, ethers.constants.MaxUint256)
-          ).to.be.revertedWith("auction processed");
+          ).to.be.revertedWith("status == processed");
         });
       });
     });
@@ -2225,7 +2225,7 @@ export function describeBehaviorOfAuction(
 
         it("should revert", async () => {
           await expect(auction.finalizeAuction(0)).to.be.revertedWith(
-            "auction finalized"
+            "status == finalized"
           );
         });
       });
@@ -2237,7 +2237,7 @@ export function describeBehaviorOfAuction(
 
         it("should revert", async () => {
           await expect(auction.finalizeAuction(0)).to.be.revertedWith(
-            "auction processed"
+            "status == processed"
           );
         });
       });
@@ -2248,7 +2248,7 @@ export function describeBehaviorOfAuction(
         it("should revert", async () => {
           await expect(
             auction.connect(signers.vault).transferPremium(0)
-          ).to.be.revertedWith("restricted");
+          ).to.be.revertedWith("status != finalized");
         });
       });
 
@@ -2299,7 +2299,7 @@ export function describeBehaviorOfAuction(
         it("should revert", async () => {
           await expect(
             auction.connect(signers.vault).transferPremium(0)
-          ).to.be.revertedWith("restricted");
+          ).to.be.revertedWith("status != finalized");
         });
       });
     });
@@ -2309,7 +2309,7 @@ export function describeBehaviorOfAuction(
         it("should revert", async () => {
           await expect(
             auction.connect(signers.vault).transferPremium(0)
-          ).to.be.revertedWith("restricted");
+          ).to.be.revertedWith("status != finalized");
         });
       });
 
@@ -2371,7 +2371,7 @@ export function describeBehaviorOfAuction(
         it("should revert", async () => {
           await expect(
             auction.connect(signers.vault).transferPremium(0)
-          ).to.be.revertedWith("restricted");
+          ).to.be.revertedWith("status != finalized");
         });
       });
     });
@@ -2455,7 +2455,7 @@ export function describeBehaviorOfAuction(
         it("should revert", async () => {
           await expect(
             auction.connect(signers.buyer1).withdraw(0)
-          ).to.be.revertedWith("restricted");
+          ).to.be.revertedWith("status != processed");
         });
       });
 

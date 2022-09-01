@@ -74,175 +74,75 @@ contract AuctionInternal is IAuctionEvents, OwnableInternal {
     }
 
     /**
+     * @dev Throws if auction finalization is not allowed
+     */
+    function _finalizeAuctionAllowed(AuctionStorage.Auction storage auction)
+        internal
+        view
+    {
+        _auctionNotFinalizedOrProcessed(auction.status);
+        _auctionHasStarted(auction);
+    }
+
+    /**
+     * @dev Throws if limit orders are not allowed
+     */
+    function _limitOrdersAllowed(AuctionStorage.Auction storage auction)
+        internal
+        view
+    {
+        _auctionNotFinalizedOrProcessed(auction.status);
+        _auctionHasNotEnded(auction);
+    }
+
+    /**
+     * @dev Throws if market orders are not allowed
+     */
+    function _marketOrdersAllowed(AuctionStorage.Auction storage auction)
+        internal
+        view
+    {
+        _auctionNotFinalizedOrProcessed(auction.status);
+        _auctionHasStarted(auction);
+        _auctionHasNotEnded(auction);
+    }
+
+    /**
      * @dev Throws if auction has not started.
      */
-    modifier auctionHasStarted(uint64 epoch) {
-        AuctionStorage.Layout storage l = AuctionStorage.layout();
-        AuctionStorage.Auction storage auction = l.auctions[epoch];
+    function _auctionHasStarted(AuctionStorage.Auction storage auction)
+        private
+        view
+    {
         require(auction.startTime > 0, "start time is not set");
         require(block.timestamp >= auction.startTime, "auction not started");
-        _;
     }
 
     /**
-     * @dev Throws if auction status does not match function's required status
+     * @dev Throws if auction has ended.
      */
-    modifier auctionStatus(AuctionStorage.Status status, uint64 epoch) {
-        AuctionStorage.Layout storage l = AuctionStorage.layout();
-        AuctionStorage.Auction storage auction = l.auctions[epoch];
-        require(status == auction.status, "restricted");
-        _;
+    function _auctionHasNotEnded(AuctionStorage.Auction storage auction)
+        private
+        view
+    {
+        require(auction.endTime > 0, "end time is not set");
+        require(block.timestamp <= auction.endTime, "auction has ended");
     }
 
+    /**
+     * @dev Throws if auction has been finalized or processed.
+     */
     function _auctionNotFinalizedOrProcessed(AuctionStorage.Status status)
-        internal
+        private
         pure
     {
-        require(AuctionStorage.Status.FINALIZED != status, "auction finalized");
-        require(AuctionStorage.Status.PROCESSED != status, "auction processed");
-    }
-
-    /**
-     * @dev Throws if auction status is either "FINALIZED" or "PROCESSED"
-     */
-    modifier auctionNotFinalizedOrProcessed(uint64 epoch) {
-        AuctionStorage.Layout storage l = AuctionStorage.layout();
-        AuctionStorage.Auction storage auction = l.auctions[epoch];
-        _auctionNotFinalizedOrProcessed(auction.status);
-        _;
-    }
-
-    /**
-     * @dev Throws if auction ended
-     */
-    modifier limitOrdersAllowed(uint64 epoch) {
-        AuctionStorage.Layout storage l = AuctionStorage.layout();
-        AuctionStorage.Auction storage auction = l.auctions[epoch];
-
-        _auctionNotFinalizedOrProcessed(auction.status);
-
-        require(auction.endTime > 0, "end time is not set");
-        require(block.timestamp <= auction.endTime, "auction has ended");
-        _;
-    }
-
-    /**
-     * @dev Throws if auction is not in progress
-     */
-    modifier marketOrdersAllowed(uint64 epoch) {
-        AuctionStorage.Layout storage l = AuctionStorage.layout();
-        AuctionStorage.Auction storage auction = l.auctions[epoch];
-
-        _auctionNotFinalizedOrProcessed(auction.status);
-
-        require(auction.startTime > 0, "start time is not set");
-        require(block.timestamp >= auction.startTime, "auction not started");
-
-        require(auction.endTime > 0, "end time is not set");
-        require(block.timestamp <= auction.endTime, "auction has ended");
-        _;
-    }
-
-    /************************************************
-     *  ADMIN
-     ***********************************************/
-
-    /**
-     * @notice sets a new Exchange Helper contract
-     * @param newExchangeHelper is the new Exchange Helper contract address
-     */
-    function _setExchangeHelper(address newExchangeHelper) internal {
-        AuctionStorage.Layout storage l = AuctionStorage.layout();
-
-        require(newExchangeHelper != address(0), "address not provided");
         require(
-            newExchangeHelper != address(l.Exchange),
-            "new address equals old"
+            AuctionStorage.Status.FINALIZED != status,
+            "status == finalized"
         );
-
-        emit ExchangeHelperSet(
-            address(l.Exchange),
-            newExchangeHelper,
-            msg.sender
-        );
-
-        l.Exchange = IExchangeHelper(newExchangeHelper);
-    }
-
-    /************************************************
-     *  INITIALIZE AUCTION
-     ***********************************************/
-
-    /**
-     * @notice initializes a new auction
-     * @param initAuction auction parameters
-     */
-    function _initialize(AuctionStorage.InitAuction memory initAuction)
-        internal
-    {
-        AuctionStorage.Layout storage l = AuctionStorage.layout();
-
         require(
-            initAuction.endTime > initAuction.startTime,
-            "endTime <= startTime"
-        );
-
-        require(
-            initAuction.startTime >= block.timestamp,
-            "start time too early"
-        );
-
-        require(initAuction.strike64x64 > 0, "strike price == 0");
-        require(initAuction.longTokenId > 0, "token id == 0");
-
-        AuctionStorage.Auction storage auction = l.auctions[initAuction.epoch];
-
-        require(
-            auction.status == AuctionStorage.Status.UNINITIALIZED,
-            "auction !uninitialized"
-        );
-
-        auction.status = AuctionStorage.Status.INITIALIZED;
-        auction.expiry = initAuction.expiry;
-        auction.strike64x64 = initAuction.strike64x64;
-        auction.startTime = initAuction.startTime;
-        auction.endTime = initAuction.endTime;
-        auction.totalTime = initAuction.endTime - initAuction.startTime;
-        auction.longTokenId = initAuction.longTokenId;
-
-        emit AuctionStatusSet(initAuction.epoch, auction.status);
-    }
-
-    /**
-     * @notice sets the auction max/min prices
-     * @param epoch epoch id
-     * @param maxPrice64x64 max price as 64x64 fixed point number
-     * @param minPrice64x64 min price as 64x64 fixed point number
-     */
-    function _setAuctionPrices(
-        uint64 epoch,
-        int128 maxPrice64x64,
-        int128 minPrice64x64
-    ) internal {
-        AuctionStorage.Layout storage l = AuctionStorage.layout();
-        AuctionStorage.Auction storage auction = l.auctions[epoch];
-
-        auction.maxPrice64x64 = maxPrice64x64;
-        auction.minPrice64x64 = minPrice64x64;
-
-        if (
-            auction.maxPrice64x64 <= 0 ||
-            auction.minPrice64x64 <= 0 ||
-            auction.maxPrice64x64 <= auction.minPrice64x64
-        ) {
-            // cancel the auction if prices are invalid
-            _finalizeAuction(epoch);
-        }
-
-        emit AuctionPricesSet(
-            epoch,
-            auction.maxPrice64x64,
-            auction.minPrice64x64
+            AuctionStorage.Status.PROCESSED != status,
+            "status == processed"
         );
     }
 
@@ -250,25 +150,19 @@ contract AuctionInternal is IAuctionEvents, OwnableInternal {
      *  PRICING
      ***********************************************/
 
-    /**
-     * @notice last price paid during the auction
-     * @param epoch epoch id
-     * @return price as 64x64 fixed point number
-     */
-    function _lastPrice64x64(uint64 epoch) internal view returns (int128) {
-        AuctionStorage.Layout storage l = AuctionStorage.layout();
-        return l.auctions[epoch].lastPrice64x64;
+    function _lastPrice64x64(AuctionStorage.Auction storage auction)
+        internal
+        view
+        returns (int128)
+    {
+        return auction.lastPrice64x64;
     }
 
-    /**
-     * @notice calculates price as a function of time
-     * @param epoch epoch id
-     * @return price at the current block time as 64x64 fixed point number
-     */
-    function _priceCurve64x64(uint64 epoch) internal view returns (int128) {
-        AuctionStorage.Layout storage l = AuctionStorage.layout();
-        AuctionStorage.Auction storage auction = l.auctions[epoch];
-
+    function _priceCurve64x64(AuctionStorage.Auction storage auction)
+        internal
+        view
+        returns (int128)
+    {
         uint256 startTime = auction.startTime;
         uint256 totalTime = auction.totalTime;
 
@@ -285,70 +179,25 @@ contract AuctionInternal is IAuctionEvents, OwnableInternal {
         return maxPrice64x64.sub(y);
     }
 
-    /**
-     * @notice clearing price of the auction
-     * @param epoch epoch id
-     * @return price as 64x64 fixed point number
-     */
-    function _clearingPrice64x64(uint64 epoch) internal view returns (int128) {
-        AuctionStorage.Layout storage l = AuctionStorage.layout();
-        AuctionStorage.Auction storage auction = l.auctions[epoch];
-
+    function _clearingPrice64x64(AuctionStorage.Auction storage auction)
+        internal
+        view
+        returns (int128)
+    {
         if (
             auction.status == AuctionStorage.Status.FINALIZED ||
             auction.status == AuctionStorage.Status.PROCESSED
         ) {
-            return _lastPrice64x64(epoch);
+            return _lastPrice64x64(auction);
         }
-        return _priceCurve64x64(epoch);
-    }
-
-    /************************************************
-     *  PURCHASE
-     ***********************************************/
-
-    /**
-     * @notice cancels an order
-     * @dev sender must approve contract
-     * @param epoch epoch id
-     * @param id order id
-     */
-    function _cancelLimitOrder(uint64 epoch, uint256 id) internal {
-        AuctionStorage.Layout storage l = AuctionStorage.layout();
-        AuctionStorage.Auction storage auction = l.auctions[epoch];
-
-        require(id > 0, "invalid order id");
-
-        OrderBook.Index storage orderbook = l.orderbooks[epoch];
-        OrderBook.Data memory data = orderbook._getOrderById(id);
-
-        require(data.buyer != address(0), "order does not exist");
-        require(data.buyer == msg.sender, "buyer != msg.sender");
-
-        orderbook._remove(id);
-        l.epochsByBuyer[data.buyer].remove(epoch);
-
-        if (block.timestamp >= auction.startTime) {
-            _finalizeAuction(epoch);
-        }
-
-        uint256 cost = data.price64x64.mulu(data.size);
-        ERC20.safeTransfer(msg.sender, cost);
-
-        emit OrderCanceled(epoch, id, msg.sender);
+        return _priceCurve64x64(auction);
     }
 
     /************************************************
      *  WITHDRAW
      ***********************************************/
 
-    /**
-     * @notice removes any amount(s) owed to the buyer (fill and/or refund)
-     * @param epoch epoch id
-     */
-    function _withdraw(uint64 epoch) internal {
-        AuctionStorage.Layout storage l = AuctionStorage.layout();
-
+    function _withdraw(AuctionStorage.Layout storage l, uint64 epoch) internal {
         (uint256 refund, uint256 fill) = _previewWithdraw(
             l,
             false,
@@ -387,13 +236,6 @@ contract AuctionInternal is IAuctionEvents, OwnableInternal {
         emit OrderWithdrawn(epoch, msg.sender, refund, fill);
     }
 
-    /**
-     * @notice calculates amount(s) owed to the buyer
-     * @param epoch epoch id
-     * @param buyer address of buyer
-     * @return amount refunded
-     * @return amount filled
-     */
     function _previewWithdraw(uint64 epoch, address buyer)
         internal
         returns (uint256, uint256)
@@ -408,13 +250,13 @@ contract AuctionInternal is IAuctionEvents, OwnableInternal {
         uint64 epoch,
         address buyer
     ) private returns (uint256, uint256) {
+        AuctionStorage.Auction storage auction = l.auctions[epoch];
         OrderBook.Index storage orderbook = l.orderbooks[epoch];
-        AuctionStorage.Auction memory auction = l.auctions[epoch];
 
         uint256 refund;
         uint256 fill;
 
-        int128 lastPrice64x64 = _clearingPrice64x64(epoch);
+        int128 lastPrice64x64 = _clearingPrice64x64(auction);
 
         uint256 totalContractsSold;
         uint256 next = orderbook._head();
@@ -463,15 +305,17 @@ contract AuctionInternal is IAuctionEvents, OwnableInternal {
      *  FINALIZE AUCTION
      ***********************************************/
 
-    function _processOrders(uint64 epoch) private returns (bool) {
-        AuctionStorage.Layout storage l = AuctionStorage.layout();
+    function _processOrders(AuctionStorage.Layout storage l, uint64 epoch)
+        private
+        returns (bool)
+    {
         OrderBook.Index storage orderbook = l.orderbooks[epoch];
         AuctionStorage.Auction storage auction = l.auctions[epoch];
 
         uint256 next = orderbook._head();
         uint256 length = orderbook._length();
 
-        uint256 totalContracts = _getTotalContracts(epoch);
+        uint256 totalContracts = _getTotalContracts(auction);
 
         if (auction.totalContracts <= 0) {
             // sets totalContracts if this is the first bid.
@@ -485,7 +329,7 @@ contract AuctionInternal is IAuctionEvents, OwnableInternal {
             OrderBook.Data memory data = orderbook._getOrderById(next);
 
             // check if the last "active" order has been reached
-            if (data.price64x64 < _clearingPrice64x64(epoch)) break;
+            if (data.price64x64 < _clearingPrice64x64(auction)) break;
 
             // checks if utilization >= 100%
             if (totalContractsSold + data.size >= totalContracts) {
@@ -504,14 +348,11 @@ contract AuctionInternal is IAuctionEvents, OwnableInternal {
         return false;
     }
 
-    /**
-     * @notice checks various conditions to determine if auction is finalized
-     * @param epoch epoch id
-     */
-    function _finalizeAuction(uint64 epoch) internal {
-        AuctionStorage.Layout storage l = AuctionStorage.layout();
-        AuctionStorage.Auction storage auction = l.auctions[epoch];
-
+    function _finalizeAuction(
+        AuctionStorage.Layout storage l,
+        AuctionStorage.Auction storage auction,
+        uint64 epoch
+    ) internal {
         if (
             auction.maxPrice64x64 <= 0 ||
             auction.minPrice64x64 <= 0 ||
@@ -520,100 +361,23 @@ contract AuctionInternal is IAuctionEvents, OwnableInternal {
             l.auctions[epoch].lastPrice64x64 = type(int128).max;
             auction.status = AuctionStorage.Status.FINALIZED;
             emit AuctionStatusSet(epoch, auction.status);
-        } else if (_processOrders(epoch) || block.timestamp > auction.endTime) {
+        } else if (
+            _processOrders(l, epoch) || block.timestamp > auction.endTime
+        ) {
             auction.status = AuctionStorage.Status.FINALIZED;
             emit AuctionStatusSet(epoch, auction.status);
         }
-    }
-
-    /**
-     * @notice transfers the premiums paid during auction to the vault
-     * @param epoch epoch id
-     * @return amount in premiums paid during auction
-     */
-    function _transferPremium(uint64 epoch) internal returns (uint256) {
-        AuctionStorage.Layout storage l = AuctionStorage.layout();
-        AuctionStorage.Auction storage auction = l.auctions[epoch];
-
-        require(auction.totalPremiums <= 0, "premiums transferred");
-
-        uint256 totalPremiums = _lastPrice64x64(epoch).mulu(
-            auction.totalContractsSold
-        );
-
-        auction.totalPremiums = totalPremiums;
-        ERC20.safeTransfer(address(Vault), totalPremiums);
-
-        return auction.totalPremiums;
-    }
-
-    /**
-     * @notice checks various conditions to determine if auction is processed
-     * @param epoch epoch id
-     */
-    function _processAuction(uint64 epoch) internal {
-        AuctionStorage.Layout storage l = AuctionStorage.layout();
-        AuctionStorage.Auction storage auction = l.auctions[epoch];
-
-        uint256 totalContractsSold = auction.totalContractsSold;
-
-        if (totalContractsSold > 0) {
-            uint256 longTokenId = auction.longTokenId;
-
-            uint256 longTokenBalance = Pool.balanceOf(
-                address(this),
-                longTokenId
-            );
-
-            require(auction.totalPremiums > 0, "premiums not transferred");
-
-            require(
-                longTokenBalance >= totalContractsSold,
-                "long tokens not transferred"
-            );
-        }
-
-        auction.status = AuctionStorage.Status.PROCESSED;
-        emit AuctionStatusSet(epoch, auction.status);
     }
 
     /************************************************
      *  VIEW
      ***********************************************/
 
-    /**
-     * @notice displays the epochs the buyer has a fill and/or refund
-     * @param buyer address of buyer
-     * @return array of epoch ids
-     */
-    function _epochsByBuyer(address buyer)
+    function _getTotalContracts(AuctionStorage.Auction storage auction)
         internal
         view
-        returns (uint64[] memory)
+        returns (uint256)
     {
-        AuctionStorage.Layout storage l = AuctionStorage.layout();
-        EnumerableSet.UintSet storage epochs = l.epochsByBuyer[buyer];
-
-        uint64[] memory epochsByBuyer = new uint64[](epochs.length());
-
-        unchecked {
-            for (uint256 i; i < epochs.length(); i++) {
-                epochsByBuyer[i] = uint64(epochs.at(i));
-            }
-        }
-
-        return epochsByBuyer;
-    }
-
-    /**
-     * @notice gets the total number of contracts
-     * @param epoch epoch id
-     * @return total number of contracts
-     */
-    function _getTotalContracts(uint64 epoch) internal view returns (uint256) {
-        AuctionStorage.Layout storage l = AuctionStorage.layout();
-        AuctionStorage.Auction storage auction = l.auctions[epoch];
-
         if (auction.totalContracts <= 0) {
             uint256 totalCollateral = Vault.totalCollateral();
             int128 strike64x64 = auction.strike64x64;
@@ -647,13 +411,13 @@ contract AuctionInternal is IAuctionEvents, OwnableInternal {
 
     function _validateMarketOrder(
         AuctionStorage.Layout storage l,
-        uint64 epoch,
+        AuctionStorage.Auction storage auction,
         uint256 size,
         uint256 maxCost
     ) internal view returns (int128, uint256) {
         require(size >= l.minSize, "size < minimum");
 
-        int128 price64x64 = _priceCurve64x64(epoch);
+        int128 price64x64 = _priceCurve64x64(auction);
         uint256 cost = price64x64.mulu(size);
 
         require(maxCost >= cost, "cost > maxCost");
@@ -676,19 +440,18 @@ contract AuctionInternal is IAuctionEvents, OwnableInternal {
 
     function _addOrder(
         AuctionStorage.Layout storage l,
+        AuctionStorage.Auction storage auction,
         uint64 epoch,
         int128 price64x64,
         uint256 size,
         bool isLimitOrder
     ) internal {
-        AuctionStorage.Auction storage auction = l.auctions[epoch];
-
         l.epochsByBuyer[msg.sender].add(epoch);
 
         uint256 id = l.orderbooks[epoch]._insert(price64x64, size, msg.sender);
 
         if (block.timestamp >= auction.startTime) {
-            _finalizeAuction(epoch);
+            _finalizeAuction(l, auction, epoch);
         }
 
         emit OrderAdded(epoch, id, msg.sender, price64x64, size, isLimitOrder);
