@@ -172,12 +172,32 @@ export function describeBehaviorOfVaultAdmin(
     });
 
     describe("#setAuctionWindowOffsets(uint16,uint16)", () => {
+      const newStartOffset = 14400;
+      const newEndOffset = 21600;
+
       time.revertToSnapshotAfterEach(async () => {});
 
       it("should revert if !owner", async () => {
         await expect(
-          vault.setAuctionWindowOffsets(14400, 21600)
+          vault.setAuctionWindowOffsets(newStartOffset, newEndOffset)
         ).to.be.revertedWith("Ownable: sender must be owner");
+      });
+
+      it("should set new exchange helper address", async () => {
+        await expect(
+          vault
+            .connect(signers.deployer)
+            .setAuctionWindowOffsets(newStartOffset, newEndOffset)
+        )
+          .to.emit(vault, "AuctionWindowOffsetsSet")
+          .withArgs(
+            0,
+            7200,
+            newStartOffset,
+            14400,
+            newEndOffset,
+            addresses.deployer
+          );
       });
     });
 
@@ -189,6 +209,35 @@ export function describeBehaviorOfVaultAdmin(
           "Ownable: sender must be owner"
         );
       });
+
+      it("should revert if address is 0x0", async () => {
+        await expect(
+          vault
+            .connect(signers.deployer)
+            .setFeeRecipient(ethers.constants.AddressZero)
+        ).to.be.revertedWith("address not provided");
+      });
+
+      it("should revert if new address == old address", async () => {
+        await expect(
+          vault
+            .connect(signers.deployer)
+            .setFeeRecipient(addresses.feeRecipient)
+        ).to.be.revertedWith("new address equals old");
+      });
+
+      it("should set new exchange helper address", async () => {
+        await expect(
+          vault.connect(signers.deployer).setFeeRecipient(addresses.lp1)
+        )
+          .to.emit(vault, "FeeRecipientSet")
+          .withArgs(
+            0,
+            addresses.feeRecipient,
+            addresses.lp1,
+            addresses.deployer
+          );
+      });
     });
 
     describe("#setKeeper(address)", () => {
@@ -198,6 +247,26 @@ export function describeBehaviorOfVaultAdmin(
         await expect(vault.setKeeper(addresses.lp1)).to.be.revertedWith(
           "Ownable: sender must be owner"
         );
+      });
+
+      it("should revert if address is 0x0", async () => {
+        await expect(
+          vault
+            .connect(signers.deployer)
+            .setKeeper(ethers.constants.AddressZero)
+        ).to.be.revertedWith("address not provided");
+      });
+
+      it("should revert if new address == old address", async () => {
+        await expect(
+          vault.connect(signers.deployer).setKeeper(addresses.keeper)
+        ).to.be.revertedWith("new address equals old");
+      });
+
+      it("should set new exchange helper address", async () => {
+        await expect(vault.connect(signers.deployer).setKeeper(addresses.lp1))
+          .to.emit(vault, "KeeperSet")
+          .withArgs(0, addresses.keeper, addresses.lp1, addresses.deployer);
       });
     });
 
@@ -209,25 +278,81 @@ export function describeBehaviorOfVaultAdmin(
           "Ownable: sender must be owner"
         );
       });
+
+      it("should revert if address is 0x0", async () => {
+        await expect(
+          vault
+            .connect(signers.deployer)
+            .setPricer(ethers.constants.AddressZero)
+        ).to.be.revertedWith("address not provided");
+      });
+
+      it("should revert if new address == old address", async () => {
+        await expect(
+          vault.connect(signers.deployer).setPricer(addresses.pricer)
+        ).to.be.revertedWith("new address equals old");
+      });
+
+      it("should set new exchange helper address", async () => {
+        await expect(vault.connect(signers.deployer).setPricer(addresses.lp1))
+          .to.emit(vault, "PricerSet")
+          .withArgs(0, addresses.pricer, addresses.lp1, addresses.deployer);
+      });
     });
 
     describe("#setPerformanceFee64x64(int128)", () => {
+      const newFee = fixedFromFloat(0.5);
+
       time.revertToSnapshotAfterEach(async () => {});
 
       it("should revert if !owner", async () => {
+        await expect(vault.setPerformanceFee64x64(newFee)).to.be.revertedWith(
+          "Ownable: sender must be owner"
+        );
+      });
+
+      it("should revert if fee exceeds maximum", async () => {
         await expect(
-          vault.setPerformanceFee64x64(fixedFromFloat(0.5))
-        ).to.be.revertedWith("Ownable: sender must be owner");
+          vault
+            .connect(signers.deployer)
+            .setPerformanceFee64x64(fixedFromFloat(1))
+        ).to.be.revertedWith("invalid fee amount");
+      });
+
+      it("should set a new fee", async () => {
+        await expect(
+          vault.connect(signers.deployer).setPerformanceFee64x64(newFee)
+        )
+          .to.emit(vault, "PerformanceFeeSet")
+          .withArgs(0, 0, newFee, addresses.deployer);
       });
     });
 
     describe("#setWithdrawalFee64x64(int128)", () => {
+      const newFee = fixedFromFloat(0.05);
+
       time.revertToSnapshotAfterEach(async () => {});
 
       it("should revert if !owner", async () => {
+        await expect(vault.setWithdrawalFee64x64(newFee)).to.be.revertedWith(
+          "Ownable: sender must be owner"
+        );
+      });
+
+      it("should revert if fee exceeds maximum", async () => {
         await expect(
-          vault.setWithdrawalFee64x64(fixedFromFloat(0.05))
-        ).to.be.revertedWith("Ownable: sender must be owner");
+          vault
+            .connect(signers.deployer)
+            .setWithdrawalFee64x64(fixedFromFloat(1))
+        ).to.be.revertedWith("invalid fee amount");
+      });
+
+      it("should set a new fee", async () => {
+        await expect(
+          vault.connect(signers.deployer).setWithdrawalFee64x64(newFee)
+        )
+          .to.emit(vault, "WithdrawalFeeSet")
+          .withArgs(0, 0, newFee, addresses.deployer);
       });
     });
 
