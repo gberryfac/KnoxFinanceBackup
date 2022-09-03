@@ -5,7 +5,8 @@ interface IVaultEvents {
     event AuctionProcessed(
         uint64 indexed epoch,
         uint256 totalCollateralUsed,
-        uint256 totalContractsSold
+        uint256 totalContractsSold,
+        uint256 totalPremiums
     );
 
     event AuctionWindowOffsetsSet(
@@ -48,8 +49,6 @@ interface IVaultEvents {
     event PerformanceFeeCollected(
         uint64 indexed epoch,
         uint256 netIncome,
-        uint256 totalPremiums,
-        uint256 exerciseAmount,
         uint256 feeInCollateral
     );
 

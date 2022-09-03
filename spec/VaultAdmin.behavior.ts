@@ -27,7 +27,14 @@ import {
   VaultDiamond__factory,
 } from "../types";
 
-import { assert, math, time, types, KnoxUtil, PoolUtil } from "../test/utils";
+import {
+  assert,
+  time,
+  types,
+  KnoxUtil,
+  PoolUtil,
+  getEventArgs,
+} from "../test/utils";
 
 import { diamondCut } from "../scripts/diamond";
 
@@ -407,6 +414,9 @@ export function describeBehaviorOfVaultAdmin(
 
       it("should withdraw reserved liquidity from pool", async () => {
         // process epoch 0
+        const totalCollateralInShortPosition =
+          await vault.totalShortAsCollateral();
+
         await knoxUtil.processExpiredOptions();
 
         const reservedLiquidityTokenId = params.isCall
@@ -417,9 +427,6 @@ export function describeBehaviorOfVaultAdmin(
           addresses.vault,
           reservedLiquidityTokenId
         );
-
-        const totalCollateralInShortPosition =
-          await vault.totalShortAsCollateral();
 
         assert.bnEqual(reservedLiquidityBefore, totalCollateralInShortPosition);
 
@@ -482,9 +489,9 @@ export function describeBehaviorOfVaultAdmin(
           .addMarketOrder(epoch, await auction.getTotalContracts(epoch));
 
         // process auction 0
-        await vault.connect(signers.keeper).processAuction();
-
-        totalPremiums = await vault.totalPremiums();
+        const tx = await vault.connect(signers.keeper).processAuction();
+        const args = await getEventArgs(tx, "AuctionProcessed");
+        totalPremiums = args.totalPremiums;
 
         // init auction 1
         await knoxUtil.setAndInitializeAuction();
@@ -497,14 +504,6 @@ export function describeBehaviorOfVaultAdmin(
         await expect(vault.collectPerformanceFee()).to.be.revertedWith(
           "!keeper"
         );
-      });
-
-      it("should set totalPremiums to 0", async () => {
-        // process epoch 0
-        await knoxUtil.processExpiredOptions();
-        await vault.connect(signers.keeper).withdrawReservedLiquidity();
-        await vault.connect(signers.keeper).collectPerformanceFee();
-        assert.bnEqual(await vault.totalPremiums(), BigNumber.from(0));
       });
 
       it("should not collect performance fees if option expires far-ITM", async () => {
@@ -534,12 +533,7 @@ export function describeBehaviorOfVaultAdmin(
           addresses.feeRecipient
         );
 
-        assert.equal(
-          math.bnToNumber(
-            feeRecipientBalanceAfter.sub(feeRecipientBalanceBefore)
-          ),
-          0
-        );
+        assert.bnEqual(feeRecipientBalanceAfter, feeRecipientBalanceBefore);
       });
 
       it("should collect performance fees if option expires ATM", async () => {
@@ -557,11 +551,9 @@ export function describeBehaviorOfVaultAdmin(
           addresses.feeRecipient
         );
 
-        assert.equal(
-          math.bnToNumber(
-            feeRecipientBalanceAfter.sub(feeRecipientBalanceBefore)
-          ),
-          math.bnToNumber(totalPremiums.div(5))
+        assert.bnEqual(
+          feeRecipientBalanceAfter.sub(feeRecipientBalanceBefore),
+          totalPremiums.div(5)
         );
       });
     });
@@ -648,65 +640,6 @@ export function describeBehaviorOfVaultAdmin(
 
     describe.skip("#processAuction()", () => {
       time.revertToSnapshotAfterEach(async () => {});
-    });
-
-    describe("#getExerciseAmount(uint64,uint256)", () => {
-      time.revertToSnapshotAfterEach(async () => {
-        await vault.connect(signers.keeper).setOptionParameters();
-      });
-
-      it("should return 0 if option has not expired", async () => {
-        const epoch = await vault.getEpoch();
-        const size = parseUnits("1", params.collateral.decimals);
-        const exerciseAmount = await vault.getExerciseAmount(epoch, size);
-        assert.isTrue(exerciseAmount[1].isZero());
-      });
-
-      it("should return amount == 0 if option has expired ATM", async () => {
-        const epoch = await vault.getEpoch();
-        const option = await vault.getOption(epoch);
-
-        await time.increaseTo(option.expiry.add(1));
-
-        const size = parseUnits("1", params.collateral.decimals);
-        const exerciseAmount = await vault.getExerciseAmount(epoch, size);
-
-        assert.isTrue(exerciseAmount[1].isZero());
-      });
-
-      it("should return amount > 0 if option has expired ITM", async () => {
-        const epoch = await vault.getEpoch();
-        const option = await vault.getOption(epoch);
-
-        const underlyingPrice = params.underlying.oracle.price;
-        const intrinsicValue = underlyingPrice * 0.5;
-
-        let spot = params.isCall
-          ? underlyingPrice + intrinsicValue
-          : underlyingPrice - intrinsicValue;
-
-        await poolUtil.underlyingSpotPriceOracle.mock.latestAnswer.returns(
-          spot
-        );
-
-        spot = spot / params.base.oracle.price;
-
-        await time.increaseTo(option.expiry.add(1));
-        await pool.update();
-
-        const size = parseUnits("1", params.collateral.decimals);
-        const exerciseAmount = await vault.getExerciseAmount(epoch, size);
-
-        const bnIntrinsicValue = BigNumber.from(intrinsicValue.toString());
-        const bnSpot = BigNumber.from(spot.toString());
-
-        let expectedExerciseAmount = params.isCall
-          ? bnIntrinsicValue.mul(size).div(bnSpot)
-          : bnIntrinsicValue.mul(size);
-
-        expectedExerciseAmount = expectedExerciseAmount.div(10 ** 8);
-        assert.bnEqual(exerciseAmount[1], expectedExerciseAmount);
-      });
     });
   });
 }

@@ -120,18 +120,4 @@ interface IVaultAdmin {
      * @notice processes the auction when it has been finalized
      */
     function processAuction() external;
-
-    /************************************************
-     * HELPERS
-     ***********************************************/
-
-    /**
-     * @notice calculates the exercise amount
-     * @param epoch epoch id
-     * @param size amount of contracts
-     */
-    function getExerciseAmount(uint64 epoch, uint256 size)
-        external
-        view
-        returns (bool, uint256);
 }
