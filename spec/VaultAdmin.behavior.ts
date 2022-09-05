@@ -27,14 +27,7 @@ import {
   VaultDiamond__factory,
 } from "../types";
 
-import {
-  assert,
-  time,
-  types,
-  KnoxUtil,
-  PoolUtil,
-  getEventArgs,
-} from "../test/utils";
+import { almost, assert, time, types, KnoxUtil, PoolUtil } from "../test/utils";
 
 import { diamondCut } from "../scripts/diamond";
 
@@ -584,7 +577,7 @@ export function describeBehaviorOfVaultAdmin(
     });
 
     describe("#collectPerformanceFee()", () => {
-      let totalPremiums: BigNumber;
+      let lastTotalAssets: BigNumber;
 
       time.revertToSnapshotAfterEach(async () => {
         await vault
@@ -622,9 +615,8 @@ export function describeBehaviorOfVaultAdmin(
           );
 
         // process auction 0
-        const tx = await vault.connect(signers.keeper).processAuction();
-        const args = await getEventArgs(tx, "AuctionProcessed");
-        totalPremiums = args.totalPremiums;
+        lastTotalAssets = await vault.totalAssets();
+        await vault.connect(signers.keeper).processAuction();
 
         // init auction 1
         await knoxUtil.setAndInitializeAuction();
@@ -678,15 +670,17 @@ export function describeBehaviorOfVaultAdmin(
           addresses.feeRecipient
         );
 
+        const totalAssets = await vault.totalAssets();
         await vault.connect(signers.keeper).collectPerformanceFee();
 
         const feeRecipientBalanceAfter = await asset.balanceOf(
           addresses.feeRecipient
         );
 
-        assert.bnEqual(
+        almost(
           feeRecipientBalanceAfter.sub(feeRecipientBalanceBefore),
-          totalPremiums.div(5)
+          totalAssets.sub(lastTotalAssets).div(5),
+          parseUnits("1", params.collateral.decimals - 3) // min tolerance
         );
       });
     });
