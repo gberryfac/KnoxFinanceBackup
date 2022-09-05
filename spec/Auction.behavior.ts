@@ -130,7 +130,7 @@ export function describeBehaviorOfAuction(
         txs,
         totalContractsSold,
         buyerOrderSize,
-        clearingPrice64x64: fixedToNumber(clearingPrice64x64),
+        clearingPrice: fixedToNumber(clearingPrice64x64),
       };
     };
 
@@ -183,7 +183,7 @@ export function describeBehaviorOfAuction(
         buyer1OrderSize,
         buyer2OrderSize,
         buyer3OrderSize,
-        clearingPrice64x64: fixedToNumber(clearingPrice64x64),
+        clearingPrice: fixedToNumber(clearingPrice64x64),
       };
     };
 
@@ -2461,7 +2461,6 @@ export function describeBehaviorOfAuction(
 
       describe("else if cancelled", () => {
         let epoch: BigNumber;
-
         let longTokenId: BigNumber;
 
         time.revertToSnapshotAfterEach(async () => {
@@ -2564,7 +2563,7 @@ export function describeBehaviorOfAuction(
             advancedAuction.buyer1OrderSize,
             advancedAuction.buyer1OrderSize,
             params.price.max,
-            advancedAuction.clearingPrice64x64
+            advancedAuction.clearingPrice
           );
 
           const estimatedFill = advancedAuction.buyer1OrderSize;
@@ -2601,7 +2600,7 @@ export function describeBehaviorOfAuction(
             advancedAuction.buyer3OrderSize,
             estimatedFill,
             fixedToNumber(args.price64x64),
-            advancedAuction.clearingPrice64x64
+            advancedAuction.clearingPrice
           );
 
           await verifyBalancesAfterWithdraw(
@@ -2630,7 +2629,7 @@ export function describeBehaviorOfAuction(
             simpleAuction.buyerOrderSize,
             simpleAuction.buyerOrderSize,
             fixedToNumber(args.price64x64),
-            simpleAuction.clearingPrice64x64
+            simpleAuction.clearingPrice
           );
 
           const estimatedFill = simpleAuction.buyerOrderSize;
@@ -2650,7 +2649,7 @@ export function describeBehaviorOfAuction(
             simpleAuction.buyerOrderSize,
             simpleAuction.buyerOrderSize,
             fixedToNumber(args.price64x64),
-            simpleAuction.clearingPrice64x64
+            simpleAuction.clearingPrice
           );
 
           const estimatedFill = simpleAuction.buyerOrderSize;
@@ -2711,7 +2710,7 @@ export function describeBehaviorOfAuction(
             advancedAuction.buyer1OrderSize,
             advancedAuction.buyer1OrderSize,
             params.price.max,
-            advancedAuction.clearingPrice64x64
+            advancedAuction.clearingPrice
           );
 
           let exercisedAmount = math.toUnits(
@@ -2755,8 +2754,8 @@ export function describeBehaviorOfAuction(
           let estimatedRefund = estimateRefund(
             advancedAuction.buyer3OrderSize,
             estimatedFill,
-            advancedAuction.clearingPrice64x64,
-            advancedAuction.clearingPrice64x64
+            advancedAuction.clearingPrice,
+            advancedAuction.clearingPrice
           );
 
           let exercisedAmount = math.toUnits(
@@ -2802,7 +2801,7 @@ export function describeBehaviorOfAuction(
             advancedAuction.buyer1OrderSize,
             advancedAuction.buyer1OrderSize,
             params.price.max,
-            advancedAuction.clearingPrice64x64
+            advancedAuction.clearingPrice
           );
 
           await verifyBalancesAfterWithdraw(
@@ -2837,7 +2836,7 @@ export function describeBehaviorOfAuction(
             advancedAuction.buyer3OrderSize,
             estimatedFill,
             fixedToNumber(args.price64x64),
-            advancedAuction.clearingPrice64x64
+            advancedAuction.clearingPrice
           );
 
           await verifyBalancesAfterWithdraw(
@@ -3009,7 +3008,7 @@ export function describeBehaviorOfAuction(
           );
 
           const cost = math.toUnits(
-            advancedAuction.clearingPrice64x64 *
+            advancedAuction.clearingPrice *
               math.bnToNumber(advancedAuction.buyer1OrderSize)
           );
 
@@ -3041,7 +3040,7 @@ export function describeBehaviorOfAuction(
             advancedAuction.buyer3OrderSize.sub(estimatedFill)
           );
 
-          const price = advancedAuction.clearingPrice64x64;
+          const price = advancedAuction.clearingPrice;
           const paid = price * math.bnToNumber(advancedAuction.buyer3OrderSize);
           const cost = price * remainder;
 
@@ -3071,7 +3070,7 @@ export function describeBehaviorOfAuction(
             simpleAuction.buyerOrderSize,
             simpleAuction.buyerOrderSize,
             fixedToNumber(args.price64x64),
-            simpleAuction.clearingPrice64x64
+            simpleAuction.clearingPrice
           );
 
           const [refund, fill] = await auction.callStatic[
@@ -3089,7 +3088,7 @@ export function describeBehaviorOfAuction(
             simpleAuction.buyerOrderSize,
             simpleAuction.buyerOrderSize,
             fixedToNumber(args.price64x64),
-            simpleAuction.clearingPrice64x64
+            simpleAuction.clearingPrice
           );
 
           const [refund, fill] = await auction
