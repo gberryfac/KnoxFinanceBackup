@@ -489,8 +489,8 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
      ***********************************************/
 
     /**
-     * @notice get the total quantity of the assets managed by the vault
-     * @return total active asset amount
+     * @notice get the total quantity of active collateral managed by the vault
+     * @return total active collateral amount
      */
     function _totalAssets()
         internal
@@ -498,7 +498,8 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
         override(ERC4626BaseInternal)
         returns (uint256)
     {
-        return _totalCollateral() + _totalShortAsCollateral();
+        return
+            _totalCollateral() + _totalShortAsCollateral() - _totalReserves();
     }
 
     /**
