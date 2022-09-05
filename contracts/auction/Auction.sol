@@ -245,12 +245,8 @@ contract Auction is AuctionInternal, IAuction, ReentrancyGuard {
 
         _marketOrdersAllowed(auction);
 
-        (int128 price64x64, uint256 cost) = _validateMarketOrder(
-            l,
-            auction,
-            size,
-            maxCost
-        );
+        (int128 price64x64, uint256 cost) =
+            _validateMarketOrder(l, auction, size, maxCost);
 
         uint256 credited = _wrapNativeToken(cost);
         // an approve() by the msg.sender is required beforehand
@@ -270,12 +266,8 @@ contract Auction is AuctionInternal, IAuction, ReentrancyGuard {
         AuctionStorage.Layout storage l = AuctionStorage.layout();
         AuctionStorage.Auction storage auction = l.auctions[epoch];
 
-        (int128 price64x64, uint256 cost) = _validateMarketOrder(
-            l,
-            auction,
-            size,
-            maxCost
-        );
+        (int128 price64x64, uint256 cost) =
+            _validateMarketOrder(l, auction, size, maxCost);
 
         uint256 credited = _swapForPoolTokens(l.Exchange, s, address(ERC20));
         _transferAssets(credited, cost, msg.sender);
@@ -350,9 +342,8 @@ contract Auction is AuctionInternal, IAuction, ReentrancyGuard {
 
         require(auction.totalPremiums <= 0, "premiums transferred");
 
-        uint256 totalPremiums = _lastPrice64x64(auction).mulu(
-            auction.totalContractsSold
-        );
+        uint256 totalPremiums =
+            _lastPrice64x64(auction).mulu(auction.totalContractsSold);
 
         auction.totalPremiums = totalPremiums;
         ERC20.safeTransfer(address(Vault), totalPremiums);
@@ -377,10 +368,8 @@ contract Auction is AuctionInternal, IAuction, ReentrancyGuard {
         if (totalContractsSold > 0) {
             uint256 longTokenId = auction.longTokenId;
 
-            uint256 longTokenBalance = Pool.balanceOf(
-                address(this),
-                longTokenId
-            );
+            uint256 longTokenBalance =
+                Pool.balanceOf(address(this), longTokenId);
 
             require(auction.totalPremiums > 0, "premiums not transferred");
 

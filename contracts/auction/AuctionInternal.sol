@@ -196,20 +196,13 @@ contract AuctionInternal is IAuctionEvents, OwnableInternal {
      ***********************************************/
 
     function _withdraw(AuctionStorage.Layout storage l, uint64 epoch) internal {
-        (uint256 refund, uint256 fill) = _previewWithdraw(
-            l,
-            false,
-            epoch,
-            msg.sender
-        );
+        (uint256 refund, uint256 fill) =
+            _previewWithdraw(l, false, epoch, msg.sender);
 
         l.epochsByBuyer[msg.sender].remove(epoch);
 
-        (bool expired, uint256 exercisedAmount) = _getExerciseAmount(
-            l,
-            epoch,
-            fill
-        );
+        (bool expired, uint256 exercisedAmount) =
+            _getExerciseAmount(l, epoch, fill);
 
         if (expired) {
             // If expired ITM, adjust refund
@@ -276,8 +269,8 @@ contract AuctionInternal is IAuctionEvents, OwnableInternal {
                     if (
                         totalContractsSold + data.size >= auction.totalContracts
                     ) {
-                        uint256 remainder = auction.totalContracts -
-                            totalContractsSold;
+                        uint256 remainder =
+                            auction.totalContracts - totalContractsSold;
 
                         cost = lastPrice64x64.mulu(remainder);
                         fill += remainder;
@@ -466,9 +459,8 @@ contract AuctionInternal is IAuctionEvents, OwnableInternal {
 
             if (msg.value > amount) {
                 unchecked {
-                    (bool success, ) = payable(msg.sender).call{
-                        value: msg.value - amount
-                    }("");
+                    (bool success, ) =
+                        payable(msg.sender).call{value: msg.value - amount}("");
 
                     require(success, "ETH refund failed");
 
@@ -503,15 +495,16 @@ contract AuctionInternal is IAuctionEvents, OwnableInternal {
             );
         }
 
-        uint256 amountCredited = Exchange.swapWithToken(
-            s.tokenIn,
-            tokenOut,
-            s.amountInMax + msg.value,
-            s.callee,
-            s.allowanceTarget,
-            s.data,
-            s.refundAddress
-        );
+        uint256 amountCredited =
+            Exchange.swapWithToken(
+                s.tokenIn,
+                tokenOut,
+                s.amountInMax + msg.value,
+                s.callee,
+                s.allowanceTarget,
+                s.data,
+                s.refundAddress
+            );
 
         require(
             amountCredited >= s.amountOutMin,
