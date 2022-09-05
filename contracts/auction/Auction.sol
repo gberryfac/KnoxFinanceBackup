@@ -83,6 +83,7 @@ contract Auction is AuctionInternal, IAuction, ReentrancyGuard {
         );
 
         auction.status = AuctionStorage.Status.INITIALIZED;
+        auction.expiry = initAuction.expiry;
         auction.strike64x64 = initAuction.strike64x64;
         auction.startTime = initAuction.startTime;
         auction.endTime = initAuction.endTime;
@@ -265,6 +266,8 @@ contract Auction is AuctionInternal, IAuction, ReentrancyGuard {
     ) external payable nonReentrant {
         AuctionStorage.Layout storage l = AuctionStorage.layout();
         AuctionStorage.Auction storage auction = l.auctions[epoch];
+
+        _marketOrdersAllowed(auction);
 
         (int128 price64x64, uint256 cost) =
             _validateMarketOrder(l, auction, size, maxCost);
