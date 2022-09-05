@@ -13,11 +13,12 @@ import {
   MockERC20__factory,
 } from "../../types";
 
-import { PREMIA_DIAMOND, PREMIA_MULTISIG } from "../../constants";
+import { PREMIA_DIAMOND, PREMIA_MULTISIG, WETH_ADDRESS } from "../../constants";
 
 const chainId = network.config.chainId;
 
 interface PoolUtilArgs {
+  weth: MockERC20;
   pool: IPremiaPool;
   underlyingSpotPriceOracle: MockContract;
   baseSpotPriceOracle: MockContract;
@@ -26,6 +27,7 @@ interface PoolUtilArgs {
 }
 
 export class PoolUtil {
+  weth: MockERC20;
   pool: IPremiaPool;
   underlyingSpotPriceOracle: MockContract;
   baseSpotPriceOracle: MockContract;
@@ -33,6 +35,7 @@ export class PoolUtil {
   baseAsset: MockERC20;
 
   constructor(props: PoolUtilArgs) {
+    this.weth = props.weth;
     this.pool = props.pool;
     this.baseSpotPriceOracle = props.baseSpotPriceOracle;
     this.underlyingSpotPriceOracle = props.underlyingSpotPriceOracle;
@@ -140,7 +143,13 @@ export class PoolUtil {
 
     const pool = IPremiaPool__factory.connect(poolAddress, multisig);
 
+    const weth =
+      underlying.name === "wETH"
+        ? await MockERC20__factory.connect(underlyingAsset.address, deployer)
+        : await MockERC20__factory.connect(WETH_ADDRESS[chainId], deployer);
+
     return new PoolUtil({
+      weth,
       pool,
       underlyingSpotPriceOracle,
       baseSpotPriceOracle,

@@ -49,6 +49,7 @@ export type Addresses = {
   pool?: string;
   helpers?: string;
   pricer?: string;
+  exchange: string;
   queue: string;
   vault: string;
   spotOracle?: string;

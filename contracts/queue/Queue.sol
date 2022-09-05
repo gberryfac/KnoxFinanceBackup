@@ -23,8 +23,9 @@ contract Queue is
     constructor(
         bool isCall,
         address pool,
-        address vault
-    ) QueueInternal(isCall, pool, vault) {}
+        address vault,
+        address weth
+    ) QueueInternal(isCall, pool, vault, weth) {}
 
     /************************************************
      *  SAFETY
@@ -55,6 +56,13 @@ contract Queue is
         _setMaxTVL(newMaxTVL);
     }
 
+    /**
+     * @inheritdoc IQueue
+     */
+    function setExchangeHelper(address newExchangeHelper) external onlyOwner {
+        _setExchangeHelper(newExchangeHelper);
+    }
+
     /************************************************
      *  DEPOSIT
      ***********************************************/
@@ -62,7 +70,12 @@ contract Queue is
     /**
      * @inheritdoc IQueue
      */
-    function deposit(uint256 amount) external nonReentrant whenNotPaused {
+    function deposit(uint256 amount)
+        external
+        payable
+        nonReentrant
+        whenNotPaused
+    {
         _deposit(amount, msg.sender);
     }
 
@@ -71,10 +84,33 @@ contract Queue is
      */
     function deposit(uint256 amount, address receiver)
         external
+        payable
         nonReentrant
         whenNotPaused
     {
         _deposit(amount, receiver);
+    }
+
+    /**
+     * @inheritdoc IQueue
+     */
+    function swapAndDeposit(IExchangeHelper.SwapArgs calldata s)
+        external
+        payable
+        nonReentrant
+        whenNotPaused
+    {
+        _swapAndDeposit(s, msg.sender);
+    }
+
+    /**
+     * @inheritdoc IQueue
+     */
+    function swapAndDeposit(
+        IExchangeHelper.SwapArgs calldata s,
+        address receiver
+    ) external payable nonReentrant whenNotPaused {
+        _swapAndDeposit(s, receiver);
     }
 
     /************************************************

@@ -13,6 +13,12 @@ interface IQueueEvents {
 
     event EpochSet(uint64 indexed epoch, address caller);
 
+    event ExchangeHelperSet(
+        address oldExchangeHelper,
+        address newExchangeHelper,
+        address caller
+    );
+
     event MaxTVLSet(
         uint64 indexed epoch,
         uint256 oldMaxTVL,

@@ -5,6 +5,7 @@ import "@primitivefi/hardhat-dodoc";
 import "@typechain/hardhat";
 import "hardhat-abi-exporter";
 import "hardhat-contract-sizer";
+import "hardhat-dependency-compiler";
 import "hardhat-gas-reporter";
 import "hardhat-tracer";
 import "solidity-coverage";
@@ -36,16 +37,26 @@ const config: HardhatUserConfig = {
           },
         },
       },
+      // @uniswap/v2-periphery
       {
-        version: "0.8.6",
+        version: "0.6.6",
         settings: {
           optimizer: {
-            runs: 200,
             enabled: true,
+            runs: 200,
           },
         },
       },
-
+      // @uniswap/v2-core
+      {
+        version: "0.5.16",
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 200,
+          },
+        },
+      },
       // WETH
       {
         version: "0.4.18",
@@ -82,6 +93,13 @@ const config: HardhatUserConfig = {
     outDir: "./types",
     target: "ethers-v5",
     alwaysGenerateOverloads: true,
+  },
+  dependencyCompiler: {
+    paths: [
+      "@uniswap/v2-core/contracts/UniswapV2Factory.sol",
+      "@uniswap/v2-core/contracts/UniswapV2Pair.sol",
+      "@uniswap/v2-periphery/contracts/UniswapV2Router02.sol",
+    ],
   },
   dodoc: {
     runOnCompile: DODOC_ON_COMPILE === "true",

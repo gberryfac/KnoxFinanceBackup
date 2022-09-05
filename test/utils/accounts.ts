@@ -50,6 +50,7 @@ export async function getAddresses(
     buyer2: signers.buyer2.address,
     buyer3: signers.buyer3.address,
     vault: ethers.constants.AddressZero,
+    exchange: ethers.constants.AddressZero,
     queue: ethers.constants.AddressZero,
     auction: ethers.constants.AddressZero,
   };

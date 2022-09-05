@@ -5,6 +5,8 @@ import "@solidstate/contracts/introspection/IERC165.sol";
 import "@solidstate/contracts/token/ERC1155/IERC1155.sol";
 import "@solidstate/contracts/token/ERC1155/enumerable/IERC1155Enumerable.sol";
 
+import "../exchange/IExchangeHelper.sol";
+
 import "./IQueueEvents.sol";
 
 interface IQueue is IERC165, IERC1155, IERC1155Enumerable, IQueueEvents {
@@ -18,24 +20,53 @@ interface IQueue is IERC165, IERC1155, IERC1155Enumerable, IQueueEvents {
      */
     function setMaxTVL(uint256 newMaxTVL) external;
 
+    /**
+     * @notice sets a new Exchange Helper contract
+     * @param newExchangeHelper is the new Exchange Helper contract address
+     */
+    function setExchangeHelper(address newExchangeHelper) external;
+
     /************************************************
      *  DEPOSIT
      ***********************************************/
 
     /**
      * @notice deposits collateral asset
+     * @dev sent ETH will be wrapped as wETH
      * @dev sender must approve contract
      * @param amount total collateral deposited
      */
-    function deposit(uint256 amount) external;
+    function deposit(uint256 amount) external payable;
 
     /**
      * @notice deposits collateral asset
+     * @dev sent ETH will be wrapped as wETH
      * @dev sender must approve contract
      * @param amount total collateral deposited
      * @param receiver claim token recipient
      */
-    function deposit(uint256 amount, address receiver) external;
+    function deposit(uint256 amount, address receiver) external payable;
+
+    /**
+     * @notice swaps into the collateral asset and deposits the proceeds
+     * @dev sent ETH will be wrapped as wETH
+     * @dev sender must approve contract
+     * @param s swap arguments
+     */
+    function swapAndDeposit(IExchangeHelper.SwapArgs calldata s)
+        external
+        payable;
+
+    /**
+     * @notice swaps into the collateral asset and deposits the proceeds
+     * @dev sent ETH will be wrapped as wETH
+     * @dev sender must approve contract
+     * @param s swap arguments
+     */
+    function swapAndDeposit(
+        IExchangeHelper.SwapArgs calldata s,
+        address receiver
+    ) external payable;
 
     /************************************************
      *  CANCEL

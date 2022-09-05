@@ -8,15 +8,17 @@ import { deployMockContract } from "ethereum-waffle";
 
 import {
   Auction,
+  ExchangeHelper,
   MockERC20,
   Queue,
   Auction__factory,
   AuctionProxy__factory,
+  ExchangeHelper__factory,
   Queue__factory,
   QueueProxy__factory,
 } from "../../types";
 
-import { accounts, time, types, PoolUtil, VaultUtil } from ".";
+import { accounts, time, types, uniswap, PoolUtil, VaultUtil } from ".";
 
 export interface ClaimTokenId {
   address: string;
@@ -48,8 +50,10 @@ interface KnoxUtilArgs {
   asset: MockERC20;
   vaultUtil: VaultUtil;
   poolUtil: PoolUtil;
+  exchange: ExchangeHelper;
   queue: Queue;
   auction: Auction;
+  uni: uniswap.IUniswap;
 }
 
 export class KnoxUtil {
@@ -59,8 +63,10 @@ export class KnoxUtil {
   asset: MockERC20;
   vaultUtil: VaultUtil;
   poolUtil: PoolUtil;
+  exchange: ExchangeHelper;
   queue: Queue;
   auction: Auction;
+  uni: uniswap.IUniswap;
 
   constructor(props: KnoxUtilArgs) {
     this.params = props.params;
@@ -69,8 +75,10 @@ export class KnoxUtil {
     this.asset = props.asset;
     this.vaultUtil = props.vaultUtil;
     this.poolUtil = props.poolUtil;
+    this.exchange = props.exchange;
     this.queue = props.queue;
     this.auction = props.auction;
+    this.uni = props.uni;
   }
 
   static async deploy(
@@ -97,34 +105,12 @@ export class KnoxUtil {
     const vault = vaultUtil.vault;
     addresses.vault = vault.address;
 
-    // deploy Queue
-    let queue = await new Queue__factory(signers.deployer).deploy(
-      params.isCall,
-      addresses.pool,
-      addresses.vault
-    );
-
-    const queueProxy = await new QueueProxy__factory(signers.deployer).deploy(
-      params.maxTVL,
-      queue.address
-    );
-
-    queue = Queue__factory.connect(queueProxy.address, signers.lp1);
-    addresses.queue = queue.address;
-
-    // deploy Auction
-    let auction = await new Auction__factory(signers.deployer).deploy(
-      params.isCall,
-      addresses.pool,
-      addresses.vault
-    );
-
-    const auctionProxy = await new AuctionProxy__factory(
+    // deploy ExchangeHelper
+    const exchange = await new ExchangeHelper__factory(
       signers.deployer
-    ).deploy(params.minSize, auction.address);
+    ).deploy();
 
-    auction = Auction__factory.connect(auctionProxy.address, signers.buyer1);
-    addresses.auction = auction.address;
+    addresses.exchange = exchange.address;
 
     // deploy mock Pricer
     const mockVolatilityOracle = await deployMockContract(
@@ -154,9 +140,45 @@ export class KnoxUtil {
 
     addresses.pricer = mockPricer.address;
 
+    // deploy Queue
+    let weth = poolUtil.weth;
+
+    let queue = await new Queue__factory(signers.deployer).deploy(
+      params.isCall,
+      addresses.pool,
+      addresses.vault,
+      weth.address
+    );
+
+    const queueProxy = await new QueueProxy__factory(signers.deployer).deploy(
+      params.maxTVL,
+      addresses.exchange,
+      queue.address
+    );
+
+    queue = Queue__factory.connect(queueProxy.address, signers.lp1);
+    addresses.queue = queue.address;
+
+    // deploy Auction
+
+    let auction = await new Auction__factory(signers.deployer).deploy(
+      params.isCall,
+      addresses.pool,
+      addresses.vault,
+      weth.address
+    );
+
+    const auctionProxy = await new AuctionProxy__factory(
+      signers.deployer
+    ).deploy(params.minSize, addresses.exchange, auction.address);
+
+    auction = Auction__factory.connect(auctionProxy.address, signers.buyer1);
+    addresses.auction = auction.address;
+
     // inititialize Vault
     const initImpl = {
       auction: addresses.auction,
+      exchange: addresses.exchange,
       queue: addresses.queue,
       pricer: addresses.pricer,
     };
@@ -168,6 +190,39 @@ export class KnoxUtil {
     // gets vault signer
     signers.vault = await accounts.impersonateVault(signers, addresses);
 
+    // setup Uniswap Pools
+    const uni = await uniswap.createUniswap(signers.deployer, weth.address);
+
+    const pairTokenIn = await uniswap.createUniswapPair(
+      signers.deployer,
+      uni.factory,
+      uni.tokenIn.address,
+      weth.address
+    );
+
+    await uniswap.depositUniswapLiquidity(
+      signers.deployer,
+      pairTokenIn,
+      params.mint.div(10),
+      params.mint.div(10)
+    );
+
+    if (asset.address !== weth.address) {
+      const pairTokenOut = await uniswap.createUniswapPair(
+        signers.deployer,
+        uni.factory,
+        asset.address, // vault collateral asset
+        weth.address
+      );
+
+      await uniswap.depositUniswapLiquidity(
+        signers.deployer,
+        pairTokenOut,
+        params.mint.div(10),
+        params.mint.div(10)
+      );
+    }
+
     return new KnoxUtil({
       params,
       signers,
@@ -175,8 +230,10 @@ export class KnoxUtil {
       asset,
       vaultUtil,
       poolUtil,
+      exchange,
       queue,
       auction,
+      uni,
     });
   }
 

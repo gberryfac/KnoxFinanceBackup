@@ -1,8 +1,5 @@
-// SPDX-License-Identifier: GPL-3.0-only
-pragma solidity 0.8.6;
-
-/// @title   Cumulative Normal Distribution Math Lib API Test
-/// @dev     ONLY FOR TESTING PURPOSES.
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
 
 import "abdk-libraries-solidity/ABDKMath64x64.sol";
 import "../pricer/OptionStatistics.sol";
@@ -17,7 +14,6 @@ contract TestOptionStatistics {
 
     constructor() {}
 
-    // ==== Cumulative Normal Distribution Function Library Entry ====
     function toSigned(uint256 x, bool isNegative)
         internal
         pure
