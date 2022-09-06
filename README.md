@@ -64,3 +64,27 @@ Generate a code coverage report using `solidity-coverage`:
 ```bash
 npx hardhat coverage
 ```
+
+## Deployment
+
+Create a `.env.prod` file with the following values defined:
+
+| Key                 | Description                                  |
+| ------------------- | -------------------------------------------- |
+| `DEPLOYER_KEY`      | private key of the deployer address          |
+| `POOL`              | Premia options pool address                  |
+| `VOLATILITY_ORACLE` | Premia volatility oracle contract address    |
+| `PRICER`            | pricer contract proxy address                |
+| `EXCHANGE`          | exchange helper contract address             |
+| `KEEPER`            | keeper address                               |
+| `FEE_RECIPIENT`     | fee recipient address                        |
+| `WETH`              | wETH contract address                        |
+| `IS_CALL`           | option type (Call or Put)                    |
+| `MAX_TVL`           | maximum vault total value locked (e.g. 1000) |
+| `DELTA`             | option delta (e.g. 0.4)                      |
+| `DELTA_OFFSET`      | option delta offset (e.g. 0.05)              |
+| `RESERVE_RATE`      | reserve rate (e.g. 0.001)                    |
+| `PERFORMANCE_FEE`   | performance fee percentage (e.g. 0.2)        |
+| `WITHDRAWAL_FEE`    | withdrawal fee percentage (e.g. 0.02)        |
+| `TOKEN_NAME`        | vault token name                             |
+| `TOKEN_SYMBOL`      | vault token symbol                           |
