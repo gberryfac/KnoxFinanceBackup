@@ -93,14 +93,18 @@ export const assert = {
 };
 
 export function almost(
+  actual: number | BigNumber,
   expected: number | BigNumber,
-  actual: number | BigNumber
+  tolerance?: number | BigNumber
 ) {
-  if (expected instanceof BigNumber) expected = math.bnToNumber(expected);
   if (actual instanceof BigNumber) actual = math.bnToNumber(actual);
+  if (expected instanceof BigNumber) expected = math.bnToNumber(expected);
+  if (tolerance instanceof BigNumber) tolerance = math.bnToNumber(tolerance);
 
-  // actual value should be within 0.01% of expected
-  const tolerance = expected * 0.0001;
+  // actual value should be within 0.01% of actual, by default
+  if (tolerance == null) {
+    tolerance = actual * 0.0001;
+  }
 
-  expect(expected).to.almost(actual, tolerance);
+  expect(actual).to.almost(expected, tolerance);
 }

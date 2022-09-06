@@ -195,16 +195,6 @@ interface IAuction is IAuctionEvents, IERC1155Receiver {
      ***********************************************/
 
     /**
-     * @notice displays the epochs the buyer has a fill and/or refund
-     * @param buyer address of buyer
-     * @return array of epoch ids
-     */
-    function epochsByBuyer(address buyer)
-        external
-        view
-        returns (uint64[] memory);
-
-    /**
      * @notice gets the auction parameters
      * @param epoch epoch id
      * @return auction parameters
@@ -213,6 +203,16 @@ interface IAuction is IAuctionEvents, IERC1155Receiver {
         external
         view
         returns (AuctionStorage.Auction memory);
+
+    /**
+     * @notice displays the epochs the buyer has a fill and/or refund
+     * @param buyer address of buyer
+     * @return array of epoch ids
+     */
+    function getEpochsByBuyer(address buyer)
+        external
+        view
+        returns (uint64[] memory);
 
     /**
      * @notice gets the minimum order size

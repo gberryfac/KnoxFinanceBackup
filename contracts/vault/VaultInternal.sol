@@ -13,8 +13,6 @@ import "./IVault.sol";
 import "./IVaultEvents.sol";
 import "./VaultStorage.sol";
 
-import "hardhat/console.sol";
-
 contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
     using ABDKMath64x64 for int128;
     using ABDKMath64x64 for uint256;
@@ -491,8 +489,8 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
      ***********************************************/
 
     /**
-     * @notice get the total quantity of the assets managed by the vault
-     * @return total active asset amount
+     * @notice get the total quantity of active collateral managed by the vault
+     * @return total active collateral amount
      */
     function _totalAssets()
         internal
@@ -500,7 +498,8 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
         override(ERC4626BaseInternal)
         returns (uint256)
     {
-        return _totalCollateral() + _totalShortAsCollateral();
+        return
+            _totalCollateral() + _totalShortAsCollateral() - _totalReserves();
     }
 
     /**

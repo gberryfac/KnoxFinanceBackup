@@ -12,7 +12,9 @@ import "./IAuction.sol";
 contract Auction is AuctionInternal, IAuction, ReentrancyGuard {
     using ABDKMath64x64 for int128;
     using AuctionStorage for AuctionStorage.Layout;
+    using EnumerableSet for EnumerableSet.UintSet;
     using ERC165Storage for ERC165Storage.Layout;
+    using OrderBook for OrderBook.Index;
     using SafeERC20 for IERC20;
 
     constructor(
@@ -30,7 +32,21 @@ contract Auction is AuctionInternal, IAuction, ReentrancyGuard {
      * @inheritdoc IAuction
      */
     function setExchangeHelper(address newExchangeHelper) external onlyOwner {
-        _setExchangeHelper(newExchangeHelper);
+        AuctionStorage.Layout storage l = AuctionStorage.layout();
+
+        require(newExchangeHelper != address(0), "address not provided");
+        require(
+            newExchangeHelper != address(l.Exchange),
+            "new address equals old"
+        );
+
+        emit ExchangeHelperSet(
+            address(l.Exchange),
+            newExchangeHelper,
+            msg.sender
+        );
+
+        l.Exchange = IExchangeHelper(newExchangeHelper);
     }
 
     /************************************************
@@ -44,7 +60,37 @@ contract Auction is AuctionInternal, IAuction, ReentrancyGuard {
         external
         onlyVault
     {
-        _initialize(initAuction);
+        AuctionStorage.Layout storage l = AuctionStorage.layout();
+
+        require(
+            initAuction.endTime > initAuction.startTime,
+            "endTime <= startTime"
+        );
+
+        require(
+            initAuction.startTime >= block.timestamp,
+            "start time too early"
+        );
+
+        require(initAuction.strike64x64 > 0, "strike price == 0");
+        require(initAuction.longTokenId > 0, "token id == 0");
+
+        AuctionStorage.Auction storage auction = l.auctions[initAuction.epoch];
+
+        require(
+            auction.status == AuctionStorage.Status.UNINITIALIZED,
+            "status != uninitialized"
+        );
+
+        auction.status = AuctionStorage.Status.INITIALIZED;
+        auction.expiry = initAuction.expiry;
+        auction.strike64x64 = initAuction.strike64x64;
+        auction.startTime = initAuction.startTime;
+        auction.endTime = initAuction.endTime;
+        auction.totalTime = initAuction.endTime - initAuction.startTime;
+        auction.longTokenId = initAuction.longTokenId;
+
+        emit AuctionStatusSet(initAuction.epoch, auction.status);
     }
 
     /**
@@ -54,12 +100,32 @@ contract Auction is AuctionInternal, IAuction, ReentrancyGuard {
         uint64 epoch,
         int128 maxPrice64x64,
         int128 minPrice64x64
-    )
-        external
-        auctionStatus(AuctionStorage.Status.INITIALIZED, epoch)
-        onlyVault
-    {
-        _setAuctionPrices(epoch, maxPrice64x64, minPrice64x64);
+    ) external onlyVault {
+        AuctionStorage.Layout storage l = AuctionStorage.layout();
+        AuctionStorage.Auction storage auction = l.auctions[epoch];
+
+        require(
+            AuctionStorage.Status.INITIALIZED == auction.status,
+            "status != initialized"
+        );
+
+        auction.maxPrice64x64 = maxPrice64x64;
+        auction.minPrice64x64 = minPrice64x64;
+
+        if (
+            auction.maxPrice64x64 <= 0 ||
+            auction.minPrice64x64 <= 0 ||
+            auction.maxPrice64x64 <= auction.minPrice64x64
+        ) {
+            // cancel the auction if prices are invalid
+            _finalizeAuction(l, auction, epoch);
+        }
+
+        emit AuctionPricesSet(
+            epoch,
+            auction.maxPrice64x64,
+            auction.minPrice64x64
+        );
     }
 
     /************************************************
@@ -70,21 +136,27 @@ contract Auction is AuctionInternal, IAuction, ReentrancyGuard {
      * @inheritdoc IAuction
      */
     function lastPrice64x64(uint64 epoch) external view returns (int128) {
-        return _lastPrice64x64(epoch);
+        AuctionStorage.Layout storage l = AuctionStorage.layout();
+        AuctionStorage.Auction storage auction = l.auctions[epoch];
+        return _lastPrice64x64(auction);
     }
 
     /**
      * @inheritdoc IAuction
      */
     function priceCurve64x64(uint64 epoch) external view returns (int128) {
-        return _priceCurve64x64(epoch);
+        AuctionStorage.Layout storage l = AuctionStorage.layout();
+        AuctionStorage.Auction storage auction = l.auctions[epoch];
+        return _priceCurve64x64(auction);
     }
 
     /**
      * @inheritdoc IAuction
      */
     function clearingPrice64x64(uint64 epoch) external view returns (int128) {
-        return _clearingPrice64x64(epoch);
+        AuctionStorage.Layout storage l = AuctionStorage.layout();
+        AuctionStorage.Auction storage auction = l.auctions[epoch];
+        return _clearingPrice64x64(auction);
     }
 
     /************************************************
@@ -98,13 +170,17 @@ contract Auction is AuctionInternal, IAuction, ReentrancyGuard {
         uint64 epoch,
         int128 price64x64,
         uint256 size
-    ) external payable limitOrdersAllowed(epoch) nonReentrant {
+    ) external payable nonReentrant {
         AuctionStorage.Layout storage l = AuctionStorage.layout();
+        AuctionStorage.Auction storage auction = l.auctions[epoch];
+
+        _limitOrdersAllowed(auction);
+
         uint256 cost = _validateLimitOrder(l, price64x64, size);
         uint256 credited = _wrapNativeToken(cost);
         // an approve() by the msg.sender is required beforehand
         ERC20.safeTransferFrom(msg.sender, address(this), cost - credited);
-        _addOrder(l, epoch, price64x64, size, true);
+        _addOrder(l, auction, epoch, price64x64, size, true);
     }
 
     /**
@@ -115,23 +191,46 @@ contract Auction is AuctionInternal, IAuction, ReentrancyGuard {
         uint64 epoch,
         int128 price64x64,
         uint256 size
-    ) external payable limitOrdersAllowed(epoch) nonReentrant {
+    ) external payable nonReentrant {
         AuctionStorage.Layout storage l = AuctionStorage.layout();
+        AuctionStorage.Auction storage auction = l.auctions[epoch];
+
+        _limitOrdersAllowed(auction);
+
         uint256 cost = _validateLimitOrder(l, price64x64, size);
         uint256 credited = _swapForPoolTokens(l.Exchange, s, address(ERC20));
         _transferAssets(credited, cost, msg.sender);
-        _addOrder(l, epoch, price64x64, size, true);
+        _addOrder(l, auction, epoch, price64x64, size, true);
     }
 
     /**
      * @inheritdoc IAuction
      */
-    function cancelLimitOrder(uint64 epoch, uint256 id)
-        external
-        limitOrdersAllowed(epoch)
-        nonReentrant
-    {
-        _cancelLimitOrder(epoch, id);
+    function cancelLimitOrder(uint64 epoch, uint256 id) external nonReentrant {
+        AuctionStorage.Layout storage l = AuctionStorage.layout();
+        AuctionStorage.Auction storage auction = l.auctions[epoch];
+
+        _limitOrdersAllowed(auction);
+
+        require(id > 0, "invalid order id");
+
+        OrderBook.Index storage orderbook = l.orderbooks[epoch];
+        OrderBook.Data memory data = orderbook._getOrderById(id);
+
+        require(data.buyer != address(0), "order does not exist");
+        require(data.buyer == msg.sender, "buyer != msg.sender");
+
+        orderbook._remove(id);
+        l.epochsByBuyer[data.buyer].remove(epoch);
+
+        if (block.timestamp >= auction.startTime) {
+            _finalizeAuction(l, auction, epoch);
+        }
+
+        uint256 cost = data.price64x64.mulu(data.size);
+        ERC20.safeTransfer(msg.sender, cost);
+
+        emit OrderCanceled(epoch, id, msg.sender);
     }
 
     /**
@@ -141,16 +240,19 @@ contract Auction is AuctionInternal, IAuction, ReentrancyGuard {
         uint64 epoch,
         uint256 size,
         uint256 maxCost
-    ) external payable marketOrdersAllowed(epoch) nonReentrant {
+    ) external payable nonReentrant {
         AuctionStorage.Layout storage l = AuctionStorage.layout();
+        AuctionStorage.Auction storage auction = l.auctions[epoch];
+
+        _marketOrdersAllowed(auction);
 
         (int128 price64x64, uint256 cost) =
-            _validateMarketOrder(l, epoch, size, maxCost);
+            _validateMarketOrder(l, auction, size, maxCost);
 
         uint256 credited = _wrapNativeToken(cost);
         // an approve() by the msg.sender is required beforehand
         ERC20.safeTransferFrom(msg.sender, address(this), cost - credited);
-        _addOrder(l, epoch, price64x64, size, false);
+        _addOrder(l, auction, epoch, price64x64, size, false);
     }
 
     /**
@@ -161,15 +263,18 @@ contract Auction is AuctionInternal, IAuction, ReentrancyGuard {
         uint64 epoch,
         uint256 size,
         uint256 maxCost
-    ) external payable marketOrdersAllowed(epoch) nonReentrant {
+    ) external payable nonReentrant {
         AuctionStorage.Layout storage l = AuctionStorage.layout();
+        AuctionStorage.Auction storage auction = l.auctions[epoch];
+
+        _marketOrdersAllowed(auction);
 
         (int128 price64x64, uint256 cost) =
-            _validateMarketOrder(l, epoch, size, maxCost);
+            _validateMarketOrder(l, auction, size, maxCost);
 
         uint256 credited = _swapForPoolTokens(l.Exchange, s, address(ERC20));
         _transferAssets(credited, cost, msg.sender);
-        _addOrder(l, epoch, price64x64, size, false);
+        _addOrder(l, auction, epoch, price64x64, size, false);
     }
 
     /************************************************
@@ -179,12 +284,16 @@ contract Auction is AuctionInternal, IAuction, ReentrancyGuard {
     /**
      * @inheritdoc IAuction
      */
-    function withdraw(uint64 epoch)
-        external
-        auctionStatus(AuctionStorage.Status.PROCESSED, epoch)
-        nonReentrant
-    {
-        _withdraw(epoch);
+    function withdraw(uint64 epoch) external nonReentrant {
+        AuctionStorage.Layout storage l = AuctionStorage.layout();
+        AuctionStorage.Auction storage auction = l.auctions[epoch];
+
+        require(
+            AuctionStorage.Status.PROCESSED == auction.status,
+            "status != processed"
+        );
+
+        _withdraw(l, epoch);
     }
 
     /**
@@ -211,12 +320,11 @@ contract Auction is AuctionInternal, IAuction, ReentrancyGuard {
     /**
      * @inheritdoc IAuction
      */
-    function finalizeAuction(uint64 epoch)
-        external
-        auctionNotFinalizedOrProcessed(epoch)
-        auctionHasStarted(epoch)
-    {
-        _finalizeAuction(epoch);
+    function finalizeAuction(uint64 epoch) external {
+        AuctionStorage.Layout storage l = AuctionStorage.layout();
+        AuctionStorage.Auction storage auction = l.auctions[epoch];
+        _finalizeAuctionAllowed(auction);
+        _finalizeAuction(l, auction, epoch);
     }
 
     /**
@@ -224,38 +332,63 @@ contract Auction is AuctionInternal, IAuction, ReentrancyGuard {
      */
     function transferPremium(uint64 epoch)
         external
-        auctionStatus(AuctionStorage.Status.FINALIZED, epoch)
         onlyVault
         returns (uint256)
     {
-        return _transferPremium(epoch);
+        AuctionStorage.Layout storage l = AuctionStorage.layout();
+        AuctionStorage.Auction storage auction = l.auctions[epoch];
+
+        require(
+            AuctionStorage.Status.FINALIZED == auction.status,
+            "status != finalized"
+        );
+
+        require(auction.totalPremiums <= 0, "premiums transferred");
+
+        uint256 totalPremiums =
+            _lastPrice64x64(auction).mulu(auction.totalContractsSold);
+
+        auction.totalPremiums = totalPremiums;
+        ERC20.safeTransfer(address(Vault), totalPremiums);
+
+        return auction.totalPremiums;
     }
 
     /**
      * @inheritdoc IAuction
      */
-    function processAuction(uint64 epoch)
-        external
-        auctionStatus(AuctionStorage.Status.FINALIZED, epoch)
-        onlyVault
-    {
-        _processAuction(epoch);
+    function processAuction(uint64 epoch) external onlyVault {
+        AuctionStorage.Layout storage l = AuctionStorage.layout();
+        AuctionStorage.Auction storage auction = l.auctions[epoch];
+
+        require(
+            AuctionStorage.Status.FINALIZED == auction.status,
+            "status != finalized"
+        );
+
+        uint256 totalContractsSold = auction.totalContractsSold;
+
+        if (totalContractsSold > 0) {
+            uint256 longTokenId = auction.longTokenId;
+
+            uint256 longTokenBalance =
+                Pool.balanceOf(address(this), longTokenId);
+
+            require(auction.totalPremiums > 0, "premiums not transferred");
+
+            require(
+                longTokenBalance >= totalContractsSold,
+                "long tokens not transferred"
+            );
+        }
+
+        auction.status = AuctionStorage.Status.PROCESSED;
+        emit AuctionStatusSet(epoch, auction.status);
     }
 
     /************************************************
      *  VIEW
      ***********************************************/
-
-    /**
-     * @inheritdoc IAuction
-     */
-    function epochsByBuyer(address buyer)
-        external
-        view
-        returns (uint64[] memory)
-    {
-        return _epochsByBuyer(buyer);
-    }
 
     /**
      * @inheritdoc IAuction
@@ -266,6 +399,28 @@ contract Auction is AuctionInternal, IAuction, ReentrancyGuard {
         returns (AuctionStorage.Auction memory)
     {
         return AuctionStorage._getAuction(epoch);
+    }
+
+    /**
+     * @inheritdoc IAuction
+     */
+    function getEpochsByBuyer(address buyer)
+        external
+        view
+        returns (uint64[] memory)
+    {
+        AuctionStorage.Layout storage l = AuctionStorage.layout();
+        EnumerableSet.UintSet storage epochs = l.epochsByBuyer[buyer];
+
+        uint64[] memory epochsByBuyer = new uint64[](epochs.length());
+
+        unchecked {
+            for (uint256 i; i < epochs.length(); i++) {
+                epochsByBuyer[i] = uint64(epochs.at(i));
+            }
+        }
+
+        return epochsByBuyer;
     }
 
     /**
@@ -301,7 +456,9 @@ contract Auction is AuctionInternal, IAuction, ReentrancyGuard {
      * @inheritdoc IAuction
      */
     function getTotalContracts(uint64 epoch) external view returns (uint256) {
-        return _getTotalContracts(epoch);
+        AuctionStorage.Layout storage l = AuctionStorage.layout();
+        AuctionStorage.Auction storage auction = l.auctions[epoch];
+        return _getTotalContracts(auction);
     }
 
     /**

@@ -3,18 +3,16 @@ import { BigNumber, ContractTransaction } from "ethers";
 
 import { describeBehaviorOfERC4626Base } from "@solidstate/spec";
 
-import chai, { expect } from "chai";
-import chaiAlmost from "chai-almost";
-
-chai.use(chaiAlmost());
+import { expect } from "chai";
 
 import moment from "moment-timezone";
 moment.tz.setDefault("UTC");
 
 import { Auction, IPremiaPool, IVault, MockERC20, Queue } from "../types";
 
-import { assert, math, time, types, KnoxUtil } from "../test/utils";
+import { almost, assert, math, time, types, KnoxUtil } from "../test/utils";
 import { fixedFromFloat } from "@premia/utils";
+import { parseUnits } from "ethers/lib/utils";
 
 interface VaultBaseBehaviorArgs {
   getKnoxUtil: () => Promise<KnoxUtil>;
@@ -240,17 +238,13 @@ export function describeBehaviorOfVaultBase(
         );
 
         assert.equal(math.bnToNumber(feeRecipientCollateralBalanceBefore), 0);
-
-        expect(math.bnToNumber(feeRecipientCollateralBalanceAfter)).to.almost(
-          feeInCollateral
-        );
+        almost(feeRecipientCollateralBalanceAfter, feeInCollateral);
 
         // distribution includes collateral without premiums
-        expect(
-          math.bnToNumber(
-            lpCollateralBalanceAfter.sub(lpCollateralBalanceBefore)
-          )
-        ).to.almost(totalDistributionInCollateral);
+        almost(
+          lpCollateralBalanceAfter.sub(lpCollateralBalanceBefore),
+          totalDistributionInCollateral
+        );
       });
 
       it("should distribute collateral tokens only to LP between epoch end and auction start", async () => {
@@ -308,11 +302,10 @@ export function describeBehaviorOfVaultBase(
         assert.equal(math.bnToNumber(lpShortBalanceAfter), 0);
 
         // distribution includes collateral without premiums
-        expect(
-          math.bnToNumber(
-            lpCollateralBalanceAfter.sub(lpCollateralBalanceBefore)
-          )
-        ).to.almost(totalDistributionInCollateral);
+        almost(
+          lpCollateralBalanceAfter.sub(lpCollateralBalanceBefore),
+          totalDistributionInCollateral
+        );
       });
 
       it("should collect withdrawal fees in collateral and short tokens to LP after auction ends", async () => {
@@ -379,21 +372,14 @@ export function describeBehaviorOfVaultBase(
           feeInShortContracts
         );
 
-        expect(math.bnToNumber(feeRecipientCollateralBalanceAfter)).to.almost(
-          feeInCollateral
-        );
-
-        assert.equal(
-          math.bnToNumber(lpShortBalanceAfter),
-          totalDistributionInShortContracts
-        );
+        almost(feeRecipientCollateralBalanceAfter, feeInCollateral);
+        almost(lpShortBalanceAfter, totalDistributionInShortContracts);
 
         // distribution contains collateral and premiums earned from auction
-        expect(
-          math.bnToNumber(
-            lpCollateralBalanceAfter.sub(lpCollateralBalanceBefore)
-          )
-        ).to.almost(totalDistributionInCollateral);
+        almost(
+          lpCollateralBalanceAfter.sub(lpCollateralBalanceBefore),
+          totalDistributionInCollateral
+        );
       });
 
       it("should distribute collateral and short tokens to LP after auction ends", async () => {
@@ -441,7 +427,11 @@ export function describeBehaviorOfVaultBase(
         );
 
         assert.equal(math.bnToNumber(lpVaultSharesAfter), 0);
-        expect(math.bnToNumber(vaultShortBalanceAfter)).to.almost(0);
+        almost(
+          vaultShortBalanceAfter,
+          0,
+          parseUnits("1", params.collateral.decimals - 3) // min tolerance
+        );
 
         assert.equal(
           math.bnToNumber(lpShortBalanceAfter),
@@ -449,11 +439,10 @@ export function describeBehaviorOfVaultBase(
         );
 
         // distribution contains collateral and premiums earned from auction
-        expect(
-          math.bnToNumber(
-            lpCollateralBalanceAfter.sub(lpCollateralBalanceBefore)
-          )
-        ).to.almost(totalDistributionInCollateral);
+        almost(
+          lpCollateralBalanceAfter.sub(lpCollateralBalanceBefore),
+          totalDistributionInCollateral
+        );
       });
     });
 
@@ -563,17 +552,13 @@ export function describeBehaviorOfVaultBase(
         );
 
         assert.equal(math.bnToNumber(feeRecipientCollateralBalanceBefore), 0);
-
-        expect(math.bnToNumber(feeRecipientCollateralBalanceAfter)).to.almost(
-          feeInCollateral
-        );
+        almost(feeRecipientCollateralBalanceAfter, feeInCollateral);
 
         // distribution includes collateral without premiums
-        expect(
-          math.bnToNumber(
-            lpCollateralBalanceAfter.sub(lpCollateralBalanceBefore)
-          )
-        ).to.almost(totalDistributionInCollateral);
+        almost(
+          lpCollateralBalanceAfter.sub(lpCollateralBalanceBefore),
+          totalDistributionInCollateral
+        );
       });
 
       it("should distribute collateral tokens only to LP between epoch end and auction start", async () => {
@@ -631,11 +616,10 @@ export function describeBehaviorOfVaultBase(
         assert.equal(math.bnToNumber(lpShortBalanceAfter), 0);
 
         // distribution includes collateral without premiums
-        expect(
-          math.bnToNumber(
-            lpCollateralBalanceAfter.sub(lpCollateralBalanceBefore)
-          )
-        ).to.almost(totalDistributionInCollateral);
+        almost(
+          lpCollateralBalanceAfter.sub(lpCollateralBalanceBefore),
+          totalDistributionInCollateral
+        );
       });
 
       it("should collect withdrawal fees in collateral and short tokens to LP after auction ends", async () => {
@@ -702,9 +686,7 @@ export function describeBehaviorOfVaultBase(
           feeInShortContracts
         );
 
-        expect(math.bnToNumber(feeRecipientCollateralBalanceAfter)).to.almost(
-          feeInCollateral
-        );
+        almost(feeRecipientCollateralBalanceAfter, feeInCollateral);
 
         assert.equal(
           math.bnToNumber(lpShortBalanceAfter),
@@ -712,11 +694,10 @@ export function describeBehaviorOfVaultBase(
         );
 
         // distribution contains collateral and premiums earned from auction
-        expect(
-          math.bnToNumber(
-            lpCollateralBalanceAfter.sub(lpCollateralBalanceBefore)
-          )
-        ).to.almost(totalDistributionInCollateral);
+        almost(
+          lpCollateralBalanceAfter.sub(lpCollateralBalanceBefore),
+          totalDistributionInCollateral
+        );
       });
 
       it("should distribute collateral and short tokens to LP after auction ends", async () => {
@@ -764,7 +745,11 @@ export function describeBehaviorOfVaultBase(
         );
 
         assert.equal(math.bnToNumber(lpVaultSharesAfter), 0);
-        expect(math.bnToNumber(vaultShortBalanceAfter)).to.almost(0);
+        almost(
+          vaultShortBalanceAfter,
+          0,
+          parseUnits("1", params.collateral.decimals - 3) // min tolerance
+        );
 
         assert.equal(
           math.bnToNumber(lpShortBalanceAfter),
@@ -772,11 +757,10 @@ export function describeBehaviorOfVaultBase(
         );
 
         // distribution contains collateral and premiums earned from auction
-        expect(
-          math.bnToNumber(
-            lpCollateralBalanceAfter.sub(lpCollateralBalanceBefore)
-          )
-        ).to.almost(totalDistributionInCollateral);
+        almost(
+          lpCollateralBalanceAfter.sub(lpCollateralBalanceBefore),
+          totalDistributionInCollateral
+        );
       });
     });
   });
