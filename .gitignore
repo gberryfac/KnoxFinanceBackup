@@ -5,6 +5,7 @@ types/
 cache
 artifacts
 .env
+.env.prod
 coverage.json
 coverage/
 

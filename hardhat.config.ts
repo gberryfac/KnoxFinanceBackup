@@ -11,6 +11,7 @@ import "hardhat-tracer";
 import "solidity-coverage";
 
 require("dotenv").config();
+require("dotenv").config({ path: "./.env.prod" });
 
 import { TEST_URI, BLOCK_NUMBER } from "./constants";
 
@@ -20,6 +21,7 @@ let {
   DODOC_ON_COMPILE,
   REPORT_GAS,
   SIZER_ON_COMPILE,
+  DEPLOYER_KEY,
 } = process.env;
 
 // Defaults to CHAINID=42161 so things will run with mainnet fork if not specified
@@ -117,5 +119,10 @@ const config: HardhatUserConfig = {
     runOnCompile: SIZER_ON_COMPILE === "true",
   },
 };
+
+if (DEPLOYER_KEY != null) {
+  config.networks.mainnet.accounts = [DEPLOYER_KEY];
+  config.networks.arbitrum.accounts = [DEPLOYER_KEY];
+}
 
 export default config;

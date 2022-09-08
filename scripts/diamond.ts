@@ -32,3 +32,20 @@ export async function diamondCut(
 
   return registeredSelectors;
 }
+
+export async function printFacets(implAddress: string, factory: any) {
+  const facetCuts = [
+    {
+      target: implAddress,
+      action: 1,
+      selectors: Object.keys(factory.interface.functions).map((fn) => {
+        const selector = factory.interface.getSighash(fn);
+        // console.log(selector, fn);
+
+        return selector;
+      }),
+    },
+  ];
+
+  console.log(facetCuts);
+}
