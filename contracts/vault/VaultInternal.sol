@@ -337,8 +337,10 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
         VaultStorage.Layout storage l = VaultStorage.layout();
         VaultStorage.Option storage option = l.options[l.epoch];
 
+        // reverts if the strike price has not been set
         require(option.strike64x64 > 0, "delta strike unset");
 
+        // calculates the delta strike price using the offset delta
         int128 offsetStrike64x64 =
             l.Pricer.getDeltaStrikePrice64x64(
                 l.isCall,
@@ -355,18 +357,20 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
         int128 timeToMaturity64x64 =
             l.Pricer.getTimeToMaturity64x64(option.expiry);
 
+        // calculates the auction max price
         int128 maxPrice64x64 =
             l.Pricer.getBlackScholesPrice64x64(
                 spot64x64,
-                offsetStrike64x64,
+                option.strike64x64,
                 timeToMaturity64x64,
                 l.isCall
             );
 
+        // calculates the auction min price
         int128 minPrice64x64 =
             l.Pricer.getBlackScholesPrice64x64(
                 spot64x64,
-                option.strike64x64,
+                offsetStrike64x64,
                 timeToMaturity64x64,
                 l.isCall
             );
@@ -375,6 +379,12 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
             // denominates price in collateral asset
             maxPrice64x64 = maxPrice64x64.div(spot64x64);
             minPrice64x64 = minPrice64x64.div(spot64x64);
+        }
+
+        if (minPrice64x64 >= maxPrice64x64) {
+            // cancels auction if the min price >= max price
+            maxPrice64x64 = int128(0);
+            minPrice64x64 = int128(0);
         }
 
         l.Auction.setAuctionPrices(l.epoch, maxPrice64x64, minPrice64x64);
