@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "../interfaces/IPremiaPool.sol";
+import "../vendor/IPremiaPool.sol";
 
 import "./IVaultAdmin.sol";
 import "./IVaultBase.sol";

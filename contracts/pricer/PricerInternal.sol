@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "../interfaces/IPremiaPool.sol";
 import "../libraries/ABDKMath64x64Token.sol";
+import "../vendor/IPremiaPool.sol";
 import "../vendor/IVolatilitySurfaceOracle.sol";
 
 import "./IPricer.sol";

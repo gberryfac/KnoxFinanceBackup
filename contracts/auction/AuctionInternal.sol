@@ -8,10 +8,10 @@ import "@solidstate/contracts/token/ERC20/metadata/IERC20Metadata.sol";
 import "@solidstate/contracts/utils/IWETH.sol";
 import "@solidstate/contracts/utils/SafeERC20.sol";
 
-import "../interfaces/IPremiaPool.sol";
-
 import "../libraries/ABDKMath64x64Token.sol";
 import "../libraries/Helpers.sol";
+
+import "../vendor/IPremiaPool.sol";
 
 import "../vault/IVault.sol";
 

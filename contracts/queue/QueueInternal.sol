@@ -9,7 +9,7 @@ import "@solidstate/contracts/token/ERC1155/enumerable/ERC1155EnumerableInternal
 import "@solidstate/contracts/utils/IWETH.sol";
 import "@solidstate/contracts/utils/SafeERC20.sol";
 
-import "../interfaces/IPremiaPool.sol";
+import "../vendor/IPremiaPool.sol";
 
 import "../vault/IVault.sol";
 

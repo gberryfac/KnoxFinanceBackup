@@ -6,9 +6,9 @@ import "@solidstate/contracts/token/ERC20/metadata/ERC20MetadataStorage.sol";
 import "@solidstate/contracts/token/ERC20/metadata/IERC20Metadata.sol";
 import "@solidstate/contracts/token/ERC4626/base/ERC4626BaseStorage.sol";
 
-import "../interfaces/IPremiaPool.sol";
-
 import "../libraries/Helpers.sol";
+
+import "../vendor/IPremiaPool.sol";
 
 import "./VaultStorage.sol";
 

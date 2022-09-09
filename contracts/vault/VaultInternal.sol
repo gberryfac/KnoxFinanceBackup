@@ -4,10 +4,10 @@ pragma solidity ^0.8.0;
 import "@solidstate/contracts/access/ownable/OwnableInternal.sol";
 import "@solidstate/contracts/token/ERC4626/base/ERC4626BaseInternal.sol";
 
-import "../interfaces/IPremiaPool.sol";
-
 import "../libraries/ABDKMath64x64Token.sol";
 import "../libraries/Helpers.sol";
+
+import "../vendor/IPremiaPool.sol";
 
 import "./IVault.sol";
 import "./IVaultEvents.sol";
