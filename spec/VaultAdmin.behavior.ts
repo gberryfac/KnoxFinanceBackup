@@ -12,6 +12,8 @@ import moment from "moment-timezone";
 moment.tz.setDefault("UTC");
 
 import {
+  UNDERLYING_FREE_LIQ_TOKEN_ID,
+  BASE_FREE_LIQ_TOKEN_ID,
   UNDERLYING_RESERVED_LIQ_TOKEN_ID,
   BASE_RESERVED_LIQ_TOKEN_ID,
 } from "../constants";
@@ -510,13 +512,11 @@ export function describeBehaviorOfVaultAdmin(
           .connect(signers.buyer1)
           .approve(addresses.auction, ethers.constants.MaxUint256);
 
+        const size = await auction.getTotalContracts(epoch);
+
         await auction
           .connect(signers.buyer1)
-          .addMarketOrder(
-            epoch,
-            await auction.getTotalContracts(epoch),
-            ethers.constants.MaxUint256
-          );
+          .addMarketOrder(epoch, size, ethers.constants.MaxUint256);
 
         // process auction 0
         await vault.connect(signers.keeper).processAuction();
@@ -769,8 +769,109 @@ export function describeBehaviorOfVaultAdmin(
       });
     });
 
-    describe.skip("#processAuction()", () => {
-      time.revertToSnapshotAfterEach(async () => {});
+    describe("#processAuction()", () => {
+      let epoch: BigNumber;
+      let startTime: BigNumber;
+      let size: BigNumber;
+
+      time.revertToSnapshotAfterEach(async () => {
+        await vault
+          .connect(signers.deployer)
+          .setPerformanceFee64x64(fixedFromFloat(0.2));
+
+        // lp1 deposits into queue
+        await asset
+          .connect(signers.lp1)
+          .approve(addresses.queue, params.deposit);
+
+        await queue.connect(signers.lp1)["deposit(uint256)"](params.deposit);
+
+        // init epoch 0 auction
+        [startTime, , epoch] = await knoxUtil.setAndInitializeAuction();
+
+        // init epoch 1
+        await time.fastForwardToFriday8AM();
+        await knoxUtil.initializeNextEpoch();
+
+        // auction 0 starts
+        await time.increaseTo(startTime);
+
+        // buyer1 purchases all available options
+        await asset
+          .connect(signers.buyer1)
+          .approve(addresses.auction, ethers.constants.MaxUint256);
+
+        size = await auction.getTotalContracts(epoch);
+
+        await auction
+          .connect(signers.buyer1)
+          .addMarketOrder(epoch, size, ethers.constants.MaxUint256);
+      });
+
+      it("should move collateral to reserved liquidity queue if option is exercised", async () => {
+        // process auction 0
+        await vault.connect(signers.keeper).processAuction();
+
+        const totalCollateralInShortPosition =
+          await vault.totalShortAsCollateral();
+
+        const freeLiquidityTokenId = params.isCall
+          ? UNDERLYING_FREE_LIQ_TOKEN_ID
+          : BASE_FREE_LIQ_TOKEN_ID;
+
+        const reservedLiquidityTokenId = params.isCall
+          ? UNDERLYING_RESERVED_LIQ_TOKEN_ID
+          : BASE_RESERVED_LIQ_TOKEN_ID;
+
+        const reservedLiquidityBefore = await pool.balanceOf(
+          addresses.vault,
+          reservedLiquidityTokenId
+        );
+
+        const freeLiquidityBefore = await pool.balanceOf(
+          addresses.vault,
+          freeLiquidityTokenId
+        );
+
+        assert.bnEqual(reservedLiquidityBefore, BigNumber.from(0));
+        assert.bnEqual(freeLiquidityBefore, BigNumber.from(0));
+
+        // options expires ITM
+        let underlyingPrice = params.underlying.oracle.price;
+        let intrinsicValue = 1;
+
+        const spot = params.isCall
+          ? underlyingPrice + intrinsicValue
+          : underlyingPrice - intrinsicValue;
+
+        await poolUtil.underlyingSpotPriceOracle.mock.latestAnswer.returns(
+          spot
+        );
+
+        // fast forward to hold period end
+        const { endTime } = await auction.getAuction(epoch);
+        await time.increaseTo(endTime.add(86400));
+
+        const { longTokenId } = await auction.getAuction(epoch);
+        await auction.connect(signers.buyer1).withdraw(epoch);
+        await pool
+          .connect(signers.buyer1)
+          .exerciseFrom(addresses.buyer1, longTokenId, size);
+
+        const reservedLiquidityAfter = await pool.balanceOf(
+          addresses.vault,
+          reservedLiquidityTokenId
+        );
+
+        const freeLiquidityAfter = await pool.balanceOf(
+          addresses.vault,
+          freeLiquidityTokenId
+        );
+
+        // reservered liquidity should include notional value + refunded APY fee
+        assert.bnGte(reservedLiquidityAfter, totalCollateralInShortPosition);
+        assert.bnEqual(freeLiquidityAfter, BigNumber.from(0));
+      });
     });
   });
 }

@@ -2447,6 +2447,11 @@ export function describeBehaviorOfAuction(
         );
       };
 
+      const fastForwardToHoldPeriodEnd = async (epoch: BigNumber) => {
+        const { endTime } = await auction.getAuction(epoch);
+        await time.increaseTo(endTime.add(86400));
+      };
+
       describe("if not processed", () => {
         time.revertToSnapshotAfterEach(async () => {
           await setupSimpleAuction(false);
@@ -2456,6 +2461,18 @@ export function describeBehaviorOfAuction(
           await expect(
             auction.connect(signers.buyer1).withdraw(0)
           ).to.be.revertedWith("status != processed");
+        });
+      });
+
+      describe("else if hold period has not ended", () => {
+        time.revertToSnapshotAfterEach(async () => {
+          await setupSimpleAuction(true);
+        });
+
+        it("should revert", async () => {
+          await expect(
+            auction.connect(signers.buyer1).withdraw(0)
+          ).to.be.revertedWith("hold period has not ended");
         });
       });
 
@@ -2505,6 +2522,7 @@ export function describeBehaviorOfAuction(
           await vault.connect(signers.keeper).initializeNextEpoch();
           await auction.connect(signers.vault).setAuctionPrices(epoch, 0, 0);
           await vault.connect(signers.keeper).processAuction();
+          await fastForwardToHoldPeriodEnd(epoch);
         });
 
         it("should send buyer1 refund, only", async () => {
@@ -2555,6 +2573,7 @@ export function describeBehaviorOfAuction(
 
         time.revertToSnapshotAfterEach(async () => {
           advancedAuction = await setupAdvancedAuction(true);
+          await fastForwardToHoldPeriodEnd(epoch);
           [, , longTokenId] = await vault.getOption(epoch);
         });
 
@@ -2619,6 +2638,7 @@ export function describeBehaviorOfAuction(
 
         time.revertToSnapshotAfterEach(async () => {
           simpleAuction = await setupSimpleAuction(true);
+          await fastForwardToHoldPeriodEnd(epoch);
           [, , longTokenId] = await vault.getOption(epoch);
         });
 
@@ -2854,6 +2874,7 @@ export function describeBehaviorOfAuction(
 
         time.revertToSnapshotAfterEach(async () => {
           simpleAuction = await setupSimpleAuction(true);
+          await fastForwardToHoldPeriodEnd(epoch);
         });
 
         it("should remove tx1 from order book", async () => {

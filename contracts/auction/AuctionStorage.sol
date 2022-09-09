@@ -30,6 +30,7 @@ library AuctionStorage {
         int128 lastPrice64x64;
         uint256 startTime;
         uint256 endTime;
+        uint256 processedTime;
         uint256 totalContracts;
         uint256 totalContractsSold;
         uint256 totalPremiums;

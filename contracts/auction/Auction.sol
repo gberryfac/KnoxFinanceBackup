@@ -293,6 +293,12 @@ contract Auction is AuctionInternal, IAuction, ReentrancyGuard {
             "status != processed"
         );
 
+        // long tokens are withheld for 24 hours after the auction has been processed
+        require(
+            block.timestamp >= auction.processedTime + 24 hours,
+            "hold period has not ended"
+        );
+
         _withdraw(l, epoch);
     }
 
@@ -382,6 +388,7 @@ contract Auction is AuctionInternal, IAuction, ReentrancyGuard {
             );
         }
 
+        auction.processedTime = block.timestamp;
         auction.status = AuctionStorage.Status.PROCESSED;
         emit AuctionStatusSet(epoch, auction.status);
     }
