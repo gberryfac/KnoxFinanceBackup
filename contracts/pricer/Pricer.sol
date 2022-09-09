@@ -4,6 +4,12 @@ pragma solidity ^0.8.0;
 import "./PricerInternal.sol";
 
 contract Pricer is IPricer, PricerInternal {
+    using ABDKMath64x64 for int128;
+    using ABDKMath64x64Token for int128;
+    using OptionStatistics for int128;
+
+    int128 private constant ONE_64x64 = 0x10000000000000000;
+
     constructor(address pool, address volatilityOracle)
         PricerInternal(pool, volatilityOracle)
     {}
@@ -52,7 +58,9 @@ contract Pricer is IPricer, PricerInternal {
         bool isCall
     ) external view returns (int128) {
         return
-            _getBlackScholesPrice64x64(
+            IVolOracle.getBlackScholesPrice64x64(
+                Base,
+                Underlying,
                 spot64x64,
                 strike64x64,
                 timeToMaturity64x64,
@@ -68,7 +76,27 @@ contract Pricer is IPricer, PricerInternal {
         uint64 expiry,
         int128 delta64x64
     ) external view returns (int128) {
-        return _getDeltaStrikePrice64x64(isCall, expiry, delta64x64);
+        int128 spot64x64 = _latestAnswer64x64();
+
+        int128 timeToMaturity64x64 = _getTimeToMaturity64x64(expiry);
+        require(timeToMaturity64x64 > 0, "tau <= 0");
+
+        int128 iv_atm =
+            _getAnnualizedVolatility64x64(
+                spot64x64,
+                spot64x64,
+                timeToMaturity64x64
+            );
+        require(iv_atm > 0, "iv_atm <= 0");
+
+        int128 v = iv_atm.mul(timeToMaturity64x64.sqrt());
+        int128 w = timeToMaturity64x64.mul(iv_atm.pow(2)) >> 1;
+
+        if (!isCall) delta64x64 = ONE_64x64.sub(delta64x64);
+        int128 beta = delta64x64.invCDF64x64();
+
+        int128 z = w.sub(beta.mul(v));
+        return spot64x64.mul(z.exp());
     }
 
     /**
@@ -79,6 +107,6 @@ contract Pricer is IPricer, PricerInternal {
         pure
         returns (int128)
     {
-        return _snapToGrid64x64(isCall, n);
+        return isCall ? n.ceil64x64() : n.floor64x64();
     }
 }

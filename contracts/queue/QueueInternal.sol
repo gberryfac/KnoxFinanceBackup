@@ -62,43 +62,6 @@ contract QueueInternal is
     }
 
     /************************************************
-     *  ADMIN
-     ***********************************************/
-
-    /**
-     * @notice sets a new max TVL for deposits
-     * @param newMaxTVL is the new TVL limit for deposits
-     */
-    function _setMaxTVL(uint256 newMaxTVL) internal {
-        QueueStorage.Layout storage l = QueueStorage.layout();
-        require(newMaxTVL > 0, "value exceeds minimum");
-        l.maxTVL = newMaxTVL;
-        emit MaxTVLSet(l.epoch, l.maxTVL, newMaxTVL, msg.sender);
-    }
-
-    /**
-     * @notice sets a new Exchange Helper contract
-     * @param newExchangeHelper is the new Exchange Helper contract address
-     */
-    function _setExchangeHelper(address newExchangeHelper) internal {
-        QueueStorage.Layout storage l = QueueStorage.layout();
-
-        require(newExchangeHelper != address(0), "address not provided");
-        require(
-            newExchangeHelper != address(l.Exchange),
-            "new address equals old"
-        );
-
-        emit ExchangeHelperSet(
-            address(l.Exchange),
-            newExchangeHelper,
-            msg.sender
-        );
-
-        l.Exchange = IExchangeHelper(newExchangeHelper);
-    }
-
-    /************************************************
      *  DEPOSIT
      ***********************************************/
 
@@ -150,24 +113,6 @@ contract QueueInternal is
     }
 
     /************************************************
-     *  CANCEL
-     ***********************************************/
-
-    /**
-     * @notice cancels deposit, refunds collateral asset
-     * @dev cancellation must be made within the same epoch as the deposit
-     * @param amount total collateral which will be withdrawn
-     */
-    function _cancel(uint256 amount) internal {
-        uint256 currentTokenId = QueueStorage._getCurrentTokenId();
-        _burn(msg.sender, currentTokenId, amount);
-        ERC20.safeTransfer(msg.sender, amount);
-
-        uint64 epoch = QueueStorage._getEpoch();
-        emit Cancel(epoch, msg.sender, amount);
-    }
-
-    /************************************************
      *  REDEEM
      ***********************************************/
 
@@ -215,51 +160,6 @@ contract QueueInternal is
                 _redeem(tokenId, receiver, owner);
             }
         }
-    }
-
-    /************************************************
-     *  PROCESS LAST EPOCH
-     ***********************************************/
-
-    /**
-     * @notice syncs queue epoch with vault epoch
-     * @param epoch current epoch of vault
-     */
-    function _syncEpoch(uint64 epoch) internal {
-        QueueStorage.Layout storage l = QueueStorage.layout();
-        l.epoch = epoch;
-        emit EpochSet(l.epoch, msg.sender);
-    }
-
-    /**
-     * @notice transfers deposited collateral to vault, calculates the price per share
-     */
-    function _processDeposits() internal {
-        uint256 deposits = ERC20.balanceOf(address(this));
-
-        ERC20.approve(address(Vault), deposits);
-        uint256 shares = Vault.deposit(deposits, address(this));
-
-        uint256 currentTokenId = QueueStorage._getCurrentTokenId();
-        uint256 claimTokenSupply = _totalSupply(currentTokenId);
-        uint256 pricePerShare = ONE_SHARE;
-
-        if (shares <= 0) {
-            pricePerShare = 0;
-        } else if (claimTokenSupply > 0) {
-            pricePerShare = (pricePerShare * shares) / claimTokenSupply;
-        }
-
-        QueueStorage.Layout storage l = QueueStorage.layout();
-        l.pricePerShare[currentTokenId] = pricePerShare;
-
-        emit ProcessQueuedDeposits(
-            l.epoch,
-            deposits,
-            pricePerShare,
-            shares,
-            claimTokenSupply
-        );
     }
 
     /************************************************

@@ -53,14 +53,31 @@ contract Queue is
      * @inheritdoc IQueue
      */
     function setMaxTVL(uint256 newMaxTVL) external onlyOwner {
-        _setMaxTVL(newMaxTVL);
+        QueueStorage.Layout storage l = QueueStorage.layout();
+        require(newMaxTVL > 0, "value exceeds minimum");
+        l.maxTVL = newMaxTVL;
+        emit MaxTVLSet(l.epoch, l.maxTVL, newMaxTVL, msg.sender);
     }
 
     /**
      * @inheritdoc IQueue
      */
     function setExchangeHelper(address newExchangeHelper) external onlyOwner {
-        _setExchangeHelper(newExchangeHelper);
+        QueueStorage.Layout storage l = QueueStorage.layout();
+
+        require(newExchangeHelper != address(0), "address not provided");
+        require(
+            newExchangeHelper != address(l.Exchange),
+            "new address equals old"
+        );
+
+        emit ExchangeHelperSet(
+            address(l.Exchange),
+            newExchangeHelper,
+            msg.sender
+        );
+
+        l.Exchange = IExchangeHelper(newExchangeHelper);
     }
 
     /************************************************
@@ -121,7 +138,12 @@ contract Queue is
      * @inheritdoc IQueue
      */
     function cancel(uint256 amount) external nonReentrant {
-        _cancel(amount);
+        uint256 currentTokenId = QueueStorage._getCurrentTokenId();
+        _burn(msg.sender, currentTokenId, amount);
+        ERC20.safeTransfer(msg.sender, amount);
+
+        uint64 epoch = QueueStorage._getEpoch();
+        emit Cancel(epoch, msg.sender, amount);
     }
 
     /************************************************
@@ -189,14 +211,40 @@ contract Queue is
      * @inheritdoc IQueue
      */
     function syncEpoch(uint64 epoch) external onlyVault {
-        _syncEpoch(epoch);
+        QueueStorage.Layout storage l = QueueStorage.layout();
+        l.epoch = epoch;
+        emit EpochSet(l.epoch, msg.sender);
     }
 
     /**
      * @inheritdoc IQueue
      */
     function processDeposits() external onlyVault {
-        _processDeposits();
+        uint256 deposits = ERC20.balanceOf(address(this));
+
+        ERC20.approve(address(Vault), deposits);
+        uint256 shares = Vault.deposit(deposits, address(this));
+
+        uint256 currentTokenId = QueueStorage._getCurrentTokenId();
+        uint256 claimTokenSupply = _totalSupply(currentTokenId);
+        uint256 pricePerShare = ONE_SHARE;
+
+        if (shares <= 0) {
+            pricePerShare = 0;
+        } else if (claimTokenSupply > 0) {
+            pricePerShare = (pricePerShare * shares) / claimTokenSupply;
+        }
+
+        QueueStorage.Layout storage l = QueueStorage.layout();
+        l.pricePerShare[currentTokenId] = pricePerShare;
+
+        emit ProcessQueuedDeposits(
+            l.epoch,
+            deposits,
+            pricePerShare,
+            shares,
+            claimTokenSupply
+        );
     }
 
     /************************************************
