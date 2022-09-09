@@ -47,6 +47,13 @@ contract VaultAdmin is IVaultAdmin, VaultInternal {
     /**
      * @inheritdoc IVaultAdmin
      */
+    function setDelta64x64(int128 newDelta64x64) external onlyOwner {
+        _setDelta64x64(newDelta64x64);
+    }
+
+    /**
+     * @inheritdoc IVaultAdmin
+     */
     function setFeeRecipient(address newFeeRecipient) external onlyOwner {
         _setFeeRecipient(newFeeRecipient);
     }

@@ -27,6 +27,12 @@ interface IVaultAdmin {
         external;
 
     /**
+     * @notice sets the option delta value
+     * @param newDelta64x64 new option delta value as a 64x64 fixed point number
+     */
+    function setDelta64x64(int128 newDelta64x64) external;
+
+    /**
      * @notice sets the new fee recipient
      * @param newFeeRecipient address of the new fee recipient
      */

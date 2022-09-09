@@ -89,6 +89,24 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
     }
 
     /**
+     * @notice sets the option delta value
+     * @param newDelta64x64 new option delta value as a 64x64 fixed point number
+     */
+    function _setDelta64x64(int128 newDelta64x64) internal {
+        VaultStorage.Layout storage l = VaultStorage.layout();
+
+        // new option delta must be greater than 0
+        require(newDelta64x64 > 0, "delta <= 0");
+        // new option delta must be less than or equal to 1
+        require(newDelta64x64 < ONE_64x64, "delta > 1");
+
+        emit DeltaSet(l.epoch, l.delta64x64, newDelta64x64, msg.sender);
+
+        // updates the storage
+        l.delta64x64 = newDelta64x64;
+    }
+
+    /**
      * @notice sets the new fee recipient
      * @param newFeeRecipient address of the new fee recipient
      */
@@ -141,7 +159,7 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
      */
     function _setPerformanceFee64x64(int128 newPerformanceFee64x64) internal {
         VaultStorage.Layout storage l = VaultStorage.layout();
-        require(newPerformanceFee64x64 < ONE_64x64, "invalid fee amount");
+        require(newPerformanceFee64x64 < ONE_64x64, "fee > 1");
 
         emit PerformanceFeeSet(
             l.epoch,
@@ -159,7 +177,7 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
      */
     function _setWithdrawalFee64x64(int128 newWithdrawalFee64x64) internal {
         VaultStorage.Layout storage l = VaultStorage.layout();
-        require(newWithdrawalFee64x64 < ONE_64x64, "invalid fee amount");
+        require(newWithdrawalFee64x64 < ONE_64x64, "fee > 1");
 
         emit WithdrawalFeeSet(
             l.epoch,

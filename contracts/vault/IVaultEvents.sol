@@ -18,6 +18,13 @@ interface IVaultEvents {
         address caller
     );
 
+    event DeltaSet(
+        uint64 indexed epoch,
+        int128 oldDelta,
+        int128 newDelta,
+        address caller
+    );
+
     event Distributions(
         uint64 indexed epoch,
         uint256 collateralAmountSansFee,

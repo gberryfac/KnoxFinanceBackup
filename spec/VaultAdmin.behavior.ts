@@ -196,6 +196,41 @@ export function describeBehaviorOfVaultAdmin(
       });
     });
 
+    describe("#setDelta64x64(int128)", () => {
+      const newDelta = fixedFromFloat(0.2);
+
+      time.revertToSnapshotAfterEach(async () => {});
+
+      it("should revert if !owner", async () => {
+        await expect(vault.setDelta64x64(newDelta)).to.be.revertedWith(
+          "Ownable: sender must be owner"
+        );
+      });
+
+      it("should revert if option delta is <= 0", async () => {
+        await expect(
+          vault.connect(signers.deployer).setDelta64x64(0)
+        ).to.be.revertedWith("delta <= 0");
+      });
+
+      it("should revert if option delta is > 1", async () => {
+        await expect(
+          vault.connect(signers.deployer).setDelta64x64(fixedFromFloat(1))
+        ).to.be.revertedWith("delta > 1");
+      });
+
+      it("should set a new delta", async () => {
+        await expect(vault.connect(signers.deployer).setDelta64x64(newDelta))
+          .to.emit(vault, "DeltaSet")
+          .withArgs(
+            0,
+            fixedFromFloat(params.delta),
+            newDelta,
+            addresses.deployer
+          );
+      });
+    });
+
     describe("#setFeeRecipient(address)", () => {
       time.revertToSnapshotAfterEach(async () => {});
 
@@ -311,7 +346,7 @@ export function describeBehaviorOfVaultAdmin(
           vault
             .connect(signers.deployer)
             .setPerformanceFee64x64(fixedFromFloat(1))
-        ).to.be.revertedWith("invalid fee amount");
+        ).to.be.revertedWith("fee > 1");
       });
 
       it("should set a new fee", async () => {
@@ -339,7 +374,7 @@ export function describeBehaviorOfVaultAdmin(
           vault
             .connect(signers.deployer)
             .setWithdrawalFee64x64(fixedFromFloat(1))
-        ).to.be.revertedWith("invalid fee amount");
+        ).to.be.revertedWith("fee > 1");
       });
 
       it("should set a new fee", async () => {
