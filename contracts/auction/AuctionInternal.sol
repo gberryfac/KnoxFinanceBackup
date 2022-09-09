@@ -28,6 +28,7 @@ contract AuctionInternal is IAuctionEvents, OwnableInternal {
     using Helpers for uint256;
     using OrderBook for OrderBook.Index;
     using SafeERC20 for IERC20;
+    using SafeERC20 for IWETH;
 
     bool internal immutable isCall;
     uint8 internal immutable baseDecimals;
@@ -484,7 +485,7 @@ contract AuctionInternal is IAuctionEvents, OwnableInternal {
         if (msg.value > 0) {
             require(s.tokenIn == address(WETH), "tokenIn != wETH");
             WETH.deposit{value: msg.value}();
-            WETH.transfer(address(Exchange), msg.value);
+            WETH.safeTransfer(address(Exchange), msg.value);
         }
 
         if (s.amountInMax > 0) {

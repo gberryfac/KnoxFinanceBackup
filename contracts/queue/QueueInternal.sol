@@ -25,6 +25,7 @@ contract QueueInternal is
 {
     using QueueStorage for QueueStorage.Layout;
     using SafeERC20 for IERC20;
+    using SafeERC20 for IWETH;
 
     uint256 internal constant ONE_SHARE = 10**18;
 
@@ -243,7 +244,7 @@ contract QueueInternal is
         uint256 claimTokenSupply = _totalSupply(currentTokenId);
         uint256 pricePerShare = ONE_SHARE;
 
-        if (shares == 0) {
+        if (shares <= 0) {
             pricePerShare = 0;
         } else if (claimTokenSupply > 0) {
             pricePerShare = (pricePerShare * shares) / claimTokenSupply;
@@ -321,7 +322,7 @@ contract QueueInternal is
         if (msg.value > 0) {
             require(s.tokenIn == address(WETH), "tokenIn != wETH");
             WETH.deposit{value: msg.value}();
-            WETH.transfer(address(Exchange), msg.value);
+            WETH.safeTransfer(address(Exchange), msg.value);
         }
 
         if (s.amountInMax > 0) {
