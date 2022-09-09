@@ -3,6 +3,10 @@ pragma solidity ^0.8.0;
 
 import "./VaultStorage.sol";
 
+/**
+ * @title Knox Vault Admin Interface
+ */
+
 interface IVaultAdmin {
     /************************************************
      *  INITIALIZATION

@@ -12,6 +12,12 @@ import "../vendor/IPremiaPool.sol";
 
 import "./VaultStorage.sol";
 
+/**
+ * @title Knox Vault Diamond Contract
+ * @dev implements EIP2535 Diamond Standard
+ * @dev contracts are upgradable
+ */
+
 contract VaultDiamond is SolidStateDiamond {
     using ERC20MetadataStorage for ERC20MetadataStorage.Layout;
     using ERC4626BaseStorage for ERC4626BaseStorage.Layout;

@@ -9,6 +9,11 @@ import "../libraries/Helpers.sol";
 import "./AuctionInternal.sol";
 import "./IAuction.sol";
 
+/**
+ * @title Knox Dutch Auction Contract
+ * @dev deployed standalone and referenced by AuctionProxy
+ */
+
 contract Auction is AuctionInternal, IAuction, ReentrancyGuard {
     using ABDKMath64x64 for int128;
     using AuctionStorage for AuctionStorage.Layout;

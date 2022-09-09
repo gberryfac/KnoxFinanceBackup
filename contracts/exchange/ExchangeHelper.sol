@@ -10,8 +10,11 @@ import "@solidstate/contracts/utils/SafeERC20.sol";
 import "./IExchangeHelper.sol";
 
 /**
+ * @title Knox Exchange Helper Contract
+ * @dev deployed standalone
  * @dev do NOT set additional approval to this contract!
  */
+
 contract ExchangeHelper is IExchangeHelper {
     using SafeERC20 for IERC20;
 

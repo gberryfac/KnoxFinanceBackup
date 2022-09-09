@@ -8,6 +8,10 @@ import "../vendor/IVolatilitySurfaceOracle.sol";
 import "./IPricer.sol";
 import "./OptionStatistics.sol";
 
+/**
+ * @title Knox Pricer Internal Contract
+ */
+
 contract PricerInternal {
     using ABDKMath64x64 for uint256;
 

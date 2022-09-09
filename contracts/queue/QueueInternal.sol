@@ -16,6 +16,10 @@ import "../vault/IVault.sol";
 import "./IQueueEvents.sol";
 import "./QueueStorage.sol";
 
+/**
+ * @title Knox Queue Internal Contract
+ */
+
 contract QueueInternal is
     ERC1155BaseInternal,
     ERC1155EnumerableInternal,

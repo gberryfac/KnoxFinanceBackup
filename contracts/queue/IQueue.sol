@@ -9,6 +9,10 @@ import "../exchange/IExchangeHelper.sol";
 
 import "./IQueueEvents.sol";
 
+/**
+ * @title Knox Queue Interface
+ */
+
 interface IQueue is IERC165, IERC1155, IERC1155Enumerable, IQueueEvents {
     /************************************************
      *  ADMIN

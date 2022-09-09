@@ -3,6 +3,10 @@ pragma solidity ^0.8.0;
 
 import "./VaultStorage.sol";
 
+/**
+ * @title Knox Vault View Interface
+ */
+
 interface IVaultView {
     /**
      * @notice gets the current epoch

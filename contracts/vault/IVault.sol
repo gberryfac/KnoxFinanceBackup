@@ -8,6 +8,10 @@ import "./IVaultBase.sol";
 import "./IVaultEvents.sol";
 import "./IVaultView.sol";
 
+/**
+ * @title Knox Vault Interface
+ */
+
 interface IVault is IVaultAdmin, IVaultBase, IVaultEvents, IVaultView {
     /**
      * @notice gets the collateral asset ERC20 interface

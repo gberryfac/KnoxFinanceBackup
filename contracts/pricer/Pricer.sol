@@ -3,6 +3,11 @@ pragma solidity ^0.8.0;
 
 import "./PricerInternal.sol";
 
+/**
+ * @title Knox Pricer Contract
+ * @dev deployed standalone
+ */
+
 contract Pricer is IPricer, PricerInternal {
     using ABDKMath64x64 for int128;
     using ABDKMath64x64Token for int128;

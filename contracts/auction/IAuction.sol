@@ -8,6 +8,10 @@ import "../exchange/IExchangeHelper.sol";
 import "./AuctionStorage.sol";
 import "./IAuctionEvents.sol";
 
+/**
+ * @title Knox Auction Interface
+ */
+
 interface IAuction is IAuctionEvents, IERC1155Receiver {
     /************************************************
      *  ADMIN

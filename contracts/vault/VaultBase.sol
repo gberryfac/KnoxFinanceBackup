@@ -5,6 +5,11 @@ import "@solidstate/contracts/token/ERC4626/base/ERC4626Base.sol";
 
 import "./VaultInternal.sol";
 
+/**
+ * @title Knox Vault Base Contract
+ * @dev deployed standalone and referenced by VaultDiamond
+ */
+
 contract VaultBase is ERC4626Base, VaultInternal {
     using SafeERC20 for IERC20;
     using VaultStorage for VaultStorage.Layout;

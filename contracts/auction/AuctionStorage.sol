@@ -7,6 +7,10 @@ import "../exchange/IExchangeHelper.sol";
 
 import "./OrderBook.sol";
 
+/**
+ * @title Knox Dutch Auction Diamond Storage Library
+ */
+
 library AuctionStorage {
     using OrderBook for OrderBook.Index;
 

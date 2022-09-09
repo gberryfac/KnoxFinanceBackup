@@ -9,6 +9,11 @@ import "@solidstate/contracts/utils/ReentrancyGuard.sol";
 import "./IQueue.sol";
 import "./QueueInternal.sol";
 
+/**
+ * @title Knox Queue Contract
+ * @dev deployed standalone and referenced by QueueProxy
+ */
+
 contract Queue is
     ERC1155Base,
     ERC1155Enumerable,

@@ -3,6 +3,11 @@ pragma solidity ^0.8.0;
 
 import "./VaultInternal.sol";
 
+/**
+ * @title Knox Vault Admin Contract
+ * @dev deployed standalone and referenced by VaultDiamond
+ */
+
 contract VaultAdmin is IVaultAdmin, VaultInternal {
     using ABDKMath64x64 for int128;
     using Helpers for uint256;

@@ -18,6 +18,10 @@ import "../vault/IVault.sol";
 import "./AuctionStorage.sol";
 import "./IAuctionEvents.sol";
 
+/**
+ * @title Knox Dutch Auction Internal Contract
+ */
+
 contract AuctionInternal is IAuctionEvents, OwnableInternal {
     using ABDKMath64x64 for int128;
     using ABDKMath64x64 for uint256;

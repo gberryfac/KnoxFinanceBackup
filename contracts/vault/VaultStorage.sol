@@ -7,6 +7,10 @@ import "../pricer/IPricer.sol";
 
 import "../queue/IQueue.sol";
 
+/**
+ * @title Knox Vault Diamond Storage Library
+ */
+
 library VaultStorage {
     /************************************************
      *  INITIALIZATION STRUCTS

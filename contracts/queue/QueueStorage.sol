@@ -3,6 +3,10 @@ pragma solidity ^0.8.0;
 
 import "../exchange/IExchangeHelper.sol";
 
+/**
+ * @title Knox Queue Diamond Storage Library
+ */
+
 library QueueStorage {
     /************************************************
      *  LAYOUT

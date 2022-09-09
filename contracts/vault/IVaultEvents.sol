@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+/**
+ * @title Knox Vault Events Interface
+ */
+
 interface IVaultEvents {
     event AuctionProcessed(
         uint64 indexed epoch,
