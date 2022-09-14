@@ -10,12 +10,6 @@ import "./AuctionStorage.sol";
 interface IAuctionEvents {
     event AuctionStatusSet(uint64 indexed epoch, AuctionStorage.Status status);
 
-    event AuctionPricesSet(
-        uint64 indexed epoch,
-        int128 maxPrice64x64,
-        int128 minPrice64x64
-    );
-
     event ExchangeHelperSet(
         address oldExchangeHelper,
         address newExchangeHelper,

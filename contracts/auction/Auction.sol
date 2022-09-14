@@ -128,12 +128,6 @@ contract Auction is AuctionInternal, IAuction, ReentrancyGuard {
             auction.status = AuctionStorage.Status.FINALIZED;
             emit AuctionStatusSet(epoch, auction.status);
         }
-
-        emit AuctionPricesSet(
-            epoch,
-            auction.maxPrice64x64,
-            auction.minPrice64x64
-        );
     }
 
     /************************************************

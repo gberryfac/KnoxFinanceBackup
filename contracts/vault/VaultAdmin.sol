@@ -316,6 +316,16 @@ contract VaultAdmin is IVaultAdmin, VaultInternal {
             minPrice64x64 = minPrice64x64.div(spot64x64);
         }
 
+        emit AuctionPricesSet(
+            l.epoch,
+            option.strike64x64,
+            offsetStrike64x64,
+            spot64x64,
+            timeToMaturity64x64,
+            maxPrice64x64,
+            minPrice64x64
+        );
+
         l.Auction.setAuctionPrices(l.epoch, maxPrice64x64, minPrice64x64);
     }
 

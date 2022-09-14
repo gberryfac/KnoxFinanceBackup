@@ -10,6 +10,16 @@ interface IVaultEvents {
      *  EVENTS
      ***********************************************/
 
+    event AuctionPricesSet(
+        uint64 indexed epoch,
+        int128 strike64x64,
+        int128 offsetStrike64x64,
+        int128 spot64x64,
+        int128 timeToMaturity64x64,
+        int128 maxPrice64x64,
+        int128 minPrice64x64
+    );
+
     event AuctionProcessed(
         uint64 indexed epoch,
         uint256 totalCollateralUsed,
