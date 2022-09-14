@@ -261,11 +261,6 @@ contract VaultAdmin is IVaultAdmin, VaultInternal {
                 l.delta64x64.sub(l.deltaOffset64x64)
             );
 
-        offsetStrike64x64 = l.Pricer.snapToGrid64x64(
-            l.isCall,
-            offsetStrike64x64
-        );
-
         // fetches the spot price of the underlying
         int128 spot64x64 = l.Pricer.latestAnswer64x64();
 
