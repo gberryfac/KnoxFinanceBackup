@@ -29,7 +29,6 @@ contract QueueInternal is
 {
     using QueueStorage for QueueStorage.Layout;
     using SafeERC20 for IERC20;
-    using SafeERC20 for IWETH;
 
     uint256 internal constant ONE_SHARE = 10**18;
 
@@ -70,44 +69,12 @@ contract QueueInternal is
      ***********************************************/
 
     /**
-     * @notice deposits collateral asset into the queue
-     * @param amount total collateral deposited
-     * @param receiver claim token recipient
-     */
-    function _deposit(uint256 amount, address receiver) internal {
-        QueueStorage.Layout storage l = QueueStorage.layout();
-        uint256 credited = _wrapNativeToken(amount);
-        // an approve() by the msg.sender is required beforehand
-        ERC20.safeTransferFrom(receiver, address(this), amount - credited);
-        _deposit(l, amount, receiver);
-    }
-
-    /**
-     * @notice swaps into the collateral asset and deposits the proceeds into the queue
-     * @param s exchange arguments
-     * @param receiver claim token recipient
-     */
-    function _swapAndDeposit(
-        IExchangeHelper.SwapArgs calldata s,
-        address receiver
-    ) internal {
-        QueueStorage.Layout storage l = QueueStorage.layout();
-        uint256 credited = _swapForPoolTokens(l.Exchange, s, address(ERC20));
-        _deposit(l, credited, receiver);
-    }
-
-    /**
      * @notice validates the deposit, redeems claim tokens for vault shares and mints claim
      * tokens 1:1 for collateral deposited
      * @param l queue storage layout
      * @param amount total collateral deposited
-     * @param receiver claim token recipient
      */
-    function _deposit(
-        QueueStorage.Layout storage l,
-        uint256 amount,
-        address receiver
-    ) private {
+    function _deposit(QueueStorage.Layout storage l, uint256 amount) internal {
         require(amount > 0, "value exceeds minimum");
 
         // the maximum total value locked is the sum of collateral assets held in
@@ -119,14 +86,14 @@ contract QueueInternal is
 
         // prior to making a new deposit, the vault will redeem all available claim tokens
         // in exchange for the pro-rata vault shares
-        _redeemMax(receiver, msg.sender);
+        _redeemMax(msg.sender, msg.sender);
 
         uint256 currentTokenId = QueueStorage._getCurrentTokenId();
 
         // the queue mints claim tokens 1:1 with collateral deposited
-        _mint(receiver, currentTokenId, amount, "");
+        _mint(msg.sender, currentTokenId, amount, "");
 
-        emit Deposit(l.epoch, receiver, msg.sender, amount);
+        emit Deposit(l.epoch, msg.sender, amount);
     }
 
     /************************************************
@@ -199,89 +166,6 @@ contract QueueInternal is
         QueueStorage.Layout storage l = QueueStorage.layout();
         uint256 balance = _balanceOf(account, tokenId);
         return (balance * l.pricePerShare[tokenId]) / ONE_SHARE;
-    }
-
-    /************************************************
-     *  DEPOSIT HELPERS
-     ***********************************************/
-
-    /**
-     * @notice wraps ETH sent to the contract and credits the amount, if the collateral asset
-     * is not WETH, the transaction will revert
-     * @param amount total collateral deposited
-     * @return credited amount
-     */
-    function _wrapNativeToken(uint256 amount) private returns (uint256) {
-        uint256 credit;
-
-        if (msg.value > 0) {
-            require(address(ERC20) == address(WETH), "collateral != wETH");
-
-            if (msg.value > amount) {
-                // if the ETH amount is greater than the amount needed, it will be sent
-                // back to the msg.sender
-                unchecked {
-                    (bool success, ) =
-                        payable(msg.sender).call{value: msg.value - amount}("");
-
-                    require(success, "ETH refund failed");
-
-                    credit = amount;
-                }
-            } else {
-                credit = msg.value;
-            }
-
-            WETH.deposit{value: credit}();
-        }
-
-        return credit;
-    }
-
-    /**
-     * @notice pull token from user, send to exchangeHelper trigger a trade from
-     * ExchangeHelper, and credits the amount
-     * @param Exchange ExchangeHelper contract interface
-     * @param s swap arguments
-     * @param tokenOut token to swap for. should always equal to the collateral asset
-     * @return credited amount
-     */
-    function _swapForPoolTokens(
-        IExchangeHelper Exchange,
-        IExchangeHelper.SwapArgs calldata s,
-        address tokenOut
-    ) private returns (uint256) {
-        if (msg.value > 0) {
-            require(s.tokenIn == address(WETH), "tokenIn != wETH");
-            WETH.deposit{value: msg.value}();
-            WETH.safeTransfer(address(Exchange), msg.value);
-        }
-
-        if (s.amountInMax > 0) {
-            IERC20(s.tokenIn).safeTransferFrom(
-                msg.sender,
-                address(Exchange),
-                s.amountInMax
-            );
-        }
-
-        uint256 amountCredited =
-            Exchange.swapWithToken(
-                s.tokenIn,
-                tokenOut,
-                s.amountInMax + msg.value,
-                s.callee,
-                s.allowanceTarget,
-                s.data,
-                s.refundAddress
-            );
-
-        require(
-            amountCredited >= s.amountOutMin,
-            "not enough output from trade"
-        );
-
-        return amountCredited;
     }
 
     /************************************************

@@ -43,15 +43,6 @@ interface IQueue is IERC165, IERC1155, IERC1155Enumerable, IQueueEvents {
     function deposit(uint256 amount) external payable;
 
     /**
-     * @notice deposits collateral asset
-     * @dev sent ETH will be wrapped as wETH
-     * @dev sender must approve contract
-     * @param amount total collateral deposited
-     * @param receiver claim token recipient
-     */
-    function deposit(uint256 amount, address receiver) external payable;
-
-    /**
      * @notice swaps into the collateral asset and deposits the proceeds
      * @dev sent ETH will be wrapped as wETH
      * @dev sender must approve contract
@@ -60,17 +51,6 @@ interface IQueue is IERC165, IERC1155, IERC1155Enumerable, IQueueEvents {
     function swapAndDeposit(IExchangeHelper.SwapArgs calldata s)
         external
         payable;
-
-    /**
-     * @notice swaps into the collateral asset and deposits the proceeds
-     * @dev sent ETH will be wrapped as wETH
-     * @dev sender must approve contract
-     * @param s swap arguments
-     */
-    function swapAndDeposit(
-        IExchangeHelper.SwapArgs calldata s,
-        address receiver
-    ) external payable;
 
     /************************************************
      *  CANCEL
