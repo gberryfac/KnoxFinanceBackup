@@ -69,7 +69,7 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
         VaultStorage.Layout storage l = VaultStorage.layout();
 
         // sets the expiry for the next Friday
-        uint64 expiry = uint64(block.timestamp._getNextFriday());
+        uint64 expiry = uint64(block.timestamp.getNextFriday());
 
         // calculates the delta strike price
         int128 strike64x64 =
@@ -116,7 +116,7 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
         VaultStorage.Option storage option = l.options[l.epoch];
 
         // auctions begin on Friday
-        uint256 startTimestamp = Helpers._getFriday(block.timestamp);
+        uint256 startTimestamp = Helpers.getFriday(block.timestamp);
 
         // offsets the start and end times by a fixed amount
         uint256 startTime = startTimestamp + l.startOffset;
@@ -218,7 +218,7 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
 
         // calculates the value of the vaults short position
         return
-            totalShortContracts._fromContractsToCollateral(
+            totalShortContracts.fromContractsToCollateral(
                 l.isCall,
                 l.underlyingDecimals,
                 l.baseDecimals,
@@ -428,7 +428,7 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
 
         // converts the collateral amount back to short contracts.
         uint256 shortContracts =
-            shortAsCollateral._fromCollateralToContracts(
+            shortAsCollateral.fromContractsToCollateral(
                 l.isCall,
                 l.baseDecimals,
                 lastOption.strike64x64

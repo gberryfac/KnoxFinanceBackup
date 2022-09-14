@@ -1,12 +1,13 @@
 import { ethers } from "hardhat";
 
 import { fixedFromFloat } from "@premia/utils";
+import { parseUnits } from "ethers/lib/utils";
+import { BigNumber } from "ethers";
 
 import { TestOptionMath, TestOptionMath__factory } from "../../types";
 
 import { expect } from "chai";
-import { assert } from "../utils/assertions";
-import { BigNumber } from "ethers";
+import { assert, time } from "../utils";
 
 let instance: TestOptionMath;
 
@@ -297,6 +298,106 @@ describe.only("OptionMath", () => {
         await instance.toBaseTokenAmount(5, 0, 100000),
         BigNumber.from(1)
       );
+    });
+  });
+
+  describe("#fromContractsToCollateral(bool,uint8,uint8,int128,uint256)", () => {
+    time.revertToSnapshotAfterEach(async () => {});
+
+    it("should return contract size for call option", async () => {
+      const size = parseUnits("10", 18);
+      const expectedSize = size;
+
+      assert.bnEqual(
+        await instance.fromContractsToCollateral(
+          size,
+          true,
+          18,
+          18,
+          fixedFromFloat(2000)
+        ),
+        expectedSize
+      );
+    });
+
+    it("should return contract size for put option", async () => {
+      const size = parseUnits("10", 18);
+      const expectedSize = parseUnits("2", 22);
+
+      assert.bnEqual(
+        await instance.fromContractsToCollateral(
+          size,
+          false,
+          18,
+          18,
+          fixedFromFloat(2000)
+        ),
+        expectedSize
+      );
+    });
+
+    it("should return contract size in base decimals for put option", async () => {
+      const size = parseUnits("10", 8);
+      const expectedSize = parseUnits("2", 22);
+
+      assert.bnEqual(
+        await instance.fromContractsToCollateral(
+          size,
+          false,
+          8,
+          18,
+          fixedFromFloat(2000)
+        ),
+        expectedSize
+      );
+    });
+  });
+
+  describe("#fromCollateralToContracts(bool,uint8,uint8,int128,uint256)", () => {
+    time.revertToSnapshotAfterEach(async () => {});
+
+    it("should return collateral for call option", async () => {
+      const amount = parseUnits("100", 18);
+      const expectedCollateral = amount;
+
+      assert.bnEqual(
+        await instance.fromCollateralToContracts(
+          amount,
+          true,
+          18,
+          fixedFromFloat(2000)
+        ),
+        expectedCollateral
+      );
+    });
+
+    it("should return collateral for put option", async () => {
+      const amount = parseUnits("100000", 18);
+      const expectedCollateral = parseUnits("5", 19);
+
+      assert.bnEqual(
+        await instance.fromCollateralToContracts(
+          amount,
+          false,
+          18,
+          fixedFromFloat(2000)
+        ),
+        expectedCollateral
+      );
+    });
+
+    it("should return collateral in underlying decimals for put option", async () => {
+      const amount = parseUnits("100000", 8);
+      const expectedCollateral = parseUnits("5", 9);
+
+      const collateral = await instance.fromCollateralToContracts(
+        amount,
+        false,
+        18,
+        fixedFromFloat(2000)
+      );
+
+      expect(collateral.toNumber()).to.almost(expectedCollateral.toNumber(), 1);
     });
   });
 });

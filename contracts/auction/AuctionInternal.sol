@@ -29,7 +29,7 @@ contract AuctionInternal is IAuctionEvents, OwnableInternal {
     using ABDKMath64x64Token for uint256;
     using AuctionStorage for AuctionStorage.Layout;
     using EnumerableSet for EnumerableSet.UintSet;
-    using Helpers for uint256;
+    using OptionMath for uint256;
     using OrderBook for OrderBook.Index;
     using SafeERC20 for IERC20;
     using SafeERC20 for IWETH;
@@ -478,7 +478,7 @@ contract AuctionInternal is IAuctionEvents, OwnableInternal {
             int128 strike64x64 = auction.strike64x64;
 
             return
-                totalCollateral._fromCollateralToContracts(
+                totalCollateral.fromContractsToCollateral(
                     isCall,
                     baseDecimals,
                     strike64x64

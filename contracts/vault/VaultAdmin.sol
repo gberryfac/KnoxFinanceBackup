@@ -10,7 +10,7 @@ import "./VaultInternal.sol";
 
 contract VaultAdmin is IVaultAdmin, VaultInternal {
     using ABDKMath64x64 for int128;
-    using Helpers for uint256;
+    using OptionMath for uint256;
     using SafeERC20 for IERC20;
     using VaultStorage for VaultStorage.Layout;
 
@@ -359,7 +359,7 @@ contract VaultAdmin is IVaultAdmin, VaultInternal {
         // calculates the total amount of collateral required to underwrite the contracts
         // sold during the auction
         uint256 totalCollateralUsed =
-            totalContractsSold._fromContractsToCollateral(
+            totalContractsSold.fromContractsToCollateral(
                 l.isCall,
                 l.underlyingDecimals,
                 l.baseDecimals,

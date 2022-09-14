@@ -120,4 +120,37 @@ library OptionMath {
         int128 value64x64 = value.fromDecimals(underlyingDecimals);
         return value64x64.toDecimals(baseDecimals);
     }
+
+    function fromContractsToCollateral(
+        uint256 contracts,
+        bool isCall,
+        uint8 underlyingDecimals,
+        uint8 baseDecimals,
+        int128 strike64x64
+    ) internal pure returns (uint256) {
+        if (isCall) {
+            return contracts;
+        }
+
+        return
+            toBaseTokenAmount(
+                underlyingDecimals,
+                baseDecimals,
+                strike64x64.mulu(contracts)
+            );
+    }
+
+    function fromContractsToCollateral(
+        uint256 collateral,
+        bool isCall,
+        uint8 baseDecimals,
+        int128 strike64x64
+    ) internal pure returns (uint256) {
+        if (isCall) {
+            return collateral;
+        }
+
+        int128 collateral64x64 = collateral.fromDecimals(baseDecimals);
+        return collateral64x64.div(strike64x64).toDecimals(baseDecimals);
+    }
 }

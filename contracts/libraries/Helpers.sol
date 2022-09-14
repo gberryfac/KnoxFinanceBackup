@@ -23,7 +23,7 @@ library Helpers {
      * getFriday(week 1 friday) -> week 2 friday
      * getFriday(week 1 saturday) -> week 2 friday
      */
-    function _getFriday(uint256 timestamp) internal pure returns (uint256) {
+    function getFriday(uint256 timestamp) internal pure returns (uint256) {
         // dayOfWeek = 0 (sunday) - 6 (saturday)
         uint256 dayOfWeek = ((timestamp / 1 days) + 4) % 7;
         uint256 nextFriday = timestamp + ((7 + 5 - dayOfWeek) % 7) * 1 days;
@@ -46,7 +46,7 @@ library Helpers {
      * getNextFriday(week 1 friday) -> week 2 friday
      * getNextFriday(week 1 saturday) -> week 2 friday
      */
-    function _getNextFriday(uint256 timestamp) internal pure returns (uint256) {
+    function getNextFriday(uint256 timestamp) internal pure returns (uint256) {
         // dayOfWeek = 0 (sunday) - 6 (saturday)
         uint256 dayOfWeek = ((timestamp / 1 days) + 4) % 7;
         uint256 nextFriday = timestamp + ((7 + 5 - dayOfWeek) % 7) * 1 days;
@@ -58,38 +58,5 @@ library Helpers {
             friday8am += 7 days;
         }
         return friday8am;
-    }
-
-    function _fromContractsToCollateral(
-        uint256 contracts,
-        bool isCall,
-        uint8 underlyingDecimals,
-        uint8 baseDecimals,
-        int128 strike64x64
-    ) internal pure returns (uint256) {
-        if (isCall) {
-            return contracts;
-        }
-
-        return
-            OptionMath.toBaseTokenAmount(
-                underlyingDecimals,
-                baseDecimals,
-                strike64x64.mulu(contracts)
-            );
-    }
-
-    function _fromCollateralToContracts(
-        uint256 collateral,
-        bool isCall,
-        uint8 baseDecimals,
-        int128 strike64x64
-    ) internal pure returns (uint256) {
-        if (isCall) {
-            return collateral;
-        }
-
-        int128 collateral64x64 = collateral.fromDecimals(baseDecimals);
-        return collateral64x64.div(strike64x64).toDecimals(baseDecimals);
     }
 }
