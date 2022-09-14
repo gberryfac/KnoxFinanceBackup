@@ -216,7 +216,7 @@ library ABDKMath64x64Token {
     }
 
     /**
-     * @notice converts the value to a token amount denominated in the base asset.
+     * @notice converts the value to the base token amount
      * @param underlyingDecimals decimal precision of the underlying asset
      * @param baseDecimals decimal precision of the base asset
      * @param value amount to convert

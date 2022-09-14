@@ -60,8 +60,8 @@ contract Queue is
     function setMaxTVL(uint256 newMaxTVL) external onlyOwner {
         QueueStorage.Layout storage l = QueueStorage.layout();
         require(newMaxTVL > 0, "value exceeds minimum");
-        l.maxTVL = newMaxTVL;
         emit MaxTVLSet(l.epoch, l.maxTVL, newMaxTVL, msg.sender);
+        l.maxTVL = newMaxTVL;
     }
 
     /**
@@ -69,7 +69,6 @@ contract Queue is
      */
     function setExchangeHelper(address newExchangeHelper) external onlyOwner {
         QueueStorage.Layout storage l = QueueStorage.layout();
-
         require(newExchangeHelper != address(0), "address not provided");
         require(
             newExchangeHelper != address(l.Exchange),
@@ -144,9 +143,10 @@ contract Queue is
      */
     function cancel(uint256 amount) external nonReentrant {
         uint256 currentTokenId = QueueStorage._getCurrentTokenId();
+        // burns the callers claim token
         _burn(msg.sender, currentTokenId, amount);
+        // refunds the callers deposit
         ERC20.safeTransfer(msg.sender, amount);
-
         uint64 epoch = QueueStorage._getEpoch();
         emit Cancel(epoch, msg.sender, amount);
     }
@@ -226,10 +226,14 @@ contract Queue is
      */
     function processDeposits() external onlyVault {
         uint256 deposits = ERC20.balanceOf(address(this));
-
         ERC20.approve(address(Vault), deposits);
+        // the queue deposits their entire balance into the vault at the end of each epoch
         uint256 shares = Vault.deposit(deposits, address(this));
 
+        // the shares returned by the vault represent a pro-rata share of the vault tokens. these
+        // shares are used to calculate a price-per-share based on the supply of claim tokens for
+        // that epoch. the price-per-share is used as an exchange rate of claim tokens to vault
+        // shares when a user withdraws or redeems.
         uint256 currentTokenId = QueueStorage._getCurrentTokenId();
         uint256 claimTokenSupply = _totalSupply(currentTokenId);
         uint256 pricePerShare = ONE_SHARE;
@@ -241,6 +245,7 @@ contract Queue is
         }
 
         QueueStorage.Layout storage l = QueueStorage.layout();
+        // the price-per-share can be queried if the claim token id is provided
         l.pricePerShare[currentTokenId] = pricePerShare;
 
         emit ProcessQueuedDeposits(
@@ -314,7 +319,7 @@ contract Queue is
      * @inheritdoc IQueue
      */
     function formatClaimTokenId(uint64 epoch) external view returns (uint256) {
-        return QueueStorage._formatTokenId(epoch);
+        return QueueStorage._formatClaimTokenId(epoch);
     }
 
     /**
@@ -325,13 +330,16 @@ contract Queue is
         pure
         returns (address, uint64)
     {
-        return QueueStorage._parseTokenId(tokenId);
+        return QueueStorage._parseClaimTokenId(tokenId);
     }
 
     /************************************************
      *  ERC165 SUPPORT
      ***********************************************/
 
+    /**
+     * @inheritdoc IERC165
+     */
     function supportsInterface(bytes4 interfaceId)
         external
         view
@@ -344,6 +352,17 @@ contract Queue is
      *  ERC1155 OVERRIDES
      ***********************************************/
 
+    /**
+     * @notice ERC1155 hook, called before all transfers including mint and burn
+     * @dev function should be overridden and new implementation must call super
+     * @dev called for both single and batch transfers
+     * @param operator executor of transfer
+     * @param from sender of tokens
+     * @param to receiver of tokens
+     * @param ids token IDs
+     * @param amounts quantities of tokens to transfer
+     * @param data data payload
+     */
     function _beforeTokenTransfer(
         address operator,
         address from,

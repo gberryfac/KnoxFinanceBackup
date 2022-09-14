@@ -23,7 +23,7 @@ interface IVaultAdmin {
      ***********************************************/
 
     /**
-     * @notice sets the auction window offsets
+     * @notice sets the start and end offsets for the auction
      * @param newStartOffset new start offset
      * @param newEndOffset new end offset
      */
@@ -81,7 +81,7 @@ interface IVaultAdmin {
     function setOptionParameters() external;
 
     /**
-     * @notice initializes auction
+     * @notice initializes the auction
      */
     function initializeAuction() external;
 
@@ -95,12 +95,13 @@ interface IVaultAdmin {
     function processLastEpoch() external;
 
     /**
-     * @notice transfers reserved liquidity from pool to vault
+     * @notice removes reserved liquidity from Premia pool
      */
     function withdrawReservedLiquidity() external;
 
     /**
      * @notice collects performance fees on epoch net income
+     * @dev reserved liquidity must be returned to vault prior to being called
      */
     function collectPerformanceFee() external;
 
@@ -128,6 +129,8 @@ interface IVaultAdmin {
 
     /**
      * @notice processes the auction when it has been finalized
+     * @dev divestment timestamp must be set in Premia pool, otherwise exercised options
+     * will be moved to free liquidity queue
      */
     function processAuction() external;
 }

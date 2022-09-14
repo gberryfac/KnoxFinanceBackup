@@ -9,11 +9,22 @@ interface IPremiaPool {
         address baseOracle;
     }
 
+    /**
+     * @notice query holders of given token
+     * @param id token id to query
+     * @return list of holder addresses
+     */
     function accountsByToken(uint256 id)
         external
         view
         returns (address[] memory);
 
+    /**
+     * @notice query the balance of given token held by given address
+     * @param account address to query
+     * @param id token to query
+     * @return token balance
+     */
     function balanceOf(address account, uint256 id)
         external
         view
@@ -70,6 +81,11 @@ interface IPremiaPool {
      */
     function setDivestmentTimestamp(uint64 timestamp, bool isCallPool) external;
 
+    /**
+     * @notice query tokens held by given address
+     * @param account address to query
+     * @return list of token ids
+     */
     function tokensByAccount(address account)
         external
         view

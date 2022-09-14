@@ -8,6 +8,10 @@ import "./VaultStorage.sol";
  */
 
 interface IVaultView {
+    /************************************************
+     *  VIEW
+     ***********************************************/
+
     /**
      * @notice gets the current epoch
      * @return current epoch id

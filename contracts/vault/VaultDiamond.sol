@@ -25,20 +25,11 @@ contract VaultDiamond is SolidStateDiamond {
     using VaultStorage for VaultStorage.Layout;
 
     constructor(VaultStorage.InitProxy memory initProxy) {
-        require(
-            initProxy.delta64x64 >= 0x00000000000000000,
-            "exceeds minimum allowable value"
-        );
-
-        require(
-            initProxy.delta64x64 <= 0x010000000000000000,
-            "exceeds maximum allowable value"
-        );
-
         address asset;
 
         {
             VaultStorage.Layout storage l = VaultStorage.layout();
+
             IPremiaPool.PoolSettings memory settings =
                 IPremiaPool(initProxy.pool).getPoolSettings();
 

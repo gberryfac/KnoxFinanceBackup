@@ -92,7 +92,6 @@ contract Auction is AuctionInternal, IAuction, ReentrancyGuard {
         auction.strike64x64 = initAuction.strike64x64;
         auction.startTime = initAuction.startTime;
         auction.endTime = initAuction.endTime;
-        auction.totalTime = initAuction.endTime - initAuction.startTime;
         auction.longTokenId = initAuction.longTokenId;
 
         emit AuctionStatusSet(initAuction.epoch, auction.status);
@@ -114,6 +113,7 @@ contract Auction is AuctionInternal, IAuction, ReentrancyGuard {
             "status != initialized"
         );
 
+        // stores the auction max/ min prices
         auction.maxPrice64x64 = maxPrice64x64;
         auction.minPrice64x64 = minPrice64x64;
 
@@ -122,8 +122,11 @@ contract Auction is AuctionInternal, IAuction, ReentrancyGuard {
             auction.minPrice64x64 <= 0 ||
             auction.maxPrice64x64 <= auction.minPrice64x64
         ) {
-            // cancel the auction if prices are invalid
-            _finalizeAuction(l, auction, epoch);
+            // if either price is 0 or the max price is less than or equal to the min price,
+            // the auction should always be cancelled.
+            l.auctions[epoch].lastPrice64x64 = type(int128).max;
+            auction.status = AuctionStorage.Status.FINALIZED;
+            emit AuctionStatusSet(epoch, auction.status);
         }
 
         emit AuctionPricesSet(
@@ -298,7 +301,9 @@ contract Auction is AuctionInternal, IAuction, ReentrancyGuard {
             "status != processed"
         );
 
-        // long tokens are withheld for 24 hours after the auction has been processed
+        // long tokens are withheld for 24 hours after the auction has been processed, otherwise
+        // if a long position is exercised within 24 hours of the position being underwritten
+        // the collateral from the position will be moved to the pools "free liquidity" queue.
         require(
             block.timestamp >= auction.processedTime + 24 hours,
             "hold period has not ended"
@@ -495,6 +500,9 @@ contract Auction is AuctionInternal, IAuction, ReentrancyGuard {
      *  ERC165 SUPPORT
      ***********************************************/
 
+    /**
+     * @inheritdoc IERC165
+     */
     function supportsInterface(bytes4 interfaceId)
         external
         view
@@ -507,6 +515,9 @@ contract Auction is AuctionInternal, IAuction, ReentrancyGuard {
      *  ERC1155 SUPPORT
      ***********************************************/
 
+    /**
+     * @inheritdoc IERC1155Receiver
+     */
     function onERC1155Received(
         address,
         address,
@@ -517,6 +528,9 @@ contract Auction is AuctionInternal, IAuction, ReentrancyGuard {
         return this.onERC1155Received.selector;
     }
 
+    /**
+     * @inheritdoc IERC1155Receiver
+     */
     function onERC1155BatchReceived(
         address,
         address,

@@ -6,6 +6,10 @@ pragma solidity ^0.8.0;
  */
 
 interface IVaultEvents {
+    /************************************************
+     *  EVENTS
+     ***********************************************/
+
     event AuctionProcessed(
         uint64 indexed epoch,
         uint256 totalCollateralUsed,
@@ -29,10 +33,11 @@ interface IVaultEvents {
         address caller
     );
 
-    event Distributions(
+    event DistributionSent(
         uint64 indexed epoch,
-        uint256 collateralAmountSansFee,
-        uint256 shortContractsSansFee
+        uint256 collateralAmount,
+        uint256 shortContracts,
+        address receiver
     );
 
     event FeeRecipientSet(

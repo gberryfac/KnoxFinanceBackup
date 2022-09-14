@@ -22,9 +22,6 @@ contract PricerInternal {
     AggregatorV3Interface public immutable UnderlyingSpotOracle;
 
     constructor(address pool, address volatilityOracle) {
-        require(pool != address(0), "address not provided");
-        require(volatilityOracle != address(0), "address not provided");
-
         IVolOracle = IVolatilitySurfaceOracle(volatilityOracle);
 
         IPremiaPool.PoolSettings memory settings =

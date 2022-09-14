@@ -13,6 +13,10 @@ contract VaultView is IVaultView, VaultInternal {
 
     constructor(bool isCall, address pool) VaultInternal(isCall, pool) {}
 
+    /************************************************
+     *  VIEW
+     ***********************************************/
+
     /**
      * @inheritdoc IVaultView
      */
