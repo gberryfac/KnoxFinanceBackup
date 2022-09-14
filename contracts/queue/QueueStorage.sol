@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "../exchange/IExchangeHelper.sol";
+import "../vendor/IExchangeHelper.sol";
 
 /**
  * @title Knox Queue Diamond Storage Library

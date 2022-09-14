@@ -3,21 +3,22 @@
 
 pragma solidity ^0.8.0;
 
-import "@solidstate/contracts/token/ERC20/IERC20.sol";
-import "@solidstate/contracts/utils/IWETH.sol";
-import "@solidstate/contracts/utils/SafeERC20.sol";
+import {SafeERC20} from "@solidstate/contracts/utils/SafeERC20.sol";
+import {IERC20} from "@solidstate/contracts/token/ERC20/IERC20.sol";
 
-import "./IExchangeHelper.sol";
+import {IExchangeHelper} from "./IExchangeHelper.sol";
 
 /**
- * @title Knox Exchange Helper Contract
- * @dev deployed standalone
+ * @title Premia Exchange Helper
+ * @dev deployed standalone and referenced by ExchangeProxy
  * @dev do NOT set additional approval to this contract!
  */
-
 contract ExchangeHelper is IExchangeHelper {
     using SafeERC20 for IERC20;
 
+    /**
+     * @inheritdoc IExchangeHelper
+     */
     function swapWithToken(
         address sourceToken,
         address targetToken,
@@ -26,7 +27,7 @@ contract ExchangeHelper is IExchangeHelper {
         address allowanceTarget,
         bytes calldata data,
         address refundAddress
-    ) external returns (uint256) {
+    ) external returns (uint256 amountOut) {
         IERC20(sourceToken).approve(allowanceTarget, sourceTokenAmount);
 
         (bool success, ) = callee.call(data);
@@ -39,14 +40,11 @@ contract ExchangeHelper is IExchangeHelper {
 
         // refund unused sourceToken
         uint256 sourceLeft = IERC20(sourceToken).balanceOf(address(this));
-        if (sourceLeft > 0) {
+        if (sourceLeft > 0)
             IERC20(sourceToken).safeTransfer(refundAddress, sourceLeft);
-        }
 
         // send the final amount back to the pool
-        uint256 amountOut = IERC20(targetToken).balanceOf(address(this));
+        amountOut = IERC20(targetToken).balanceOf(address(this));
         IERC20(targetToken).safeTransfer(msg.sender, amountOut);
-
-        return amountOut;
     }
 }

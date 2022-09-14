@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import "@solidstate/contracts/utils/EnumerableSet.sol";
 
-import "../exchange/IExchangeHelper.sol";
+import "../vendor/IExchangeHelper.sol";
 
 import "./OrderBook.sol";
 

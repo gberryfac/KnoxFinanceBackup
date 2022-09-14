@@ -5,7 +5,7 @@ import "@solidstate/contracts/introspection/IERC165.sol";
 import "@solidstate/contracts/token/ERC1155/IERC1155.sol";
 import "@solidstate/contracts/token/ERC1155/enumerable/IERC1155Enumerable.sol";
 
-import "../exchange/IExchangeHelper.sol";
+import "../vendor/IExchangeHelper.sol";
 
 import "./IQueueEvents.sol";
 

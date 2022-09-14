@@ -3,9 +3,10 @@
 pragma solidity ^0.8.0;
 
 /**
- * @title Knox Exchange Helper Interface
+ * @title Premia Exchange Helper
+ * @dev deployed standalone and referenced by internal functions
+ * @dev do NOT set approval to this contract!
  */
-
 interface IExchangeHelper {
     struct SwapArgs {
         // token to pass in to swap
@@ -24,13 +25,24 @@ interface IExchangeHelper {
         address refundAddress;
     }
 
+    /**
+     * @notice perform arbitrary swap transaction
+     * @param sourceToken source token to pull into this address
+     * @param targetToken target token to buy
+     * @param pullAmount amount of source token to start the trade
+     * @param callee exchange address to call to execute the trade.
+     * @param allowanceTarget address for which to set allowance for the trade
+     * @param data calldata to execute the trade
+     * @param refundAddress address that un-used source token goes to
+     * @return amountOut quantity of targetToken yielded by swap
+     */
     function swapWithToken(
         address sourceToken,
         address targetToken,
-        uint256 sourceTokenAmount,
+        uint256 pullAmount,
         address callee,
         address allowanceTarget,
         bytes calldata data,
         address refundAddress
-    ) external returns (uint256);
+    ) external returns (uint256 amountOut);
 }

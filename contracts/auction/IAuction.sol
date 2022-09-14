@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 import "@solidstate/contracts/introspection/IERC165.sol";
 import "@solidstate/contracts/token/ERC1155/IERC1155Receiver.sol";
 
-import "../exchange/IExchangeHelper.sol";
+import "../vendor/IExchangeHelper.sol";
 
 import "./AuctionStorage.sol";
 import "./IAuctionEvents.sol";
