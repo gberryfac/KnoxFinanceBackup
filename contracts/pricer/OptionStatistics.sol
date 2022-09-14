@@ -3,12 +3,15 @@ pragma solidity ^0.8.4;
 
 import "abdk-libraries-solidity/ABDKMath64x64.sol";
 
+/**
+ * @title Cumulative Normal Distribution Math Library
+ * @dev based on Primitive Finance's Cumulative Normal Distribution Math Library
+ * https://github.com/primitivefinance/rmm-core
+ */
+
 library OptionStatistics {
     using ABDKMath64x64 for int128;
     using ABDKMath64x64 for uint256;
-
-    // Inspired by Primitive Finance's Cumulative Normal Distribution Math Library
-    // https://github.com/primitivefinance/rmm-core
 
     /// @notice Thrown on passing an arg that is out of the input range for these math functions
     error InverseOutOfBounds(int128 value);

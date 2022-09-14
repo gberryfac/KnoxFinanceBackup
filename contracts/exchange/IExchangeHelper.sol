@@ -3,7 +3,7 @@
 pragma solidity ^0.8.0;
 
 /**
- * @dev do NOT set approval to this contract!
+ * @title Knox Exchange Helper Interface
  */
 
 interface IExchangeHelper {

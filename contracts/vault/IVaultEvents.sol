@@ -1,7 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+/**
+ * @title Knox Vault Events Interface
+ */
+
 interface IVaultEvents {
+    /************************************************
+     *  EVENTS
+     ***********************************************/
+
     event AuctionProcessed(
         uint64 indexed epoch,
         uint256 totalCollateralUsed,
@@ -25,10 +33,11 @@ interface IVaultEvents {
         address caller
     );
 
-    event Distributions(
+    event DistributionSent(
         uint64 indexed epoch,
-        uint256 collateralAmountSansFee,
-        uint256 shortContractsSansFee
+        uint256 collateralAmount,
+        uint256 shortContracts,
+        address receiver
     );
 
     event FeeRecipientSet(

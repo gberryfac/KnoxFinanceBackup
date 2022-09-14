@@ -367,11 +367,6 @@ export function describeBehaviorOfAuction(
         await assert.bnEqual(data.totalContractsSold, ethers.constants.Zero);
 
         await assert.bnEqual(data.totalPremiums, ethers.constants.Zero);
-        await assert.bnEqual(
-          data.totalTime,
-          initAuction.endTime.sub(initAuction.startTime)
-        );
-
         await assert.bnEqual(data.lastPrice64x64, ethers.constants.Zero);
         await assert.bnEqual(data.longTokenId, initAuction.longTokenId);
       });
@@ -783,7 +778,7 @@ export function describeBehaviorOfAuction(
             );
           });
         } else {
-          it("should revert if collateral token != wETH", async () => {
+          it("should revert if collateral != wETH", async () => {
             await asset
               .connect(signers.buyer1)
               .approve(addresses.auction, ethers.constants.MaxUint256);
@@ -795,7 +790,7 @@ export function describeBehaviorOfAuction(
                 params.size,
                 { value: params.size }
               )
-            ).to.be.revertedWith("collateral token != wETH");
+            ).to.be.revertedWith("collateral != wETH");
           });
         }
       });
@@ -1713,7 +1708,7 @@ export function describeBehaviorOfAuction(
             );
           });
         } else {
-          it("should revert if collateral token != wETH", async () => {
+          it("should revert if collateral != wETH", async () => {
             await asset
               .connect(signers.buyer1)
               .approve(addresses.auction, ethers.constants.MaxUint256);
@@ -1725,7 +1720,7 @@ export function describeBehaviorOfAuction(
                 ethers.constants.MaxUint256,
                 { value: params.size }
               )
-            ).to.be.revertedWith("collateral token != wETH");
+            ).to.be.revertedWith("collateral != wETH");
           });
         }
       });

@@ -6,6 +6,10 @@ import "@solidstate/contracts/utils/SafeERC20.sol";
 
 import "./ABDKMath64x64Token.sol";
 
+/**
+ * @title Common Helper Function Library
+ */
+
 library Helpers {
     using ABDKMath64x64 for int128;
     using ABDKMath64x64Token for int128;
@@ -14,7 +18,6 @@ library Helpers {
     /**
      * @notice returns the next Friday 8AM timestamp
      * @param timestamp is the current timestamp
-     * Reference: https://codereview.stackexchange.com/a/33532
      * Examples:
      * getFriday(week 1 thursday) -> week 1 friday
      * getFriday(week 1 friday) -> week 2 friday

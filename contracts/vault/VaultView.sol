@@ -3,10 +3,19 @@ pragma solidity ^0.8.0;
 
 import "./VaultInternal.sol";
 
+/**
+ * @title Knox Vault View Contract (read-only)
+ * @dev deployed standalone and referenced by VaultDiamond
+ */
+
 contract VaultView is IVaultView, VaultInternal {
     using VaultStorage for VaultStorage.Layout;
 
     constructor(bool isCall, address pool) VaultInternal(isCall, pool) {}
+
+    /************************************************
+     *  VIEW
+     ***********************************************/
 
     /**
      * @inheritdoc IVaultView

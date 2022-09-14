@@ -178,6 +178,14 @@ export function describeBehaviorOfVaultAdmin(
         ).to.be.revertedWith("Ownable: sender must be owner");
       });
 
+      it("should revert start offset > end offset", async () => {
+        await expect(
+          vault
+            .connect(signers.deployer)
+            .setAuctionWindowOffsets(newEndOffset, newStartOffset)
+        ).to.be.revertedWith("start offset > end offset");
+      });
+
       it("should set new exchange helper address", async () => {
         await expect(
           vault

@@ -1,12 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "../interfaces/IPremiaPool.sol";
 import "../libraries/ABDKMath64x64Token.sol";
+import "../vendor/IPremiaPool.sol";
 import "../vendor/IVolatilitySurfaceOracle.sol";
 
 import "./IPricer.sol";
 import "./OptionStatistics.sol";
+
+/**
+ * @title Knox Pricer Internal Contract
+ */
 
 contract PricerInternal {
     using ABDKMath64x64 for uint256;
@@ -18,9 +22,6 @@ contract PricerInternal {
     AggregatorV3Interface public immutable UnderlyingSpotOracle;
 
     constructor(address pool, address volatilityOracle) {
-        require(pool != address(0), "address not provided");
-        require(volatilityOracle != address(0), "address not provided");
-
         IVolOracle = IVolatilitySurfaceOracle(volatilityOracle);
 
         IPremiaPool.PoolSettings memory settings =

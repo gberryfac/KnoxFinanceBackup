@@ -377,7 +377,7 @@ export async function describeBehaviorOfQueue(
           );
         });
       } else {
-        it("should revert if collateral token != wETH", async () => {
+        it("should revert if collateral != wETH", async () => {
           await asset
             .connect(signers.lp1)
             .approve(addresses.queue, ethers.constants.MaxUint256);
@@ -386,7 +386,7 @@ export async function describeBehaviorOfQueue(
               value: params.deposit,
               gasPrice,
             })
-          ).to.be.revertedWith("collateral token != wETH");
+          ).to.be.revertedWith("collateral != wETH");
         });
       }
     });

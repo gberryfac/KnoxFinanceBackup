@@ -9,12 +9,16 @@ import "@solidstate/contracts/token/ERC1155/enumerable/ERC1155EnumerableInternal
 import "@solidstate/contracts/utils/IWETH.sol";
 import "@solidstate/contracts/utils/SafeERC20.sol";
 
-import "../interfaces/IPremiaPool.sol";
+import "../vendor/IPremiaPool.sol";
 
 import "../vault/IVault.sol";
 
 import "./IQueueEvents.sol";
 import "./QueueStorage.sol";
+
+/**
+ * @title Knox Queue Internal Contract
+ */
 
 contract QueueInternal is
     ERC1155BaseInternal,
@@ -66,7 +70,7 @@ contract QueueInternal is
      ***********************************************/
 
     /**
-     * @notice deposits collateral asset
+     * @notice deposits collateral asset into the queue
      * @param amount total collateral deposited
      * @param receiver claim token recipient
      */
@@ -79,7 +83,7 @@ contract QueueInternal is
     }
 
     /**
-     * @notice swaps into the collateral asset and deposits the proceeds
+     * @notice swaps into the collateral asset and deposits the proceeds into the queue
      * @param s exchange arguments
      * @param receiver claim token recipient
      */
@@ -92,21 +96,34 @@ contract QueueInternal is
         _deposit(l, credited, receiver);
     }
 
+    /**
+     * @notice validates the deposit, redeems claim tokens for vault shares and mints claim
+     * tokens 1:1 for collateral deposited
+     * @param l queue storage layout
+     * @param amount total collateral deposited
+     * @param receiver claim token recipient
+     */
     function _deposit(
         QueueStorage.Layout storage l,
         uint256 amount,
         address receiver
     ) private {
-        uint256 totalWithDepositedAmount =
-            Vault.totalAssets() + ERC20.balanceOf(address(this));
-
-        require(totalWithDepositedAmount <= l.maxTVL, "maxTVL exceeded");
         require(amount > 0, "value exceeds minimum");
 
-        // redeems shares from previous epochs
+        // the maximum total value locked is the sum of collateral assets held in
+        // the queue and the vault. if a deposit exceeds the max TVL, the transaction
+        // should revert.
+        uint256 totalWithDepositedAmount =
+            Vault.totalAssets() + ERC20.balanceOf(address(this));
+        require(totalWithDepositedAmount <= l.maxTVL, "maxTVL exceeded");
+
+        // prior to making a new deposit, the vault will redeem all available claim tokens
+        // in exchange for the pro-rata vault shares
         _redeemMax(receiver, msg.sender);
 
         uint256 currentTokenId = QueueStorage._getCurrentTokenId();
+
+        // the queue mints claim tokens 1:1 with collateral deposited
         _mint(receiver, currentTokenId, amount, "");
 
         emit Deposit(l.epoch, receiver, msg.sender, amount);
@@ -129,16 +146,18 @@ contract QueueInternal is
     ) internal {
         uint256 currentTokenId = QueueStorage._getCurrentTokenId();
 
+        // claim tokens cannot be redeemed within the same epoch that they were minted
         require(
             tokenId != currentTokenId,
             "current claim token cannot be redeemed"
         );
 
         uint256 balance = _balanceOf(owner, tokenId);
-
         uint256 unredeemedShares = _previewUnredeemed(tokenId, owner);
 
+        // burns claim tokens held by owner
         _burn(owner, tokenId, balance);
+        // transfers unredeemed share amount to the receiver
         require(Vault.transfer(receiver, unredeemedShares), "transfer failed");
 
         uint64 epoch = QueueStorage._getEpoch();
@@ -186,16 +205,21 @@ contract QueueInternal is
      *  DEPOSIT HELPERS
      ***********************************************/
 
+    /**
+     * @notice wraps ETH sent to the contract and credits the amount, if the collateral asset
+     * is not WETH, the transaction will revert
+     * @param amount total collateral deposited
+     * @return credited amount
+     */
     function _wrapNativeToken(uint256 amount) private returns (uint256) {
         uint256 credit;
 
         if (msg.value > 0) {
-            require(
-                address(ERC20) == address(WETH),
-                "collateral token != wETH"
-            );
+            require(address(ERC20) == address(WETH), "collateral != wETH");
 
             if (msg.value > amount) {
+                // if the ETH amount is greater than the amount needed, it will be sent
+                // back to the msg.sender
                 unchecked {
                     (bool success, ) =
                         payable(msg.sender).call{value: msg.value - amount}("");
@@ -214,6 +238,14 @@ contract QueueInternal is
         return credit;
     }
 
+    /**
+     * @notice pull token from user, send to exchangeHelper trigger a trade from
+     * ExchangeHelper, and credits the amount
+     * @param Exchange ExchangeHelper contract interface
+     * @param s swap arguments
+     * @param tokenOut token to swap for. should always equal to the collateral asset
+     * @return credited amount
+     */
     function _swapForPoolTokens(
         IExchangeHelper Exchange,
         IExchangeHelper.SwapArgs calldata s,
@@ -255,6 +287,18 @@ contract QueueInternal is
     /************************************************
      *  ERC1155 OVERRIDES
      ***********************************************/
+
+    /**
+     * @notice ERC1155 hook, called before all transfers including mint and burn
+     * @dev function should be overridden and new implementation must call super
+     * @dev called for both single and batch transfers
+     * @param operator executor of transfer
+     * @param from sender of tokens
+     * @param to receiver of tokens
+     * @param ids token IDs
+     * @param amounts quantities of tokens to transfer
+     * @param data data payload
+     */
 
     function _beforeTokenTransfer(
         address operator,

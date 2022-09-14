@@ -3,6 +3,11 @@ pragma solidity ^0.8.0;
 
 import "./VaultInternal.sol";
 
+/**
+ * @title Knox Vault Admin Contract
+ * @dev deployed standalone and referenced by VaultDiamond
+ */
+
 contract VaultAdmin is IVaultAdmin, VaultInternal {
     using ABDKMath64x64 for int128;
     using Helpers for uint256;
@@ -46,6 +51,7 @@ contract VaultAdmin is IVaultAdmin, VaultInternal {
         onlyOwner
     {
         VaultStorage.Layout storage l = VaultStorage.layout();
+        require(newEndOffset > newStartOffset, "start offset > end offset");
 
         emit AuctionWindowOffsetsSet(
             l.epoch,
@@ -65,15 +71,11 @@ contract VaultAdmin is IVaultAdmin, VaultInternal {
      */
     function setDelta64x64(int128 newDelta64x64) external onlyOwner {
         VaultStorage.Layout storage l = VaultStorage.layout();
-
-        // new option delta must be greater than 0
         require(newDelta64x64 > 0, "delta <= 0");
-        // new option delta must be less than or equal to 1
         require(newDelta64x64 < ONE_64x64, "delta > 1");
 
         emit DeltaSet(l.epoch, l.delta64x64, newDelta64x64, msg.sender);
 
-        // updates the storage
         l.delta64x64 = newDelta64x64;
     }
 
@@ -222,9 +224,15 @@ contract VaultAdmin is IVaultAdmin, VaultInternal {
      */
     function initializeNextEpoch() external onlyKeeper {
         VaultStorage.Layout storage l = VaultStorage.layout();
+
+        // when the queue processes its deposits, it will send the enitre balance to the vault
+        // in exchange for a pro-rata share of the vault tokens.
         l.Queue.processDeposits();
 
+        // the epoch id is incremented
         l.epoch = l.epoch + 1;
+
+        // the queue epoch id must remain in sync with the vault
         l.Queue.syncEpoch(l.epoch);
     }
 
@@ -239,8 +247,11 @@ contract VaultAdmin is IVaultAdmin, VaultInternal {
         VaultStorage.Layout storage l = VaultStorage.layout();
         VaultStorage.Option storage option = l.options[l.epoch];
 
-        // reverts if the strike price has not been set
+        // assumes that the strike price has been set
         require(option.strike64x64 > 0, "delta strike unset");
+
+        // the delta offset is used to calculate an offset strike price which should always be
+        // further OTM.
 
         // calculates the delta strike price using the offset delta
         int128 offsetStrike64x64 =
@@ -255,11 +266,38 @@ contract VaultAdmin is IVaultAdmin, VaultInternal {
             offsetStrike64x64
         );
 
+        // fetches the spot price of the underlying
         int128 spot64x64 = l.Pricer.latestAnswer64x64();
+
+        // fetches the time to maturity of the option
         int128 timeToMaturity64x64 =
             l.Pricer.getTimeToMaturity64x64(option.expiry);
 
-        // calculates the auction max price
+        /**
+         * it is assumed that the rounded strike price will always be further ITM than the offset
+         * strike price. the further ITM option will always be more expensive and will therefore
+         * be used to determine the max price of the auction. likewise, the offset strike price
+         * (further OTM) should resemble a cheaper option and it is therefore used as the min
+         * option price in our auction.
+         *
+         *
+         * Call Option
+         * -----------
+         * Strike    Rounded Strike             Offset Strike
+         *   |  ---------> |                          |
+         *   |             |                          |
+         * -----------------------Price------------------------>
+         *
+         *
+         * Put Option
+         * -----------
+         * Offset Strike              Rounded Strike    Strike
+         *       |                           | <--------- |
+         *       |                           |            |
+         * -----------------------Price------------------------>
+         */
+
+        // calculates the auction max price using the strike price further (ITM)
         int128 maxPrice64x64 =
             l.Pricer.getBlackScholesPrice64x64(
                 spot64x64,
@@ -268,7 +306,7 @@ contract VaultAdmin is IVaultAdmin, VaultInternal {
                 l.isCall
             );
 
-        // calculates the auction min price
+        // calculates the auction min price using the offset strike price further (OTM)
         int128 minPrice64x64 =
             l.Pricer.getBlackScholesPrice64x64(
                 spot64x64,
@@ -278,15 +316,9 @@ contract VaultAdmin is IVaultAdmin, VaultInternal {
             );
 
         if (l.isCall) {
-            // denominates price in collateral asset
+            // denominates price in the collateral asset
             maxPrice64x64 = maxPrice64x64.div(spot64x64);
             minPrice64x64 = minPrice64x64.div(spot64x64);
-        }
-
-        if (minPrice64x64 >= maxPrice64x64) {
-            // cancels auction if the min price >= max price
-            maxPrice64x64 = int128(0);
-            minPrice64x64 = int128(0);
         }
 
         l.Auction.setAuctionPrices(l.epoch, maxPrice64x64, minPrice64x64);
@@ -302,18 +334,25 @@ contract VaultAdmin is IVaultAdmin, VaultInternal {
     function processAuction() external onlyKeeper {
         VaultStorage.Layout storage l = VaultStorage.layout();
 
+        // stores the last total asset amount, this is effectively the amount of assets held
+        // in the vault at the start of the auction
         l.lastTotalAssets = _totalAssets();
 
         uint64 lastEpoch = _lastEpoch(l);
         VaultStorage.Option memory lastOption = _lastOption(l);
 
         if (!l.Auction.isFinalized(lastEpoch)) {
+            // if the auction is not finalized already, finalize it
             l.Auction.finalizeAuction(lastEpoch);
         }
 
+        // transfers the premiums from the auction contract to the vault
         uint256 totalPremiums = l.Auction.transferPremium(lastEpoch);
+        //fetches the total number of contracts sold during the auction
         uint256 totalContractsSold = l.Auction.getTotalContractsSold(lastEpoch);
 
+        // calculates the total amount of collateral required to underwrite the contracts
+        // sold during the auction
         uint256 totalCollateralUsed =
             totalContractsSold._fromContractsToCollateral(
                 l.isCall,
@@ -322,8 +361,12 @@ contract VaultAdmin is IVaultAdmin, VaultInternal {
                 lastOption.strike64x64
             );
 
+        // approves the Premia pool to spend, the collateral amount + the reserves needed
+        // to pay the APY fee
         ERC20.approve(address(Pool), totalCollateralUsed + _totalReserves());
 
+        // underwrites the contracts sold during the auction, the pool sends the short tokens
+        // to the vault, and long tokens to the auction contract
         Pool.writeFrom(
             address(this),
             address(l.Auction),
@@ -333,6 +376,12 @@ contract VaultAdmin is IVaultAdmin, VaultInternal {
             l.isCall
         );
 
+        // the divestment timestamp is the time at which collateral locked in the Premia pool
+        // will be moved into the pools "reserved liquidity" queue. if the divestment timestamp
+        // is not set, collateral will remain in the "free liquidity" queue and could potentially
+        // be used to underwrite a position without the directive of the vault. note, the minimum
+        // amount of time the divestment timestamp can be set to is 24 hours after the position
+        // has been underwritten.
         uint64 divestmentTimestamp = uint64(block.timestamp + 24 hours);
         Pool.setDivestmentTimestamp(divestmentTimestamp, l.isCall);
 

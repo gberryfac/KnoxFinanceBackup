@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+import "@solidstate/contracts/introspection/IERC165.sol";
 import "@solidstate/contracts/token/ERC1155/IERC1155Receiver.sol";
 
 import "../exchange/IExchangeHelper.sol";
@@ -8,7 +9,11 @@ import "../exchange/IExchangeHelper.sol";
 import "./AuctionStorage.sol";
 import "./IAuctionEvents.sol";
 
-interface IAuction is IAuctionEvents, IERC1155Receiver {
+/**
+ * @title Knox Auction Interface
+ */
+
+interface IAuction is IAuctionEvents, IERC165, IERC1155Receiver {
     /************************************************
      *  ADMIN
      ***********************************************/
@@ -143,7 +148,7 @@ interface IAuction is IAuctionEvents, IERC1155Receiver {
      ***********************************************/
 
     /**
-     * @notice removes any amount(s) owed to the buyer (fill and/or refund)
+     * @notice withdraws any amount(s) owed to the buyer (fill and/or refund)
      * @param epoch epoch id
      */
     function withdraw(uint64 epoch) external;
@@ -172,7 +177,8 @@ interface IAuction is IAuctionEvents, IERC1155Receiver {
      ***********************************************/
 
     /**
-     * @notice checks various conditions to determine if auction is finalized
+     * @notice determines whether the auction has reached finality. the end criteria for the auction are
+     * met if the auction has reached 100% utilization or the end time has been exceeded.
      * @param epoch epoch id
      */
     function finalizeAuction(uint64 epoch) external;
@@ -242,7 +248,7 @@ interface IAuction is IAuctionEvents, IERC1155Receiver {
         returns (AuctionStorage.Status);
 
     /**
-     * @notice gets the total number of contracts
+     * @notice gets the total number of contracts that can be sold during the auction
      * @param epoch epoch id
      * @return total number of contracts
      */
@@ -261,7 +267,7 @@ interface IAuction is IAuctionEvents, IERC1155Receiver {
     /**
      * @notice checks if the auction is finalized
      * @param epoch epoch id
-     * @return true == finalized, false == not finalized
+     * @return true if the auction is finalized
      */
     function isFinalized(uint64 epoch) external view returns (bool);
 }
