@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 import "@solidstate/contracts/token/ERC20/IERC20.sol";
 import "@solidstate/contracts/utils/SafeERC20.sol";
 
-import "./ABDKMath64x64Token.sol";
+import "./OptionMath.sol";
 
 /**
  * @title Common Helper Function Library
@@ -72,7 +72,7 @@ library Helpers {
         }
 
         return
-            ABDKMath64x64Token.toBaseTokenAmount(
+            OptionMath.toBaseTokenAmount(
                 underlyingDecimals,
                 baseDecimals,
                 strike64x64.mulu(contracts)

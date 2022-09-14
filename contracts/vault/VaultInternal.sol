@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 import "@solidstate/contracts/access/ownable/OwnableInternal.sol";
 import "@solidstate/contracts/token/ERC4626/base/ERC4626BaseInternal.sol";
 
-import "../libraries/ABDKMath64x64Token.sol";
+import "../libraries/OptionMath.sol";
 import "../libraries/Helpers.sol";
 
 import "../vendor/IPremiaPool.sol";
@@ -20,8 +20,8 @@ import "./VaultStorage.sol";
 contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
     using ABDKMath64x64 for int128;
     using ABDKMath64x64 for uint256;
-    using ABDKMath64x64Token for int128;
-    using ABDKMath64x64Token for uint256;
+    using OptionMath for int128;
+    using OptionMath for uint256;
     using Helpers for uint256;
     using SafeERC20 for IERC20;
     using VaultStorage for VaultStorage.Layout;

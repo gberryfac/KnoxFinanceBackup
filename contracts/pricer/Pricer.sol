@@ -10,7 +10,7 @@ import "./PricerInternal.sol";
 
 contract Pricer is IPricer, PricerInternal {
     using ABDKMath64x64 for int128;
-    using ABDKMath64x64Token for int128;
+    using OptionMath for int128;
     using OptionStatistics for int128;
 
     int128 private constant ONE_64x64 = 0x10000000000000000;
