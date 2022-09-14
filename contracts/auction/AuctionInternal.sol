@@ -194,7 +194,7 @@ contract AuctionInternal is IAuctionEvents, OwnableInternal {
          * assumes max price is always greater than min price
          * assumes the time remaining is in the range of 0 and 1
          * ------------------------------
-         * time_remaning_percent(t) = t - time_start / time_total
+         * time_remaning_percent(t) = (t - time_start) / time_total
          * price(t) = max_price - time_remaning_percent(t) * (max_price - min_price)
          *
          */
