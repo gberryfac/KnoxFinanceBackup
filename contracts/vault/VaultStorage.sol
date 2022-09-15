@@ -48,7 +48,7 @@ library VaultStorage {
         uint8 baseDecimals;
         // underlying asset decimals
         uint8 underlyingDecimals;
-        // vault option type (call or put)
+        // option type, true if option is a call
         bool isCall;
         // auction processing flag, true if auction has been processed
         bool auctionProcessed;
@@ -58,9 +58,11 @@ library VaultStorage {
         int128 deltaOffset64x64;
         // mapping of options to epoch id (epoch id -> option)
         mapping(uint64 => Option) options;
-        // auction start offset
+        // epoch id
+        uint64 epoch;
+        // auction start offset in seconds (startOffset = startTime - expiry)
         uint64 startOffset;
-        // auction end offset
+        // auction end offset in seconds (endOffset = endTime - expiry)
         uint64 endOffset;
         // auction start timestamp
         uint256 startTime;

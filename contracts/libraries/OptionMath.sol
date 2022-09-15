@@ -121,6 +121,14 @@ library OptionMath {
         return value64x64.toDecimals(baseDecimals);
     }
 
+    /**
+     * @notice calculates the collateral asset amount from the number of contracts
+     * @param isCall option type, true if call option
+     * @param underlyingDecimals decimal precision of the underlying asset
+     * @param baseDecimals decimal precision of the base asset
+     * @param strike64x64 strike price of the option as 64x64 fixed point number
+     * @return collateral asset amount
+     */
     function fromContractsToCollateral(
         uint256 contracts,
         bool isCall,
@@ -140,6 +148,13 @@ library OptionMath {
             );
     }
 
+    /**
+     * @notice calculates number of contracts from the collateral asset amount
+     * @param isCall option type, true if call option
+     * @param baseDecimals decimal precision of the base asset
+     * @param strike64x64 strike price of the option as 64x64 fixed point number
+     * @return number of contracts
+     */
     function fromContractsToCollateral(
         uint256 collateral,
         bool isCall,

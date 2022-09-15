@@ -290,6 +290,8 @@ contract VaultAdmin is IVaultAdmin, VaultInternal {
          *       |                           | <--------- |
          *       |                           |            |
          * -----------------------Price------------------------>
+         *
+         *
          */
 
         // calculates the auction max price using the strike price further (ITM)
