@@ -66,20 +66,6 @@ contract Auction is AuctionInternal, IAuction, ReentrancyGuard {
         onlyVault
     {
         AuctionStorage.Layout storage l = AuctionStorage.layout();
-
-        require(
-            initAuction.endTime > initAuction.startTime,
-            "endTime <= startTime"
-        );
-
-        require(
-            initAuction.startTime >= block.timestamp,
-            "start time too early"
-        );
-
-        require(initAuction.strike64x64 > 0, "strike price == 0");
-        require(initAuction.longTokenId > 0, "token id == 0");
-
         AuctionStorage.Auction storage auction = l.auctions[initAuction.epoch];
 
         require(
@@ -87,14 +73,28 @@ contract Auction is AuctionInternal, IAuction, ReentrancyGuard {
             "status != uninitialized"
         );
 
-        auction.status = AuctionStorage.Status.INITIALIZED;
-        auction.expiry = initAuction.expiry;
-        auction.strike64x64 = initAuction.strike64x64;
-        auction.startTime = initAuction.startTime;
-        auction.endTime = initAuction.endTime;
-        auction.longTokenId = initAuction.longTokenId;
-
-        emit AuctionStatusSet(initAuction.epoch, auction.status);
+        if (
+            initAuction.startTime >= initAuction.endTime ||
+            block.timestamp > initAuction.startTime ||
+            block.timestamp > initAuction.expiry ||
+            initAuction.strike64x64 <= 0 ||
+            initAuction.longTokenId <= 0
+        ) {
+            // the auction is cancelled if the start time is greater than or equal to
+            // the end time, the current time is greater than the start time, or the
+            // option parameters are invalid
+            l.auctions[initAuction.epoch].lastPrice64x64 = type(int128).max;
+            auction.status = AuctionStorage.Status.FINALIZED;
+            emit AuctionStatusSet(initAuction.epoch, auction.status);
+        } else {
+            auction.status = AuctionStorage.Status.INITIALIZED;
+            auction.expiry = initAuction.expiry;
+            auction.strike64x64 = initAuction.strike64x64;
+            auction.startTime = initAuction.startTime;
+            auction.endTime = initAuction.endTime;
+            auction.longTokenId = initAuction.longTokenId;
+            emit AuctionStatusSet(initAuction.epoch, auction.status);
+        }
     }
 
     /**

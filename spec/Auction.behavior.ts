@@ -284,55 +284,68 @@ export function describeBehaviorOfAuction(
       });
 
       it("should revert if endTime <= startTime", async () => {
-        await expect(
-          auction.connect(signers.vault).initialize({
-            epoch: 0,
-            expiry: await time.getFriday8AM(timestamp),
-            strike64x64: strike64x64,
-            longTokenId: BigNumber.from("1"),
-            startTime: BigNumber.from(timestamp + 60),
-            endTime: BigNumber.from(timestamp + 60),
-          })
-        ).to.be.revertedWith("endTime <= startTime");
+        await auction.connect(signers.vault).initialize({
+          epoch: 0,
+          expiry: await time.getFriday8AM(timestamp),
+          strike64x64: strike64x64,
+          longTokenId: BigNumber.from("1"),
+          startTime: BigNumber.from(timestamp + 60),
+          endTime: BigNumber.from(timestamp + 60),
+        });
+
+        assert.equal(await auction.getStatus(0), Status.FINALIZED);
       });
 
-      it("should revert if block.timestamp < startTime", async () => {
-        await expect(
-          auction.connect(signers.vault).initialize({
-            epoch: 0,
-            expiry: await time.getFriday8AM(timestamp),
-            strike64x64: strike64x64,
-            longTokenId: BigNumber.from("1"),
-            startTime: BigNumber.from(timestamp),
-            endTime: BigNumber.from(timestamp + 86400),
-          })
-        ).to.be.revertedWith("start time too early");
+      it("should revert if block.timestamp > startTime", async () => {
+        await auction.connect(signers.vault).initialize({
+          epoch: 0,
+          expiry: await time.getFriday8AM(timestamp),
+          strike64x64: strike64x64,
+          longTokenId: BigNumber.from("1"),
+          startTime: BigNumber.from(timestamp),
+          endTime: BigNumber.from(timestamp + 86400),
+        });
+
+        assert.equal(await auction.getStatus(0), Status.FINALIZED);
+      });
+
+      it("should revert if block.timestamp > expiry", async () => {
+        await auction.connect(signers.vault).initialize({
+          epoch: 0,
+          expiry: (await time.getFriday8AM(timestamp)) - 86400,
+          strike64x64: strike64x64,
+          longTokenId: BigNumber.from("1"),
+          startTime: BigNumber.from(timestamp),
+          endTime: BigNumber.from(timestamp + 86400),
+        });
+
+        assert.equal(await auction.getStatus(0), Status.FINALIZED);
       });
 
       it("should revert if strike price == 0", async () => {
-        await expect(
-          auction.connect(signers.vault).initialize({
-            epoch: 0,
-            expiry: await time.getFriday8AM(timestamp),
-            strike64x64: BigNumber.from("0"),
-            longTokenId: BigNumber.from("1"),
-            startTime: BigNumber.from(timestamp + 60),
-            endTime: BigNumber.from(timestamp + 86400),
-          })
-        ).to.be.revertedWith("strike price == 0");
+        await auction.connect(signers.vault).initialize({
+          epoch: 0,
+          expiry: await time.getFriday8AM(timestamp),
+          strike64x64: BigNumber.from("0"),
+          longTokenId: BigNumber.from("1"),
+          startTime: BigNumber.from(timestamp + 60),
+          endTime: BigNumber.from(timestamp + 86400),
+        });
+
+        assert.equal(await auction.getStatus(0), Status.FINALIZED);
       });
 
       it("should revert if long token id == 0", async () => {
-        await expect(
-          auction.connect(signers.vault).initialize({
-            epoch: 0,
-            expiry: await time.getFriday8AM(timestamp),
-            strike64x64: strike64x64,
-            longTokenId: BigNumber.from("0"),
-            startTime: BigNumber.from(timestamp + 60),
-            endTime: BigNumber.from(timestamp + 86400),
-          })
-        ).to.be.revertedWith("token id == 0");
+        await auction.connect(signers.vault).initialize({
+          epoch: 0,
+          expiry: await time.getFriday8AM(timestamp),
+          strike64x64: strike64x64,
+          longTokenId: BigNumber.from("0"),
+          startTime: BigNumber.from(timestamp + 60),
+          endTime: BigNumber.from(timestamp + 86400),
+        });
+
+        assert.equal(await auction.getStatus(0), Status.FINALIZED);
       });
 
       it("should initialize new auction with correct state", async () => {
