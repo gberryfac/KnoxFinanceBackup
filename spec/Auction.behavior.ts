@@ -10,13 +10,7 @@ import { expect } from "chai";
 import moment from "moment-timezone";
 moment.tz.setDefault("UTC");
 
-import {
-  Auction,
-  ExchangeHelper,
-  IPremiaPool,
-  IVault,
-  MockERC20,
-} from "../types";
+import { Auction, IPremiaPool, IVault, MockERC20 } from "../types";
 
 import {
   accounts,
@@ -58,7 +52,6 @@ export function describeBehaviorOfAuction(
     let asset: MockERC20;
     let auction: Auction;
     let vault: IVault;
-    let exchange: ExchangeHelper;
     let pool: IPremiaPool;
     let weth: MockERC20;
 
@@ -89,7 +82,6 @@ export function describeBehaviorOfAuction(
       vault = knoxUtil.vaultUtil.vault;
       pool = knoxUtil.poolUtil.pool;
       auction = knoxUtil.auction;
-      exchange = knoxUtil.exchange;
 
       poolUtil = knoxUtil.poolUtil;
       weth = poolUtil.weth;
@@ -108,8 +100,7 @@ export function describeBehaviorOfAuction(
     });
 
     const setupSimpleAuction = async (processAuction: boolean) => {
-      const [startTime, endTime, epoch] =
-        await knoxUtil.setAndInitializeAuction();
+      const [startTime, , epoch] = await knoxUtil.setAndInitializeAuction();
 
       await time.fastForwardToFriday8AM();
       await knoxUtil.initializeNextEpoch();
@@ -465,7 +456,9 @@ export function describeBehaviorOfAuction(
 
       it("should revert if new address == old address", async () => {
         await expect(
-          auction.connect(signers.deployer).setExchangeHelper(exchange.address)
+          auction
+            .connect(signers.deployer)
+            .setExchangeHelper(addresses.exchange)
         ).to.be.revertedWith("new address equals old");
       });
 
@@ -902,7 +895,7 @@ export function describeBehaviorOfAuction(
             amountIn,
             amountOutMin,
             path,
-            exchange.address,
+            addresses.exchange,
             (await time.now()) + 86400,
           ]);
 
@@ -954,7 +947,7 @@ export function describeBehaviorOfAuction(
               amountOut,
               amountInMax,
               path,
-              exchange.address,
+              addresses.exchange,
               (await time.now()) + 86400,
             ]);
 
@@ -1043,7 +1036,7 @@ export function describeBehaviorOfAuction(
             amountIn,
             amountOutMin,
             path,
-            exchange.address,
+            addresses.exchange,
             (await time.now()) + 86400,
           ]);
 
@@ -1143,7 +1136,7 @@ export function describeBehaviorOfAuction(
             amountIn,
             amountOutMin,
             path,
-            exchange.address,
+            addresses.exchange,
             (await time.now()) + 86400,
           ]);
 
@@ -1810,7 +1803,7 @@ export function describeBehaviorOfAuction(
             expectedInputAmount,
             expectedCost,
             path,
-            exchange.address,
+            addresses.exchange,
             (await time.now()) + 86400,
           ]);
 
@@ -1859,7 +1852,7 @@ export function describeBehaviorOfAuction(
               amountOut,
               amountInMax,
               path,
-              exchange.address,
+              addresses.exchange,
               (await time.now()) + 86400,
             ]);
 
@@ -1958,7 +1951,7 @@ export function describeBehaviorOfAuction(
             expectedInputAmount,
             swapAmountOut,
             path,
-            exchange.address,
+            addresses.exchange,
             (await time.now()) + 86400,
           ]);
 
@@ -2068,7 +2061,7 @@ export function describeBehaviorOfAuction(
             expectedInputAmount,
             swapAmountOut,
             path,
-            exchange.address,
+            addresses.exchange,
             (await time.now()) + 86400,
           ]);
 

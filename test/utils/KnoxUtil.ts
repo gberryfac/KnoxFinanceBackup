@@ -1,4 +1,4 @@
-import { ethers } from "hardhat";
+import { ethers, network } from "hardhat";
 import { BigNumber } from "ethers";
 const { provider } = ethers;
 const { hexConcat, hexZeroPad } = ethers.utils;
@@ -6,19 +6,21 @@ const { hexConcat, hexZeroPad } = ethers.utils;
 import { fixedFromFloat } from "@premia/utils";
 import { deployMockContract } from "ethereum-waffle";
 
+import { PREMIA_EXCHANGE_HELPER } from "../../constants";
+
 import {
   Auction,
-  ExchangeHelper,
   MockERC20,
   Queue,
   Auction__factory,
   AuctionProxy__factory,
-  ExchangeHelper__factory,
   Queue__factory,
   QueueProxy__factory,
 } from "../../types";
 
 import { accounts, time, types, uniswap, PoolUtil, VaultUtil } from ".";
+
+const chainId = network.config.chainId;
 
 export interface ClaimTokenId {
   address: string;
@@ -50,7 +52,6 @@ interface KnoxUtilArgs {
   asset: MockERC20;
   vaultUtil: VaultUtil;
   poolUtil: PoolUtil;
-  exchange: ExchangeHelper;
   queue: Queue;
   auction: Auction;
   uni: uniswap.IUniswap;
@@ -63,7 +64,6 @@ export class KnoxUtil {
   asset: MockERC20;
   vaultUtil: VaultUtil;
   poolUtil: PoolUtil;
-  exchange: ExchangeHelper;
   queue: Queue;
   auction: Auction;
   uni: uniswap.IUniswap;
@@ -75,7 +75,6 @@ export class KnoxUtil {
     this.asset = props.asset;
     this.vaultUtil = props.vaultUtil;
     this.poolUtil = props.poolUtil;
-    this.exchange = props.exchange;
     this.queue = props.queue;
     this.auction = props.auction;
     this.uni = props.uni;
@@ -105,12 +104,7 @@ export class KnoxUtil {
     const vault = vaultUtil.vault;
     addresses.vault = vault.address;
 
-    // deploy ExchangeHelper
-    const exchange = await new ExchangeHelper__factory(
-      signers.deployer
-    ).deploy();
-
-    addresses.exchange = exchange.address;
+    addresses.exchange = PREMIA_EXCHANGE_HELPER[chainId];
 
     // deploy mock Pricer
     const mockVolatilityOracle = await deployMockContract(
@@ -230,7 +224,6 @@ export class KnoxUtil {
       asset,
       vaultUtil,
       poolUtil,
-      exchange,
       queue,
       auction,
       uni,

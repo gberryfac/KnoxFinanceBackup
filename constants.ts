@@ -8,8 +8,8 @@ export enum CHAINID {
 /* eslint-enable */
 
 export const BLOCK_NUMBER = {
-  // TODO: [CHAINID.ETH_MAINNET]: // must be a monday
-  [CHAINID.ARB_MAINNET]: 17900000, // Jul-18-2022 09:21:06 AM +UTC
+  // MUST BE ON A MONDAY
+  [CHAINID.ARB_MAINNET]: 19700000, // Aug-08-2022 09:31:23 AM +UTC
 };
 
 export const TEST_URI = {
@@ -137,7 +137,7 @@ export const DAI_SPOT_PRICE = 100000000;
 export const LINK_SPOT_PRICE = 1000000000;
 
 /**
- * Premia Pools
+ * Premia Deployments
  * https://github.com/Premian-Labs/premia-contracts/blob/master/docs/deployments
  */
 export const WETH_DAI_POOL = {
@@ -168,6 +168,10 @@ export const PREMIA_MULTISIG = {
 
 export const PREMIA_DIAMOND = {
   [CHAINID.ARB_MAINNET]: "0x89b36CE3491f2258793C7408Bd46aac725973BA2",
+};
+
+export const PREMIA_EXCHANGE_HELPER = {
+  [CHAINID.ARB_MAINNET]: "0xD8A0D357171beBC63CeA559c4e9CD182c1bf25ef",
 };
 
 /**

@@ -11,7 +11,7 @@ import chaiAlmost from "chai-almost";
 
 chai.use(chaiAlmost());
 
-import { ExchangeHelper, IVault, MockERC20, Queue } from "../types";
+import { IVault, MockERC20, Queue } from "../types";
 
 import {
   almost,
@@ -68,7 +68,6 @@ export async function describeBehaviorOfQueue(
     let asset: MockERC20;
     let queue: Queue;
     let vault: IVault;
-    let exchange: ExchangeHelper;
     let weth: MockERC20;
     let poolUtil: PoolUtil;
 
@@ -90,7 +89,6 @@ export async function describeBehaviorOfQueue(
       asset = knoxUtil.asset;
       vault = knoxUtil.vaultUtil.vault;
       queue = knoxUtil.queue;
-      exchange = knoxUtil.exchange;
 
       poolUtil = knoxUtil.poolUtil;
       weth = poolUtil.weth;
@@ -169,7 +167,7 @@ export async function describeBehaviorOfQueue(
 
       it("should revert if new address == old address", async () => {
         await expect(
-          queue.connect(signers.deployer).setExchangeHelper(exchange.address)
+          queue.connect(signers.deployer).setExchangeHelper(addresses.exchange)
         ).to.be.revertedWith("new address equals old");
       });
 
@@ -423,7 +421,7 @@ export async function describeBehaviorOfQueue(
           expectedInputAmount,
           amountOutMin,
           path,
-          exchange.address,
+          addresses.exchange,
           (await time.now()) + 86400,
         ]);
 
@@ -465,7 +463,7 @@ export async function describeBehaviorOfQueue(
             amountOut,
             amountInMax,
             path,
-            exchange.address,
+            addresses.exchange,
             (await time.now()) + 86400,
           ]);
 
@@ -531,7 +529,7 @@ export async function describeBehaviorOfQueue(
             amountIn,
             amountOutMin,
             path,
-            exchange.address,
+            addresses.exchange,
             (await time.now()) + 86400,
           ]);
 
