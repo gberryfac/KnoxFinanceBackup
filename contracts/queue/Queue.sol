@@ -200,15 +200,6 @@ contract Queue is
     /**
      * @inheritdoc IQueue
      */
-    function syncEpoch(uint64 epoch) external onlyVault {
-        QueueStorage.Layout storage l = QueueStorage.layout();
-        l.epoch = epoch;
-        emit EpochSet(l.epoch, msg.sender);
-    }
-
-    /**
-     * @inheritdoc IQueue
-     */
     function processDeposits() external onlyVault {
         uint256 deposits = ERC20.balanceOf(address(this));
         ERC20.approve(address(Vault), deposits);
@@ -230,8 +221,12 @@ contract Queue is
         }
 
         QueueStorage.Layout storage l = QueueStorage.layout();
+
         // the price-per-share can be queried if the claim token id is provided
         l.pricePerShare[currentTokenId] = pricePerShare;
+
+        // increment the epoch id
+        l.epoch = l.epoch + 1;
 
         emit ProcessQueuedDeposits(
             l.epoch,

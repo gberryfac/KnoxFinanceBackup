@@ -10,8 +10,6 @@ interface IQueueEvents {
 
     event Deposit(uint64 indexed epoch, address depositer, uint256 amount);
 
-    event EpochSet(uint64 indexed epoch, address caller);
-
     event ExchangeHelperSet(
         address oldExchangeHelper,
         address newExchangeHelper,

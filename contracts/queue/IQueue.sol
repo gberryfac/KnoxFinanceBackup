@@ -115,12 +115,6 @@ interface IQueue is IERC165, IERC1155, IERC1155Enumerable, IQueueEvents {
      ***********************************************/
 
     /**
-     * @notice syncs queue epoch with vault epoch
-     * @param epoch current epoch of vault
-     */
-    function syncEpoch(uint64 epoch) external;
-
-    /**
      * @notice transfers deposited collateral to vault, calculates the price per share
      */
     function processDeposits() external;

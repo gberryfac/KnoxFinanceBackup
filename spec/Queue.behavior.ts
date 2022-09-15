@@ -897,20 +897,6 @@ export async function describeBehaviorOfQueue(
       });
     });
 
-    describe("#syncEpoch(uint64)", () => {
-      time.revertToSnapshotAfterEach(async () => {});
-
-      it("should revert if !vault", async () => {
-        await expect(queue.syncEpoch(0)).to.be.revertedWith("!vault");
-      });
-
-      it("should set the current epoch of the queue", async () => {
-        assert.bnEqual(await queue.getEpoch(), BigNumber.from(0));
-        await queue.connect(signers.vault).syncEpoch(1);
-        assert.bnEqual(await queue.getEpoch(), BigNumber.from(1));
-      });
-    });
-
     describe("#processDeposits()", () => {
       describe("if shares are not minted", () => {
         time.revertToSnapshotAfterEach(async () => {});

@@ -211,11 +211,8 @@ contract VaultAdmin is IVaultAdmin, VaultInternal {
         // in exchange for a pro-rata share of the vault tokens.
         l.Queue.processDeposits();
 
-        // the epoch id is incremented
+        // increment the epoch id
         l.epoch = l.epoch + 1;
-
-        // the queue epoch id must remain in sync with the vault
-        l.Queue.syncEpoch(l.epoch);
     }
 
     /************************************************
