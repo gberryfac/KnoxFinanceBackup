@@ -10,7 +10,7 @@ import { expect } from "chai";
 import moment from "moment-timezone";
 moment.tz.setDefault("UTC");
 
-import { Auction, IPremiaPool, IVault, MockERC20 } from "../types";
+import { Auction, IPremiaPool, IVaultMock, MockERC20 } from "../types";
 
 import {
   accounts,
@@ -51,7 +51,7 @@ export function describeBehaviorOfAuction(
     // Contract Instances and Proxies
     let asset: MockERC20;
     let auction: Auction;
-    let vault: IVault;
+    let vault: IVaultMock;
     let pool: IPremiaPool;
     let weth: MockERC20;
 

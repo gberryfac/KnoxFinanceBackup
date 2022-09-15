@@ -11,7 +11,7 @@ import chaiAlmost from "chai-almost";
 
 chai.use(chaiAlmost());
 
-import { IVault, MockERC20, Queue } from "../types";
+import { IVaultMock, MockERC20, Queue } from "../types";
 
 import {
   almost,
@@ -67,7 +67,7 @@ export async function describeBehaviorOfQueue(
     // Contract Instances and Proxies
     let asset: MockERC20;
     let queue: Queue;
-    let vault: IVault;
+    let vault: IVaultMock;
     let weth: MockERC20;
     let poolUtil: PoolUtil;
 

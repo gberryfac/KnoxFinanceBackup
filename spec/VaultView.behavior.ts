@@ -8,7 +8,7 @@ chai.use(chaiAlmost());
 import moment from "moment-timezone";
 moment.tz.setDefault("UTC");
 
-import { Auction, IPremiaPool, IVault, MockERC20 } from "../types";
+import { Auction, IPremiaPool, IVaultMock, MockERC20 } from "../types";
 
 import { assert, time, types, KnoxUtil, PoolUtil } from "../test/utils";
 
@@ -29,7 +29,7 @@ export function describeBehaviorOfVaultView(
     // Contract Instances and Proxies
     let asset: MockERC20;
     let auction: Auction;
-    let vault: IVault;
+    let vault: IVaultMock;
     let pool: IPremiaPool;
 
     // Contract Utilities

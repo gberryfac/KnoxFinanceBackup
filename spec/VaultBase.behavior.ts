@@ -8,7 +8,7 @@ import { expect } from "chai";
 import moment from "moment-timezone";
 moment.tz.setDefault("UTC");
 
-import { Auction, IPremiaPool, IVault, MockERC20, Queue } from "../types";
+import { Auction, IPremiaPool, IVaultMock, MockERC20, Queue } from "../types";
 
 import { almost, assert, math, time, types, KnoxUtil } from "../test/utils";
 import { fixedFromFloat } from "@premia/utils";
@@ -52,7 +52,7 @@ export function describeBehaviorOfVaultBase(
     let asset: MockERC20;
     let queue: Queue;
     let auction: Auction;
-    let vault: IVault;
+    let vault: IVaultMock;
     let pool: IPremiaPool;
 
     // Contract Utilities
@@ -264,7 +264,7 @@ export function describeBehaviorOfVaultBase(
 
           // process epoch 0
           await knoxUtil.processExpiredOptions();
-          await vault.connect(signers.keeper).processLastEpoch();
+          await vault.connect(signers.keeper).collectPerformanceFee();
 
           // init epoch 2
           await knoxUtil.initializeNextEpoch();
@@ -326,7 +326,7 @@ export function describeBehaviorOfVaultBase(
 
           // process epoch 0
           await knoxUtil.processExpiredOptions();
-          await vault.connect(signers.keeper).processLastEpoch();
+          await vault.connect(signers.keeper).collectPerformanceFee();
 
           // init epoch 2
           await knoxUtil.initializeNextEpoch();
@@ -652,7 +652,7 @@ export function describeBehaviorOfVaultBase(
 
           // process epoch 0
           await knoxUtil.processExpiredOptions();
-          await vault.connect(signers.keeper).processLastEpoch();
+          await vault.connect(signers.keeper).collectPerformanceFee();
 
           // init epoch 2
           await knoxUtil.initializeNextEpoch();
@@ -714,7 +714,7 @@ export function describeBehaviorOfVaultBase(
 
           // process epoch 0
           await knoxUtil.processExpiredOptions();
-          await vault.connect(signers.keeper).processLastEpoch();
+          await vault.connect(signers.keeper).collectPerformanceFee();
 
           // init epoch 2
           await knoxUtil.initializeNextEpoch();

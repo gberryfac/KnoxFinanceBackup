@@ -21,13 +21,10 @@ import {
 import {
   Auction,
   IPremiaPool,
-  IVault,
+  IVaultMock,
   MockERC20,
   Queue,
-  IVault__factory,
   Pricer__factory,
-  VaultAdmin__factory,
-  VaultDiamond__factory,
 } from "../types";
 
 import {
@@ -39,8 +36,6 @@ import {
   PoolUtil,
   getEventArgs,
 } from "../test/utils";
-
-import { diamondCut } from "../scripts/diamond";
 
 interface VaultAdminBehaviorArgs {
   getKnoxUtil: () => Promise<KnoxUtil>;
@@ -60,7 +55,7 @@ export function describeBehaviorOfVaultAdmin(
     let asset: MockERC20;
     let queue: Queue;
     let auction: Auction;
-    let vault: IVault;
+    let vault: IVaultMock;
     let pool: IPremiaPool;
 
     // Contract Utilities
@@ -514,105 +509,7 @@ export function describeBehaviorOfVaultAdmin(
       });
     });
 
-    describe.skip("#processLastEpoch(bool)", () => {
-      time.revertToSnapshotAfterEach(async () => {});
-    });
-
-    describe("#withdrawReservedLiquidity()", () => {
-      time.revertToSnapshotAfterEach(async () => {
-        await vault
-          .connect(signers.deployer)
-          .setPerformanceFee64x64(fixedFromFloat(0.2));
-
-        // lp1 deposits into queue
-        await asset
-          .connect(signers.lp1)
-          .approve(addresses.queue, params.deposit);
-
-        await queue.connect(signers.lp1)["deposit(uint256)"](params.deposit);
-
-        // init epoch 0 auction
-        let [startTime, , epoch] = await knoxUtil.setAndInitializeAuction();
-
-        // init epoch 1
-        await time.fastForwardToFriday8AM();
-        await knoxUtil.initializeNextEpoch();
-
-        // auction 0 starts
-        await time.increaseTo(startTime);
-
-        // buyer1 purchases all available options
-        await asset
-          .connect(signers.buyer1)
-          .approve(addresses.auction, ethers.constants.MaxUint256);
-
-        const size = await auction.getTotalContracts(epoch);
-
-        await auction
-          .connect(signers.buyer1)
-          .addMarketOrder(epoch, size, ethers.constants.MaxUint256);
-
-        // process auction 0
-        await vault.connect(signers.keeper).processAuction();
-
-        // init auction 1
-        await knoxUtil.setAndInitializeAuction();
-
-        await time.fastForwardToFriday8AM();
-        await time.increase(100);
-      });
-
-      it("should revert if !keeper", async () => {
-        await expect(vault.withdrawReservedLiquidity()).to.be.revertedWith(
-          "!keeper"
-        );
-      });
-
-      it("should withdraw reserved liquidity from pool", async () => {
-        // process epoch 0
-        const totalCollateralInShortPosition =
-          await vault.totalShortAsCollateral();
-
-        await knoxUtil.processExpiredOptions();
-
-        const reservedLiquidityTokenId = params.isCall
-          ? UNDERLYING_RESERVED_LIQ_TOKEN_ID
-          : BASE_RESERVED_LIQ_TOKEN_ID;
-
-        const reservedLiquidityBefore = await pool.balanceOf(
-          addresses.vault,
-          reservedLiquidityTokenId
-        );
-
-        assert.bnEqual(reservedLiquidityBefore, totalCollateralInShortPosition);
-
-        const vaultCollateralBalanceBefore = await asset.balanceOf(
-          addresses.vault
-        );
-
-        await vault.connect(signers.keeper).withdrawReservedLiquidity();
-
-        const reservedLiquidityAfter = await pool.balanceOf(
-          addresses.vault,
-          reservedLiquidityTokenId
-        );
-
-        const vaultCollateralBalanceAfter = await asset.balanceOf(
-          addresses.vault
-        );
-
-        assert.bnEqual(reservedLiquidityAfter, BigNumber.from(0));
-
-        assert.bnEqual(
-          reservedLiquidityBefore.add(vaultCollateralBalanceBefore),
-          vaultCollateralBalanceAfter
-        );
-      });
-    });
-
     describe("#collectPerformanceFee()", () => {
-      let lastTotalAssets: BigNumber;
-
       time.revertToSnapshotAfterEach(async () => {
         await vault
           .connect(signers.deployer)
@@ -649,7 +546,6 @@ export function describeBehaviorOfVaultAdmin(
           );
 
         // process auction 0
-        lastTotalAssets = await vault.totalAssets();
         await vault.connect(signers.keeper).processAuction();
 
         // init auction 1
@@ -680,7 +576,6 @@ export function describeBehaviorOfVaultAdmin(
 
         // process epoch 0
         await knoxUtil.processExpiredOptions();
-        await vault.connect(signers.keeper).withdrawReservedLiquidity();
 
         const feeRecipientBalanceBefore = await asset.balanceOf(
           addresses.feeRecipient
@@ -697,24 +592,23 @@ export function describeBehaviorOfVaultAdmin(
 
       it("should collect performance fees if option expires ATM", async () => {
         // process epoch 0
+
         await knoxUtil.processExpiredOptions();
-        await vault.connect(signers.keeper).withdrawReservedLiquidity();
 
         const feeRecipientBalanceBefore = await asset.balanceOf(
           addresses.feeRecipient
         );
 
-        const totalAssets = await vault.totalAssets();
-        await vault.connect(signers.keeper).collectPerformanceFee();
+        const tx = await vault.connect(signers.keeper).collectPerformanceFee();
+        const args = await getEventArgs(tx, "PerformanceFeeCollected");
 
         const feeRecipientBalanceAfter = await asset.balanceOf(
           addresses.feeRecipient
         );
 
-        almost(
+        assert.bnEqual(
           feeRecipientBalanceAfter.sub(feeRecipientBalanceBefore),
-          totalAssets.sub(lastTotalAssets).div(5),
-          parseUnits("1", params.collateral.decimals - 3) // min tolerance
+          args.feeInCollateral
         );
       });
     });
