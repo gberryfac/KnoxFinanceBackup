@@ -2,11 +2,12 @@
 pragma solidity ^0.8.0;
 
 import "../libraries/OptionMath.sol";
+
 import "../vendor/IPremiaPool.sol";
 import "../vendor/IVolatilitySurfaceOracle.sol";
+import "../vendor/CumulativeNormalDistribution.sol";
 
 import "./IPricer.sol";
-import "./OptionStatistics.sol";
 
 /**
  * @title Knox Pricer Internal Contract
@@ -24,8 +25,8 @@ contract PricerInternal {
     constructor(address pool, address volatilityOracle) {
         IVolOracle = IVolatilitySurfaceOracle(volatilityOracle);
 
-        IPremiaPool.PoolSettings memory settings =
-            IPremiaPool(pool).getPoolSettings();
+        IPremiaPool.PoolSettings memory settings = IPremiaPool(pool)
+            .getPoolSettings();
 
         Base = settings.base;
         Underlying = settings.underlying;
@@ -47,8 +48,8 @@ contract PricerInternal {
      */
     function _latestAnswer64x64() internal view returns (int128) {
         (, int256 basePrice, , , ) = BaseSpotOracle.latestRoundData();
-        (, int256 underlyingPrice, , , ) =
-            UnderlyingSpotOracle.latestRoundData();
+        (, int256 underlyingPrice, , , ) = UnderlyingSpotOracle
+            .latestRoundData();
 
         return ABDKMath64x64.divi(underlyingPrice, basePrice);
     }

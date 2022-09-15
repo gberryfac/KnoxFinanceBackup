@@ -11,7 +11,7 @@ import "./PricerInternal.sol";
 contract Pricer is IPricer, PricerInternal {
     using ABDKMath64x64 for int128;
     using OptionMath for int128;
-    using OptionStatistics for int128;
+    using CumulativeNormalDistribution for int128;
 
     int128 private constant ONE_64x64 = 0x10000000000000000;
 
@@ -86,19 +86,18 @@ contract Pricer is IPricer, PricerInternal {
         int128 timeToMaturity64x64 = _getTimeToMaturity64x64(expiry);
         require(timeToMaturity64x64 > 0, "tau <= 0");
 
-        int128 iv_atm =
-            _getAnnualizedVolatility64x64(
-                spot64x64,
-                spot64x64,
-                timeToMaturity64x64
-            );
+        int128 iv_atm = _getAnnualizedVolatility64x64(
+            spot64x64,
+            spot64x64,
+            timeToMaturity64x64
+        );
         require(iv_atm > 0, "iv_atm <= 0");
 
         int128 v = iv_atm.mul(timeToMaturity64x64.sqrt());
         int128 w = timeToMaturity64x64.mul(iv_atm.pow(2)) >> 1;
 
         if (!isCall) delta64x64 = ONE_64x64.sub(delta64x64);
-        int128 beta = delta64x64.invCDF64x64();
+        int128 beta = delta64x64.getInverseCDF();
 
         int128 z = w.sub(beta.mul(v));
         return spot64x64.mul(z.exp());
