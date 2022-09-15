@@ -136,6 +136,9 @@ describe.only("OptionMath", () => {
   });
 
   describe("#floor64x64", () => {
+    it("should revert if x == 0", async () => {
+      await expect(instance.ceil64x64(0)).to.be.reverted;
+    });
     it("should round 1.0 to 1.0", async () => {
       const x = fixedFromFloat("1.0");
       assert.equal(
