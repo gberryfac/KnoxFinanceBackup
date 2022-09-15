@@ -61,9 +61,9 @@ library VaultStorage {
         // epoch id
         uint64 epoch;
         // auction start offset in seconds (startOffset = startTime - expiry)
-        uint64 startOffset;
+        uint256 startOffset;
         // auction end offset in seconds (endOffset = endTime - expiry)
-        uint64 endOffset;
+        uint256 endOffset;
         // auction start timestamp
         uint256 startTime;
         // total asset amount withdrawn during an epoch

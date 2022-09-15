@@ -27,8 +27,10 @@ interface IVaultAdmin {
      * @param newStartOffset new start offset
      * @param newEndOffset new end offset
      */
-    function setAuctionWindowOffsets(uint16 newStartOffset, uint16 newEndOffset)
-        external;
+    function setAuctionWindowOffsets(
+        uint256 newStartOffset,
+        uint256 newEndOffset
+    ) external;
 
     /**
      * @notice sets the option delta value

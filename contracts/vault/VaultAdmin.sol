@@ -46,10 +46,10 @@ contract VaultAdmin is IVaultAdmin, VaultInternal {
     /**
      * @inheritdoc IVaultAdmin
      */
-    function setAuctionWindowOffsets(uint16 newStartOffset, uint16 newEndOffset)
-        external
-        onlyOwner
-    {
+    function setAuctionWindowOffsets(
+        uint256 newStartOffset,
+        uint256 newEndOffset
+    ) external onlyOwner {
         VaultStorage.Layout storage l = VaultStorage.layout();
         require(newEndOffset > newStartOffset, "start offset > end offset");
 
