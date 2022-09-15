@@ -3,14 +3,12 @@ pragma solidity ^0.8.0;
 
 import "./AuctionStorage.sol";
 
+/**
+ * @title Knox Auction Events Interface
+ */
+
 interface IAuctionEvents {
     event AuctionStatusSet(uint64 indexed epoch, AuctionStorage.Status status);
-
-    event AuctionPricesSet(
-        uint64 indexed epoch,
-        int128 maxPrice64x64,
-        int128 minPrice64x64
-    );
 
     event ExchangeHelperSet(
         address oldExchangeHelper,

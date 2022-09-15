@@ -377,7 +377,7 @@ export async function describeBehaviorOfQueue(
           );
         });
       } else {
-        it("should revert if collateral token != wETH", async () => {
+        it("should revert if collateral != wETH", async () => {
           await asset
             .connect(signers.lp1)
             .approve(addresses.queue, ethers.constants.MaxUint256);
@@ -386,7 +386,7 @@ export async function describeBehaviorOfQueue(
               value: params.deposit,
               gasPrice,
             })
-          ).to.be.revertedWith("collateral token != wETH");
+          ).to.be.revertedWith("collateral != wETH");
         });
       }
     });
@@ -676,6 +676,151 @@ export async function describeBehaviorOfQueue(
           await queue["redeem(uint256)"](tokenId);
 
           const lpBalance = await vault.balanceOf(addresses.lp1);
+          assert.bnEqual(lpBalance, params.deposit);
+
+          const queueBalance = await vault.balanceOf(addresses.queue);
+          assert.isTrue(queueBalance.isZero());
+        });
+      });
+    });
+
+    describe("#redeem(uint256,address)", () => {
+      describe("if epoch has not been incremented", () => {
+        time.revertToSnapshotAfterEach(async () => {
+          await asset
+            .connect(signers.lp1)
+            .approve(addresses.queue, params.deposit);
+
+          await queue["deposit(uint256)"](params.deposit);
+        });
+
+        it("should revert if tokenId == currentTokenId", async () => {
+          const tokenId = await queue.getCurrentTokenId();
+
+          await expect(
+            queue["redeem(uint256,address)"](tokenId, addresses.lp2)
+          ).to.be.revertedWith("current claim token cannot be redeemed");
+        });
+      });
+
+      describe("else", () => {
+        let tokenId: BigNumber;
+
+        time.revertToSnapshotAfterEach(async () => {
+          await knoxUtil.setAndInitializeAuction();
+
+          await asset
+            .connect(signers.lp1)
+            .approve(addresses.queue, params.deposit);
+
+          await queue["deposit(uint256)"](params.deposit);
+
+          tokenId = await queue.getCurrentTokenId();
+
+          await time.fastForwardToFriday8AM();
+          await knoxUtil.initializeNextEpoch();
+        });
+
+        it("should burn claim tokens when shares are redeemed", async () => {
+          await queue["redeem(uint256,address)"](tokenId, addresses.lp2);
+          const balance = await queue.balanceOf(addresses.lp2, tokenId);
+          assert.isTrue(balance.isZero());
+        });
+
+        it("should send redeemed vault shares to receiver", async () => {
+          await queue["redeem(uint256,address)"](tokenId, addresses.lp2);
+
+          const lpBalance = await vault.balanceOf(addresses.lp2);
+          assert.bnEqual(lpBalance, params.deposit);
+
+          const queueBalance = await vault.balanceOf(addresses.queue);
+          assert.isTrue(queueBalance.isZero());
+        });
+      });
+    });
+
+    describe("#redeem(uint256,address,address)", () => {
+      describe("if epoch has not been incremented", () => {
+        time.revertToSnapshotAfterEach(async () => {
+          await asset
+            .connect(signers.lp1)
+            .approve(addresses.queue, params.deposit);
+
+          await queue["deposit(uint256)"](params.deposit);
+        });
+
+        it("should revert if tokenId == currentTokenId", async () => {
+          const tokenId = await queue.getCurrentTokenId();
+          await queue.setApprovalForAll(addresses.lp2, true);
+
+          await expect(
+            queue
+              .connect(signers.lp2)
+              ["redeem(uint256,address,address)"](
+                tokenId,
+                addresses.lp2,
+                addresses.lp1
+              )
+          ).to.be.revertedWith("current claim token cannot be redeemed");
+        });
+      });
+
+      describe("else", () => {
+        let tokenId: BigNumber;
+
+        time.revertToSnapshotAfterEach(async () => {
+          await knoxUtil.setAndInitializeAuction();
+
+          await asset
+            .connect(signers.lp1)
+            .approve(addresses.queue, params.deposit);
+
+          await queue["deposit(uint256)"](params.deposit);
+
+          tokenId = await queue.getCurrentTokenId();
+
+          await time.fastForwardToFriday8AM();
+          await knoxUtil.initializeNextEpoch();
+        });
+
+        it("should revert if the owner has not approved the receiver", async () => {
+          await expect(
+            queue
+              .connect(signers.lp2)
+              ["redeem(uint256,address,address)"](
+                tokenId,
+                addresses.lp2,
+                addresses.lp1
+              )
+          ).to.be.revertedWith("ERC1155: caller is not owner nor approved");
+        });
+
+        it("should burn claim tokens when shares are redeemed", async () => {
+          await queue.setApprovalForAll(addresses.lp2, true);
+
+          await queue
+            .connect(signers.lp2)
+            ["redeem(uint256,address,address)"](
+              tokenId,
+              addresses.lp2,
+              addresses.lp1
+            );
+          const balance = await queue.balanceOf(addresses.lp1, tokenId);
+          assert.isTrue(balance.isZero());
+        });
+
+        it("should send redeemed vault shares to receiver", async () => {
+          await queue.setApprovalForAll(addresses.lp2, true);
+
+          await queue
+            .connect(signers.lp2)
+            ["redeem(uint256,address,address)"](
+              tokenId,
+              addresses.lp2,
+              addresses.lp1
+            );
+
+          const lpBalance = await vault.balanceOf(addresses.lp2);
           assert.bnEqual(lpBalance, params.deposit);
 
           const queueBalance = await vault.balanceOf(addresses.queue);

@@ -12,6 +12,8 @@ import moment from "moment-timezone";
 moment.tz.setDefault("UTC");
 
 import {
+  UNDERLYING_FREE_LIQ_TOKEN_ID,
+  BASE_FREE_LIQ_TOKEN_ID,
   UNDERLYING_RESERVED_LIQ_TOKEN_ID,
   BASE_RESERVED_LIQ_TOKEN_ID,
 } from "../constants";
@@ -23,11 +25,20 @@ import {
   MockERC20,
   Queue,
   IVault__factory,
+  Pricer__factory,
   VaultAdmin__factory,
   VaultDiamond__factory,
 } from "../types";
 
-import { almost, assert, time, types, KnoxUtil, PoolUtil } from "../test/utils";
+import {
+  almost,
+  assert,
+  time,
+  types,
+  KnoxUtil,
+  PoolUtil,
+  getEventArgs,
+} from "../test/utils";
 
 import { diamondCut } from "../scripts/diamond";
 
@@ -176,6 +187,14 @@ export function describeBehaviorOfVaultAdmin(
         ).to.be.revertedWith("Ownable: sender must be owner");
       });
 
+      it("should revert start offset > end offset", async () => {
+        await expect(
+          vault
+            .connect(signers.deployer)
+            .setAuctionWindowOffsets(newEndOffset, newStartOffset)
+        ).to.be.revertedWith("start offset > end offset");
+      });
+
       it("should set new exchange helper address", async () => {
         await expect(
           vault
@@ -189,6 +208,41 @@ export function describeBehaviorOfVaultAdmin(
             newStartOffset,
             14400,
             newEndOffset,
+            addresses.deployer
+          );
+      });
+    });
+
+    describe("#setDelta64x64(int128)", () => {
+      const newDelta = fixedFromFloat(0.2);
+
+      time.revertToSnapshotAfterEach(async () => {});
+
+      it("should revert if !owner", async () => {
+        await expect(vault.setDelta64x64(newDelta)).to.be.revertedWith(
+          "Ownable: sender must be owner"
+        );
+      });
+
+      it("should revert if option delta is <= 0", async () => {
+        await expect(
+          vault.connect(signers.deployer).setDelta64x64(0)
+        ).to.be.revertedWith("delta <= 0");
+      });
+
+      it("should revert if option delta is > 1", async () => {
+        await expect(
+          vault.connect(signers.deployer).setDelta64x64(fixedFromFloat(1))
+        ).to.be.revertedWith("delta > 1");
+      });
+
+      it("should set a new delta", async () => {
+        await expect(vault.connect(signers.deployer).setDelta64x64(newDelta))
+          .to.emit(vault, "DeltaSet")
+          .withArgs(
+            0,
+            fixedFromFloat(params.delta),
+            newDelta,
             addresses.deployer
           );
       });
@@ -309,7 +363,7 @@ export function describeBehaviorOfVaultAdmin(
           vault
             .connect(signers.deployer)
             .setPerformanceFee64x64(fixedFromFloat(1))
-        ).to.be.revertedWith("invalid fee amount");
+        ).to.be.revertedWith("fee > 1");
       });
 
       it("should set a new fee", async () => {
@@ -337,7 +391,7 @@ export function describeBehaviorOfVaultAdmin(
           vault
             .connect(signers.deployer)
             .setWithdrawalFee64x64(fixedFromFloat(1))
-        ).to.be.revertedWith("invalid fee amount");
+        ).to.be.revertedWith("fee > 1");
       });
 
       it("should set a new fee", async () => {
@@ -510,13 +564,11 @@ export function describeBehaviorOfVaultAdmin(
           .connect(signers.buyer1)
           .approve(addresses.auction, ethers.constants.MaxUint256);
 
+        const size = await auction.getTotalContracts(epoch);
+
         await auction
           .connect(signers.buyer1)
-          .addMarketOrder(
-            epoch,
-            await auction.getTotalContracts(epoch),
-            ethers.constants.MaxUint256
-          );
+          .addMarketOrder(epoch, size, ethers.constants.MaxUint256);
 
         // process auction 0
         await vault.connect(signers.keeper).processAuction();
@@ -762,15 +814,147 @@ export function describeBehaviorOfVaultAdmin(
     });
 
     describe("#setAuctionPrices()", () => {
-      time.revertToSnapshotAfterEach(async () => {});
+      time.revertToSnapshotAfterEach(async () => {
+        const pricer = await new Pricer__factory(signers.deployer).deploy(
+          params.pool.address,
+          params.pool.volatility
+        );
+
+        await vault.connect(signers.deployer).setPricer(pricer.address);
+
+        // init epoch 0 auction
+        await knoxUtil.setAndInitializeAuction();
+
+        // init epoch 1
+        await time.fastForwardToFriday8AM();
+      });
 
       it("should revert if !keeper", async () => {
         await expect(vault.setAuctionPrices()).to.be.revertedWith("!keeper");
       });
+
+      // note: it is possible for the offset strike to end up being further ITM than
+      // the strike this may occur if the strike is rounded above/below the offset
+      // strike. if the delta offset is too small the likelihood of this happening
+      // increases.
+      it("should set the offset strike price further OTM than the strike price", async () => {
+        const tx = await vault.connect(signers.keeper).setAuctionPrices();
+        const args = await getEventArgs(tx, "AuctionPricesSet");
+        params.isCall
+          ? assert.bnGt(args.offsetStrike64x64, args.strike64x64)
+          : assert.bnGt(args.strike64x64, args.offsetStrike64x64);
+      });
+
+      it("should set max price greater than the min price", async () => {
+        const tx = await vault.connect(signers.keeper).setAuctionPrices();
+        const args = await getEventArgs(tx, "AuctionPricesSet");
+        assert.bnGt(args.maxPrice64x64, args.minPrice64x64);
+      });
     });
 
-    describe.skip("#processAuction()", () => {
-      time.revertToSnapshotAfterEach(async () => {});
+    describe("#processAuction()", () => {
+      let epoch: BigNumber;
+      let startTime: BigNumber;
+      let size: BigNumber;
+
+      time.revertToSnapshotAfterEach(async () => {
+        await vault
+          .connect(signers.deployer)
+          .setPerformanceFee64x64(fixedFromFloat(0.2));
+
+        // lp1 deposits into queue
+        await asset
+          .connect(signers.lp1)
+          .approve(addresses.queue, params.deposit);
+
+        await queue.connect(signers.lp1)["deposit(uint256)"](params.deposit);
+
+        // init epoch 0 auction
+        [startTime, , epoch] = await knoxUtil.setAndInitializeAuction();
+
+        // init epoch 1
+        await time.fastForwardToFriday8AM();
+        await knoxUtil.initializeNextEpoch();
+
+        // auction 0 starts
+        await time.increaseTo(startTime);
+
+        // buyer1 purchases all available options
+        await asset
+          .connect(signers.buyer1)
+          .approve(addresses.auction, ethers.constants.MaxUint256);
+
+        size = await auction.getTotalContracts(epoch);
+
+        await auction
+          .connect(signers.buyer1)
+          .addMarketOrder(epoch, size, ethers.constants.MaxUint256);
+      });
+
+      it("should move collateral to reserved liquidity queue if option is exercised", async () => {
+        // process auction 0
+        await vault.connect(signers.keeper).processAuction();
+
+        const totalCollateralInShortPosition =
+          await vault.totalShortAsCollateral();
+
+        const freeLiquidityTokenId = params.isCall
+          ? UNDERLYING_FREE_LIQ_TOKEN_ID
+          : BASE_FREE_LIQ_TOKEN_ID;
+
+        const reservedLiquidityTokenId = params.isCall
+          ? UNDERLYING_RESERVED_LIQ_TOKEN_ID
+          : BASE_RESERVED_LIQ_TOKEN_ID;
+
+        const reservedLiquidityBefore = await pool.balanceOf(
+          addresses.vault,
+          reservedLiquidityTokenId
+        );
+
+        const freeLiquidityBefore = await pool.balanceOf(
+          addresses.vault,
+          freeLiquidityTokenId
+        );
+
+        assert.bnEqual(reservedLiquidityBefore, BigNumber.from(0));
+        assert.bnEqual(freeLiquidityBefore, BigNumber.from(0));
+
+        // options expires ITM
+        let underlyingPrice = params.underlying.oracle.price;
+        let intrinsicValue = 1;
+
+        const spot = params.isCall
+          ? underlyingPrice + intrinsicValue
+          : underlyingPrice - intrinsicValue;
+
+        await poolUtil.underlyingSpotPriceOracle.mock.latestAnswer.returns(
+          spot
+        );
+
+        // fast forward to hold period end
+        const { endTime } = await auction.getAuction(epoch);
+        await time.increaseTo(endTime.add(86400));
+
+        const { longTokenId } = await auction.getAuction(epoch);
+        await auction.connect(signers.buyer1).withdraw(epoch);
+        await pool
+          .connect(signers.buyer1)
+          .exerciseFrom(addresses.buyer1, longTokenId, size);
+
+        const reservedLiquidityAfter = await pool.balanceOf(
+          addresses.vault,
+          reservedLiquidityTokenId
+        );
+
+        const freeLiquidityAfter = await pool.balanceOf(
+          addresses.vault,
+          freeLiquidityTokenId
+        );
+
+        // reservered liquidity should include notional value + refunded APY fee
+        assert.bnGte(reservedLiquidityAfter, totalCollateralInShortPosition);
+        assert.bnEqual(freeLiquidityAfter, BigNumber.from(0));
+      });
     });
   });
 }

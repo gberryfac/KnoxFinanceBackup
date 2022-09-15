@@ -3,9 +3,13 @@ pragma solidity ^0.8.0;
 
 import "@solidstate/contracts/utils/EnumerableSet.sol";
 
-import "../exchange/IExchangeHelper.sol";
+import "../vendor/IExchangeHelper.sol";
 
 import "./OrderBook.sol";
+
+/**
+ * @title Knox Dutch Auction Diamond Storage Library
+ */
 
 library AuctionStorage {
     using OrderBook for OrderBook.Index;
@@ -22,27 +26,45 @@ library AuctionStorage {
     enum Status {UNINITIALIZED, INITIALIZED, FINALIZED, PROCESSED}
 
     struct Auction {
+        // status of the auction
         Status status;
+        // option expiration timestamp
         uint64 expiry;
+        // option strike price as a 64x64 fixed point number
         int128 strike64x64;
+        // auction max price
         int128 maxPrice64x64;
+        // auction min price
         int128 minPrice64x64;
+        // last price paid during the auction
         int128 lastPrice64x64;
+        // auction start timestamp
         uint256 startTime;
+        // auction end timestamp
         uint256 endTime;
+        // auction processed timestamp
+        uint256 processedTime;
+        // total contracts available
         uint256 totalContracts;
+        // total contracts sold
         uint256 totalContractsSold;
+        // total premiums collected
         uint256 totalPremiums;
-        uint256 totalTime;
+        // option long token id
         uint256 longTokenId;
     }
 
     struct Layout {
-        IExchangeHelper Exchange;
+        // minimum order size
         uint256 minSize;
+        // mapping of auctions to epoch id (epoch id -> auction)
         mapping(uint64 => Auction) auctions;
+        // mapping of order books to epoch id (epoch id -> order book)
         mapping(uint64 => OrderBook.Index) orderbooks;
+        // mapping of epoch set to buyer addresses (buyer -> epoch set)
         mapping(address => EnumerableSet.UintSet) epochsByBuyer;
+        // ExchangeHelper contract interface
+        IExchangeHelper Exchange;
     }
 
     bytes32 internal constant STORAGE_SLOT =
@@ -59,14 +81,29 @@ library AuctionStorage {
      *  VIEW
      ***********************************************/
 
+    /**
+     * @notice gets the auction parameters
+     * @param epoch epoch id
+     * @return auction parameters
+     */
     function _getAuction(uint64 epoch) internal view returns (Auction memory) {
         return layout().auctions[epoch];
     }
 
+    /**
+     * @notice gets the minimum order size
+     * @return minimum order size
+     */
     function _getMinSize() internal view returns (uint256) {
         return layout().minSize;
     }
 
+    /**
+     * @notice gets the order from the auction orderbook
+     * @param epoch epoch id
+     * @param id order id
+     * @return order from auction orderbook
+     */
     function _getOrderById(uint64 epoch, uint256 id)
         internal
         view
@@ -76,6 +113,11 @@ library AuctionStorage {
         return orderbook._getOrderById(id);
     }
 
+    /**
+     * @notice gets the status of the auction
+     * @param epoch epoch id
+     * @return auction status
+     */
     function _getStatus(uint64 epoch)
         internal
         view
@@ -84,6 +126,11 @@ library AuctionStorage {
         return layout().auctions[epoch].status;
     }
 
+    /**
+     * @notice gets the total number of contracts that can be sold during the auction
+     * @param epoch epoch id
+     * @return total number of contracts
+     */
     function _getTotalContractsSold(uint64 epoch)
         internal
         view
@@ -92,6 +139,11 @@ library AuctionStorage {
         return layout().auctions[epoch].totalContractsSold;
     }
 
+    /**
+     * @notice checks if the auction is finalized
+     * @param epoch epoch id
+     * @return true if the auction is finalized
+     */
     function _isFinalized(uint64 epoch) internal view returns (bool) {
         return layout().auctions[epoch].status == Status.FINALIZED;
     }
