@@ -175,14 +175,6 @@ contract VaultAdmin is IVaultAdmin, VaultInternal {
     /**
      * @inheritdoc IVaultAdmin
      */
-    function setAndInitializeAuction() external onlyKeeper {
-        _setOptionParameters();
-        _initializeAuction();
-    }
-
-    /**
-     * @inheritdoc IVaultAdmin
-     */
     function setOptionParameters() external onlyKeeper {
         _setOptionParameters();
     }

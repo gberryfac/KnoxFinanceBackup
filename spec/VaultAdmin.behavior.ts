@@ -380,10 +380,6 @@ export function describeBehaviorOfVaultAdmin(
       });
     });
 
-    describe("#setAndInitializeAuction()", () => {
-      time.revertToSnapshotAfterEach(async () => {});
-    });
-
     describe("#setOptionParameters()", () => {
       time.revertToSnapshotAfterEach(async () => {});
 
