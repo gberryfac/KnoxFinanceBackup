@@ -65,12 +65,17 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
         VaultStorage.Layout storage l = VaultStorage.layout();
 
         /**
-         * the withdrawal lock is active after the auction has started and
-         * before the auction has been processed. when the auction has been
-         * processed by the keeper the auctionProcessed flag is set to
-         * true, deactivating the lock. the flag is set to false and the
-         * startTime is updated when the auction is initialized by the keeper.
-         * the lock is reactivated when the auction starts.
+         * the withdrawal lock is active after the auction has started and deactivated
+         * when the auction is processed.
+         *
+         * when the auction has been processed by the keeper the auctionProcessed flag
+         * is set to true, deactivating the lock.
+         *
+         * when the auction is initialized by the keeper the flag is set to false and
+         * the startTime is updated.
+         *
+         * note, the auction must start for the lock to be reactivated. i.e. if the
+         * flag is false but the auction has not started the lock is deactivated.
          *
          *
          *    Auction       Auction      Auction       Auction
