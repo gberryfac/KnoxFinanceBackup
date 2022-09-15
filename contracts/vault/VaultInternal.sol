@@ -58,6 +58,36 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
         _;
     }
 
+    /**
+     * @dev Throws if called while withdrawals are locked
+     */
+    modifier withdrawalsLocked() {
+        VaultStorage.Layout storage l = VaultStorage.layout();
+
+        /**
+         * the withdrawal lock is active after the auction has started and
+         * before the auction has been processed. when the auction has been
+         * processed by the keeper the auctionProcessed flag is set to
+         * true, deactivating the lock. the flag is set to false and the
+         * startTime is updated when the auction is initialized by the keeper.
+         * the lock is reactivated when the auction starts.
+         *
+         *
+         *    Auction       Auction      Auction       Auction
+         *  Initialized     Started     Processed    Initialized
+         *       |             |///Locked///|             |
+         *       |             |////////////|             |
+         * -------------------------Time--------------------------->
+         *
+         *
+         */
+
+        if (block.timestamp >= l.startTime) {
+            require(l.auctionProcessed, "auction has not been processed");
+        }
+        _;
+    }
+
     /************************************************
      *  INITIALIZE AUCTION
      ***********************************************/
@@ -121,6 +151,10 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
         // offsets the start and end times by a fixed amount
         uint256 startTime = startTimestamp + l.startOffset;
         uint256 endTime = startTimestamp + l.endOffset;
+
+        // resets withdrawal lock, reactivates when auction starts
+        l.startTime = startTime;
+        l.auctionProcessed = false;
 
         // initializes the auction using the option parameters and start/end times
         l.Auction.initialize(

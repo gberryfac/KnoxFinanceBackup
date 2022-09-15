@@ -50,6 +50,8 @@ library VaultStorage {
         uint8 underlyingDecimals;
         // vault option type (call or put)
         bool isCall;
+        // auction processing flag, true if auction has been processed
+        bool auctionProcessed;
         // vault option delta
         int128 delta64x64;
         // vault option delta offeset
@@ -60,8 +62,8 @@ library VaultStorage {
         uint64 startOffset;
         // auction end offset
         uint64 endOffset;
-        // epoch id
-        uint64 epoch;
+        // auction start timestamp
+        uint256 startTime;
         // total asset amount withdrawn during an epoch
         uint256 totalWithdrawals;
         // total asset amount not including premiums collected from the auction

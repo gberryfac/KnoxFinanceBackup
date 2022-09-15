@@ -392,6 +392,9 @@ contract VaultAdmin is IVaultAdmin, VaultInternal {
 
         l.Auction.processAuction(lastEpoch);
 
+        // deactivates withdrawal lock
+        l.auctionProcessed = true;
+
         emit AuctionProcessed(
             lastEpoch,
             totalCollateralUsed,
