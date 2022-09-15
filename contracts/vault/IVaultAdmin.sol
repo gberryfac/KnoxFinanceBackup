@@ -9,18 +9,15 @@ import "./VaultStorage.sol";
 
 interface IVaultAdmin {
     /************************************************
-     *  INITIALIZATION
+     *  ADMIN
      ***********************************************/
 
     /**
-     * @notice initializes vault with queue, auction, and pricer addresses
-     * @param initImpl initialization parameters
+     * @notice sets the new auction
+     * @dev the auction contract address must be set during the vault initialization
+     * @param newAuction address of the new auction
      */
-    function initialize(VaultStorage.InitImpl memory initImpl) external;
-
-    /************************************************
-     *  ADMIN
-     ***********************************************/
+    function setAuction(address newAuction) external;
 
     /**
      * @notice sets the start and end offsets for the auction
@@ -52,9 +49,17 @@ interface IVaultAdmin {
 
     /**
      * @notice sets the new pricer
+     * @dev the pricer contract address must be set during the vault initialization
      * @param newPricer address of the new pricer
      */
     function setPricer(address newPricer) external;
+
+    /**
+     * @notice sets the new queue
+     * @dev the queue contract address must be set during the vault initialization
+     * @param newQueue address of the new queue
+     */
+    function setQueue(address newQueue) external;
 
     /**
      * @notice sets the performance fee for the vault

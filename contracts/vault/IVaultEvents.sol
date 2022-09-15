@@ -10,6 +10,13 @@ interface IVaultEvents {
      *  EVENTS
      ***********************************************/
 
+    event AuctionSet(
+        uint64 indexed epoch,
+        address oldAuction,
+        address newAuction,
+        address caller
+    );
+
     event AuctionPricesSet(
         uint64 indexed epoch,
         int128 strike64x64,
@@ -89,6 +96,13 @@ interface IVaultEvents {
         uint64 indexed epoch,
         address oldPricer,
         address newPricer,
+        address caller
+    );
+
+    event QueueSet(
+        uint64 indexed epoch,
+        address oldQueue,
+        address newQueue,
         address caller
     );
 

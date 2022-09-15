@@ -19,29 +19,21 @@ contract VaultAdmin is IVaultAdmin, VaultInternal {
     constructor(bool isCall, address pool) VaultInternal(isCall, pool) {}
 
     /************************************************
-     *  INITIALIZATION
+     *  ADMIN
      ***********************************************/
 
     /**
      * @inheritdoc IVaultAdmin
      */
-    function initialize(VaultStorage.InitImpl memory initImpl)
-        external
-        onlyOwner
-    {
-        require(initImpl.auction != address(0), "address not provided");
-        require(initImpl.queue != address(0), "address not provided");
-        require(initImpl.pricer != address(0), "address not provided");
-
+    function setAuction(address newAuction) external onlyOwner {
         VaultStorage.Layout storage l = VaultStorage.layout();
-        l.Auction = IAuction(initImpl.auction);
-        l.Queue = IQueue(initImpl.queue);
-        l.Pricer = IPricer(initImpl.pricer);
-    }
+        require(newAuction != address(0), "address not provided");
+        require(newAuction != address(l.Auction), "new address equals old");
 
-    /************************************************
-     *  ADMIN
-     ***********************************************/
+        emit AuctionSet(l.epoch, address(l.Auction), newAuction, msg.sender);
+
+        l.Auction = IAuction(newAuction);
+    }
 
     /**
      * @inheritdoc IVaultAdmin
@@ -121,6 +113,19 @@ contract VaultAdmin is IVaultAdmin, VaultInternal {
         emit PricerSet(l.epoch, address(l.Pricer), newPricer, msg.sender);
 
         l.Pricer = IPricer(newPricer);
+    }
+
+    /**
+     * @inheritdoc IVaultAdmin
+     */
+    function setQueue(address newQueue) external onlyOwner {
+        VaultStorage.Layout storage l = VaultStorage.layout();
+        require(newQueue != address(0), "address not provided");
+        require(newQueue != address(l.Queue), "new address equals old");
+
+        emit QueueSet(l.epoch, address(l.Queue), newQueue, msg.sender);
+
+        l.Queue = IQueue(newQueue);
     }
 
     /**

@@ -170,14 +170,9 @@ export class KnoxUtil {
     addresses.auction = auction.address;
 
     // inititialize Vault
-    const initImpl = {
-      auction: addresses.auction,
-      exchange: addresses.exchange,
-      queue: addresses.queue,
-      pricer: addresses.pricer,
-    };
-
-    await vault.connect(signers.deployer).initialize(initImpl);
+    await vault.connect(signers.deployer).setAuction(addresses.auction);
+    await vault.connect(signers.deployer).setPricer(addresses.pricer);
+    await vault.connect(signers.deployer).setQueue(addresses.queue);
 
     const asset = vaultUtil.asset;
 

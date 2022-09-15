@@ -99,79 +99,33 @@ export function describeBehaviorOfVaultAdmin(
       });
     });
 
-    describe("#initialize(VaultStorage.InitImpl memory)", () => {
-      describe("if uninitialized", () => {
-        let vault: IVault;
+    describe("#setAuction(address)", () => {
+      time.revertToSnapshotAfterEach(async () => {});
 
-        time.revertToSnapshotAfterEach(async () => {
-          const initProxy = {
-            isCall: params.isCall,
-            minSize: params.minSize,
-            delta64x64: BigNumber.from(0),
-            deltaOffset64x64: BigNumber.from(0),
-            reserveRate64x64: BigNumber.from(0),
-            performanceFee64x64: BigNumber.from(0),
-            withdrawalFee64x64: BigNumber.from(0),
-            name: params.tokenName,
-            symbol: params.tokenSymbol,
-            keeper: addresses.keeper,
-            feeRecipient: addresses.feeRecipient,
-            pool: addresses.pool,
-          };
-
-          const vaultDiamond = await new VaultDiamond__factory(
-            signers.deployer
-          ).deploy(initProxy);
-
-          let registeredSelectors = [
-            vaultDiamond.interface.getSighash("supportsInterface(bytes4)"),
-          ];
-
-          const vaultAdminFactory = new VaultAdmin__factory(signers.deployer);
-
-          const vaultAdminContract = await vaultAdminFactory
-            .connect(signers.deployer)
-            .deploy(params.isCall, addresses.pool);
-
-          await vaultAdminContract.deployed();
-
-          registeredSelectors = registeredSelectors.concat(
-            await diamondCut(
-              vaultDiamond,
-              vaultAdminContract.address,
-              vaultAdminFactory,
-              registeredSelectors
-            )
-          );
-
-          vault = IVault__factory.connect(addresses.vault, signers.deployer);
-        });
-
-        it("should initialize contract", async () => {
-          await vault.initialize({
-            auction: addresses.auction,
-            queue: addresses.queue,
-            pricer: addresses.pricer,
-          });
-        });
+      it("should revert if !owner", async () => {
+        await expect(vault.setAuction(addresses.lp1)).to.be.revertedWith(
+          "Ownable: sender must be owner"
+        );
       });
 
-      describe("else", () => {
-        time.revertToSnapshotAfterEach(async () => {});
+      it("should revert if address is 0x0", async () => {
+        await expect(
+          vault
+            .connect(signers.deployer)
+            .setAuction(ethers.constants.AddressZero)
+        ).to.be.revertedWith("address not provided");
+      });
 
-        it("should revert if !owner", async () => {
-          await expect(
-            vault.initialize({
-              auction: addresses.auction,
-              queue: addresses.queue,
-              pricer: addresses.pricer,
-            })
-          ).to.be.revertedWith("Ownable: sender must be owner");
-        });
+      it("should revert if new address == old address", async () => {
+        await expect(
+          vault.connect(signers.deployer).setAuction(addresses.auction)
+        ).to.be.revertedWith("new address equals old");
+      });
 
-        it.skip("should revert if already intialized", async () => {});
-
-        it.skip("should revert if address is invalid", async () => {});
+      it("should set new exchange helper address", async () => {
+        await expect(vault.connect(signers.deployer).setAuction(addresses.lp1))
+          .to.emit(vault, "AuctionSet")
+          .withArgs(0, addresses.auction, addresses.lp1, addresses.deployer);
       });
     });
 
@@ -344,6 +298,34 @@ export function describeBehaviorOfVaultAdmin(
         await expect(vault.connect(signers.deployer).setPricer(addresses.lp1))
           .to.emit(vault, "PricerSet")
           .withArgs(0, addresses.pricer, addresses.lp1, addresses.deployer);
+      });
+    });
+
+    describe("#setQueue(address)", () => {
+      time.revertToSnapshotAfterEach(async () => {});
+
+      it("should revert if !owner", async () => {
+        await expect(vault.setQueue(addresses.lp1)).to.be.revertedWith(
+          "Ownable: sender must be owner"
+        );
+      });
+
+      it("should revert if address is 0x0", async () => {
+        await expect(
+          vault.connect(signers.deployer).setQueue(ethers.constants.AddressZero)
+        ).to.be.revertedWith("address not provided");
+      });
+
+      it("should revert if new address == old address", async () => {
+        await expect(
+          vault.connect(signers.deployer).setQueue(addresses.queue)
+        ).to.be.revertedWith("new address equals old");
+      });
+
+      it("should set new exchange helper address", async () => {
+        await expect(vault.connect(signers.deployer).setQueue(addresses.lp1))
+          .to.emit(vault, "QueueSet")
+          .withArgs(0, addresses.queue, addresses.lp1, addresses.deployer);
       });
     });
 
