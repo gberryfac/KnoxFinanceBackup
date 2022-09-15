@@ -175,36 +175,15 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
     }
 
     /************************************************
-     *  PROCESS LAST EPOCH
+     *  COLLECT PERFORMANCE FEE
      ***********************************************/
-
-    /**
-     * @notice removes reserved liquidity from Premia pool
-     */
-    function _withdrawReservedLiquidity() internal {
-        VaultStorage.Layout storage l = VaultStorage.layout();
-
-        // gets the vaults reserved liquidity balance
-        uint256 reservedLiquidity =
-            Pool.balanceOf(
-                address(this),
-                l.isCall
-                    ? uint256(TokenType.UNDERLYING_RESERVED_LIQ) << 248
-                    : uint256(TokenType.BASE_RESERVED_LIQ) << 248
-            );
-
-        if (reservedLiquidity > 0) {
-            // remove reserved liquidity from the pool, if available
-            Pool.withdraw(reservedLiquidity, l.isCall);
-        }
-
-        emit ReservedLiquidityWithdrawn(l.epoch, reservedLiquidity);
-    }
 
     /**
      * @notice collects performance fees on epoch net income
      */
     function _collectPerformanceFee() internal {
+        _withdrawReservedLiquidity();
+
         VaultStorage.Layout storage l = VaultStorage.layout();
 
         uint256 netIncome;
@@ -432,6 +411,29 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
     /************************************************
      *  HELPERS
      ***********************************************/
+
+    /**
+     * @notice removes reserved liquidity from Premia pool
+     */
+    function _withdrawReservedLiquidity() internal {
+        VaultStorage.Layout storage l = VaultStorage.layout();
+
+        // gets the vaults reserved liquidity balance
+        uint256 reservedLiquidity =
+            Pool.balanceOf(
+                address(this),
+                l.isCall
+                    ? uint256(TokenType.UNDERLYING_RESERVED_LIQ) << 248
+                    : uint256(TokenType.BASE_RESERVED_LIQ) << 248
+            );
+
+        if (reservedLiquidity > 0) {
+            // remove reserved liquidity from the pool, if available
+            Pool.withdraw(reservedLiquidity, l.isCall);
+        }
+
+        emit ReservedLiquidityWithdrawn(l.epoch, reservedLiquidity);
+    }
 
     /**
      * @notice calculates the total amount of collateral and short contracts to distribute

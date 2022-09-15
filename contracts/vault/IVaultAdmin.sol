@@ -93,18 +93,8 @@ interface IVaultAdmin {
     function initializeAuction() external;
 
     /************************************************
-     *  PROCESS LAST EPOCH
+     *  COLLECT PERFORMANCE FEE
      ***********************************************/
-
-    /**
-     * @notice withdraws reserved liquidity and collects performance fees
-     */
-    function processLastEpoch() external;
-
-    /**
-     * @notice removes reserved liquidity from Premia pool
-     */
-    function withdrawReservedLiquidity() external;
 
     /**
      * @notice collects performance fees on epoch net income

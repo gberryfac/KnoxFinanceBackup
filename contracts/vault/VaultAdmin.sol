@@ -195,23 +195,8 @@ contract VaultAdmin is IVaultAdmin, VaultInternal {
     }
 
     /************************************************
-     *  PROCESS LAST EPOCH
+     *  COLLECT PERFORMANCE FEE
      ***********************************************/
-
-    /**
-     * @inheritdoc IVaultAdmin
-     */
-    function processLastEpoch() external onlyKeeper {
-        _withdrawReservedLiquidity();
-        _collectPerformanceFee();
-    }
-
-    /**
-     * @inheritdoc IVaultAdmin
-     */
-    function withdrawReservedLiquidity() external onlyKeeper {
-        _withdrawReservedLiquidity();
-    }
 
     /**
      * @inheritdoc IVaultAdmin
