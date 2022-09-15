@@ -110,24 +110,6 @@ function behavesLikePricer(params: Params) {
     describe("#constructor()", () => {
       time.revertToSnapshotAfterEach(async () => {});
 
-      it("should revert if pool address is 0x0", async () => {
-        await expect(
-          new Pricer__factory(deployer).deploy(
-            ethers.constants.AddressZero,
-            mockVolatilityOracle.address
-          )
-        ).to.be.revertedWith("address not provided");
-      });
-
-      it("should revert if volatility oracle address is 0x0", async () => {
-        await expect(
-          new Pricer__factory(deployer).deploy(
-            mockPool.address,
-            ethers.constants.AddressZero
-          )
-        ).to.be.revertedWith("address not provided");
-      });
-
       it("should initialize Pricer with correct values", async () => {
         // Check Addresses
         assert.equal(await pricer.IVolOracle(), mockVolatilityOracle.address);

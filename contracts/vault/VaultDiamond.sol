@@ -6,11 +6,17 @@ import "@solidstate/contracts/token/ERC20/metadata/ERC20MetadataStorage.sol";
 import "@solidstate/contracts/token/ERC20/metadata/IERC20Metadata.sol";
 import "@solidstate/contracts/token/ERC4626/base/ERC4626BaseStorage.sol";
 
-import "../interfaces/IPremiaPool.sol";
-
 import "../libraries/Helpers.sol";
 
+import "../vendor/IPremiaPool.sol";
+
 import "./VaultStorage.sol";
+
+/**
+ * @title Knox Vault Diamond Contract
+ * @dev implements EIP2535 Diamond Standard
+ * @dev contracts are upgradable
+ */
 
 contract VaultDiamond is SolidStateDiamond {
     using ERC20MetadataStorage for ERC20MetadataStorage.Layout;
@@ -19,20 +25,11 @@ contract VaultDiamond is SolidStateDiamond {
     using VaultStorage for VaultStorage.Layout;
 
     constructor(VaultStorage.InitProxy memory initProxy) {
-        require(
-            initProxy.delta64x64 >= 0x00000000000000000,
-            "exceeds minimum allowable value"
-        );
-
-        require(
-            initProxy.delta64x64 <= 0x010000000000000000,
-            "exceeds maximum allowable value"
-        );
-
         address asset;
 
         {
             VaultStorage.Layout storage l = VaultStorage.layout();
+
             IPremiaPool.PoolSettings memory settings =
                 IPremiaPool(initProxy.pool).getPoolSettings();
 

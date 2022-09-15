@@ -64,6 +64,7 @@ export type VaultParams = {
   underlying?: Asset;
   base?: Asset;
   collateral?: Asset;
+  pool?: Pool;
   delta?: number;
   deltaOffset?: number;
   maxTVL?: BigNumber;

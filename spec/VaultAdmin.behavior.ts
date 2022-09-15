@@ -25,11 +25,20 @@ import {
   MockERC20,
   Queue,
   IVault__factory,
+  Pricer__factory,
   VaultAdmin__factory,
   VaultDiamond__factory,
 } from "../types";
 
-import { almost, assert, time, types, KnoxUtil, PoolUtil } from "../test/utils";
+import {
+  almost,
+  assert,
+  time,
+  types,
+  KnoxUtil,
+  PoolUtil,
+  getEventArgs,
+} from "../test/utils";
 
 import { diamondCut } from "../scripts/diamond";
 
@@ -178,6 +187,14 @@ export function describeBehaviorOfVaultAdmin(
         ).to.be.revertedWith("Ownable: sender must be owner");
       });
 
+      it("should revert start offset > end offset", async () => {
+        await expect(
+          vault
+            .connect(signers.deployer)
+            .setAuctionWindowOffsets(newEndOffset, newStartOffset)
+        ).to.be.revertedWith("start offset > end offset");
+      });
+
       it("should set new exchange helper address", async () => {
         await expect(
           vault
@@ -191,6 +208,41 @@ export function describeBehaviorOfVaultAdmin(
             newStartOffset,
             14400,
             newEndOffset,
+            addresses.deployer
+          );
+      });
+    });
+
+    describe("#setDelta64x64(int128)", () => {
+      const newDelta = fixedFromFloat(0.2);
+
+      time.revertToSnapshotAfterEach(async () => {});
+
+      it("should revert if !owner", async () => {
+        await expect(vault.setDelta64x64(newDelta)).to.be.revertedWith(
+          "Ownable: sender must be owner"
+        );
+      });
+
+      it("should revert if option delta is <= 0", async () => {
+        await expect(
+          vault.connect(signers.deployer).setDelta64x64(0)
+        ).to.be.revertedWith("delta <= 0");
+      });
+
+      it("should revert if option delta is > 1", async () => {
+        await expect(
+          vault.connect(signers.deployer).setDelta64x64(fixedFromFloat(1))
+        ).to.be.revertedWith("delta > 1");
+      });
+
+      it("should set a new delta", async () => {
+        await expect(vault.connect(signers.deployer).setDelta64x64(newDelta))
+          .to.emit(vault, "DeltaSet")
+          .withArgs(
+            0,
+            fixedFromFloat(params.delta),
+            newDelta,
             addresses.deployer
           );
       });
@@ -311,7 +363,7 @@ export function describeBehaviorOfVaultAdmin(
           vault
             .connect(signers.deployer)
             .setPerformanceFee64x64(fixedFromFloat(1))
-        ).to.be.revertedWith("invalid fee amount");
+        ).to.be.revertedWith("fee > 1");
       });
 
       it("should set a new fee", async () => {
@@ -339,7 +391,7 @@ export function describeBehaviorOfVaultAdmin(
           vault
             .connect(signers.deployer)
             .setWithdrawalFee64x64(fixedFromFloat(1))
-        ).to.be.revertedWith("invalid fee amount");
+        ).to.be.revertedWith("fee > 1");
       });
 
       it("should set a new fee", async () => {
@@ -762,10 +814,41 @@ export function describeBehaviorOfVaultAdmin(
     });
 
     describe("#setAuctionPrices()", () => {
-      time.revertToSnapshotAfterEach(async () => {});
+      time.revertToSnapshotAfterEach(async () => {
+        const pricer = await new Pricer__factory(signers.deployer).deploy(
+          params.pool.address,
+          params.pool.volatility
+        );
+
+        await vault.connect(signers.deployer).setPricer(pricer.address);
+
+        // init epoch 0 auction
+        await knoxUtil.setAndInitializeAuction();
+
+        // init epoch 1
+        await time.fastForwardToFriday8AM();
+      });
 
       it("should revert if !keeper", async () => {
         await expect(vault.setAuctionPrices()).to.be.revertedWith("!keeper");
+      });
+
+      // note: it is possible for the offset strike to end up being further ITM than
+      // the strike this may occur if the strike is rounded above/below the offset
+      // strike. if the delta offset is too small the likelihood of this happening
+      // increases.
+      it("should set the offset strike price further OTM than the strike price", async () => {
+        const tx = await vault.connect(signers.keeper).setAuctionPrices();
+        const args = await getEventArgs(tx, "AuctionPricesSet");
+        params.isCall
+          ? assert.bnGt(args.offsetStrike64x64, args.strike64x64)
+          : assert.bnGt(args.strike64x64, args.offsetStrike64x64);
+      });
+
+      it("should set max price greater than the min price", async () => {
+        const tx = await vault.connect(signers.keeper).setAuctionPrices();
+        const args = await getEventArgs(tx, "AuctionPricesSet");
+        assert.bnGt(args.maxPrice64x64, args.minPrice64x64);
       });
     });
 

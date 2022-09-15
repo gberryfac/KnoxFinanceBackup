@@ -1,2 +1,2 @@
 node_modules/
-contracts/pricer/OptionStatistics.sol
+contracts/vendor/

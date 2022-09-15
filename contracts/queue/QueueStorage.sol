@@ -1,17 +1,22 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "../exchange/IExchangeHelper.sol";
+import "../vendor/IExchangeHelper.sol";
+
+/**
+ * @title Knox Queue Diamond Storage Library
+ */
 
 library QueueStorage {
-    /************************************************
-     *  LAYOUT
-     ***********************************************/
     struct Layout {
-        IExchangeHelper Exchange;
+        // epoch id
         uint64 epoch;
+        // maximum total value locked
         uint256 maxTVL;
+        // mapping of claim token id to price per share (claimTokenIds -> pricePerShare)
         mapping(uint256 => uint256) pricePerShare;
+        // ExchangeHelper contract interface
+        IExchangeHelper Exchange;
     }
 
     bytes32 internal constant LAYOUT_SLOT =
@@ -28,18 +33,35 @@ library QueueStorage {
      *  VIEW
      ***********************************************/
 
+    /**
+     * @notice gets current claim token id
+     * @return claim token id
+     */
     function _getCurrentTokenId() internal view returns (uint256) {
-        return _formatTokenId(_getEpoch());
+        return _formatClaimTokenId(_getEpoch());
     }
 
+    /**
+     * @notice gets current epoch of the queue
+     * @return epoch id
+     */
     function _getEpoch() internal view returns (uint64) {
         return layout().epoch;
     }
 
+    /**
+     * @notice gets max total value locked of the vault
+     * @return max total value
+     */
     function _getMaxTVL() internal view returns (uint256) {
         return layout().maxTVL;
     }
 
+    /**
+     * @notice gets price per share for a given claim token id
+     * @param tokenId claim token id
+     * @return price per share
+     */
     function _getPricePerShare(uint256 tokenId)
         internal
         view
@@ -52,11 +74,22 @@ library QueueStorage {
      * HELPERS
      ***********************************************/
 
-    function _formatTokenId(uint64 epoch) internal view returns (uint256) {
+    /**
+     * @notice calculates claim token id for a given epoch
+     * @param epoch weekly interval id
+     * @return claim token id
+     */
+    function _formatClaimTokenId(uint64 epoch) internal view returns (uint256) {
         return (uint256(uint160(address(this))) << 64) + uint256(epoch);
     }
 
-    function _parseTokenId(uint256 tokenId)
+    /**
+     * @notice derives queue address and epoch from claim token id
+     * @param tokenId claim token id
+     * @return address of queue
+     * @return epoch id
+     */
+    function _parseClaimTokenId(uint256 tokenId)
         internal
         pure
         returns (address, uint64)

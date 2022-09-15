@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-// Inspired by PiperMerriam's Grove v0.3
-// https://github.com/pipermerriam/ethereum-grove
+/**
+ * @title Knox Auction Order Book Library
+ * @dev based on PiperMerriam's Grove v0.3
+ * https://github.com/pipermerriam/ethereum-grove
+ */
 
 library OrderBook {
     struct Index {

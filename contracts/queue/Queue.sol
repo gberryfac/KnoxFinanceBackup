@@ -9,6 +9,11 @@ import "@solidstate/contracts/utils/ReentrancyGuard.sol";
 import "./IQueue.sol";
 import "./QueueInternal.sol";
 
+/**
+ * @title Knox Queue Contract
+ * @dev deployed standalone and referenced by QueueProxy
+ */
+
 contract Queue is
     ERC1155Base,
     ERC1155Enumerable,
@@ -19,6 +24,7 @@ contract Queue is
     using ERC165Storage for ERC165Storage.Layout;
     using QueueStorage for QueueStorage.Layout;
     using SafeERC20 for IERC20;
+    using SafeERC20 for IWETH;
 
     constructor(
         bool isCall,
@@ -53,14 +59,30 @@ contract Queue is
      * @inheritdoc IQueue
      */
     function setMaxTVL(uint256 newMaxTVL) external onlyOwner {
-        _setMaxTVL(newMaxTVL);
+        QueueStorage.Layout storage l = QueueStorage.layout();
+        require(newMaxTVL > 0, "value exceeds minimum");
+        emit MaxTVLSet(l.epoch, l.maxTVL, newMaxTVL, msg.sender);
+        l.maxTVL = newMaxTVL;
     }
 
     /**
      * @inheritdoc IQueue
      */
     function setExchangeHelper(address newExchangeHelper) external onlyOwner {
-        _setExchangeHelper(newExchangeHelper);
+        QueueStorage.Layout storage l = QueueStorage.layout();
+        require(newExchangeHelper != address(0), "address not provided");
+        require(
+            newExchangeHelper != address(l.Exchange),
+            "new address equals old"
+        );
+
+        emit ExchangeHelperSet(
+            address(l.Exchange),
+            newExchangeHelper,
+            msg.sender
+        );
+
+        l.Exchange = IExchangeHelper(newExchangeHelper);
     }
 
     /************************************************
@@ -76,19 +98,11 @@ contract Queue is
         nonReentrant
         whenNotPaused
     {
-        _deposit(amount, msg.sender);
-    }
-
-    /**
-     * @inheritdoc IQueue
-     */
-    function deposit(uint256 amount, address receiver)
-        external
-        payable
-        nonReentrant
-        whenNotPaused
-    {
-        _deposit(amount, receiver);
+        QueueStorage.Layout storage l = QueueStorage.layout();
+        uint256 credited = _wrapNativeToken(amount);
+        // an approve() by the msg.sender is required beforehand
+        ERC20.safeTransferFrom(msg.sender, address(this), amount - credited);
+        _deposit(l, amount);
     }
 
     /**
@@ -100,17 +114,9 @@ contract Queue is
         nonReentrant
         whenNotPaused
     {
-        _swapAndDeposit(s, msg.sender);
-    }
-
-    /**
-     * @inheritdoc IQueue
-     */
-    function swapAndDeposit(
-        IExchangeHelper.SwapArgs calldata s,
-        address receiver
-    ) external payable nonReentrant whenNotPaused {
-        _swapAndDeposit(s, receiver);
+        QueueStorage.Layout storage l = QueueStorage.layout();
+        uint256 credited = _swapForPoolTokens(l.Exchange, s, address(ERC20));
+        _deposit(l, credited);
     }
 
     /************************************************
@@ -121,7 +127,13 @@ contract Queue is
      * @inheritdoc IQueue
      */
     function cancel(uint256 amount) external nonReentrant {
-        _cancel(amount);
+        uint256 currentTokenId = QueueStorage._getCurrentTokenId();
+        // burns the callers claim token
+        _burn(msg.sender, currentTokenId, amount);
+        // refunds the callers deposit
+        ERC20.safeTransfer(msg.sender, amount);
+        uint64 epoch = QueueStorage._getEpoch();
+        emit Cancel(epoch, msg.sender, amount);
     }
 
     /************************************************
@@ -189,14 +201,45 @@ contract Queue is
      * @inheritdoc IQueue
      */
     function syncEpoch(uint64 epoch) external onlyVault {
-        _syncEpoch(epoch);
+        QueueStorage.Layout storage l = QueueStorage.layout();
+        l.epoch = epoch;
+        emit EpochSet(l.epoch, msg.sender);
     }
 
     /**
      * @inheritdoc IQueue
      */
     function processDeposits() external onlyVault {
-        _processDeposits();
+        uint256 deposits = ERC20.balanceOf(address(this));
+        ERC20.approve(address(Vault), deposits);
+        // the queue deposits their entire balance into the vault at the end of each epoch
+        uint256 shares = Vault.deposit(deposits, address(this));
+
+        // the shares returned by the vault represent a pro-rata share of the vault tokens. these
+        // shares are used to calculate a price-per-share based on the supply of claim tokens for
+        // that epoch. the price-per-share is used as an exchange rate of claim tokens to vault
+        // shares when a user withdraws or redeems.
+        uint256 currentTokenId = QueueStorage._getCurrentTokenId();
+        uint256 claimTokenSupply = _totalSupply(currentTokenId);
+        uint256 pricePerShare = ONE_SHARE;
+
+        if (shares <= 0) {
+            pricePerShare = 0;
+        } else if (claimTokenSupply > 0) {
+            pricePerShare = (pricePerShare * shares) / claimTokenSupply;
+        }
+
+        QueueStorage.Layout storage l = QueueStorage.layout();
+        // the price-per-share can be queried if the claim token id is provided
+        l.pricePerShare[currentTokenId] = pricePerShare;
+
+        emit ProcessQueuedDeposits(
+            l.epoch,
+            deposits,
+            pricePerShare,
+            shares,
+            claimTokenSupply
+        );
     }
 
     /************************************************
@@ -254,6 +297,89 @@ contract Queue is
     }
 
     /************************************************
+     *  DEPOSIT HELPERS
+     ***********************************************/
+
+    /**
+     * @notice wraps ETH sent to the contract and credits the amount, if the collateral asset
+     * is not WETH, the transaction will revert
+     * @param amount total collateral deposited
+     * @return credited amount
+     */
+    function _wrapNativeToken(uint256 amount) private returns (uint256) {
+        uint256 credit;
+
+        if (msg.value > 0) {
+            require(address(ERC20) == address(WETH), "collateral != wETH");
+
+            if (msg.value > amount) {
+                // if the ETH amount is greater than the amount needed, it will be sent
+                // back to the msg.sender
+                unchecked {
+                    (bool success, ) =
+                        payable(msg.sender).call{value: msg.value - amount}("");
+
+                    require(success, "ETH refund failed");
+
+                    credit = amount;
+                }
+            } else {
+                credit = msg.value;
+            }
+
+            WETH.deposit{value: credit}();
+        }
+
+        return credit;
+    }
+
+    /**
+     * @notice pull token from user, send to exchangeHelper trigger a trade from
+     * ExchangeHelper, and credits the amount
+     * @param Exchange ExchangeHelper contract interface
+     * @param s swap arguments
+     * @param tokenOut token to swap for. should always equal to the collateral asset
+     * @return credited amount
+     */
+    function _swapForPoolTokens(
+        IExchangeHelper Exchange,
+        IExchangeHelper.SwapArgs calldata s,
+        address tokenOut
+    ) private returns (uint256) {
+        if (msg.value > 0) {
+            require(s.tokenIn == address(WETH), "tokenIn != wETH");
+            WETH.deposit{value: msg.value}();
+            WETH.safeTransfer(address(Exchange), msg.value);
+        }
+
+        if (s.amountInMax > 0) {
+            IERC20(s.tokenIn).safeTransferFrom(
+                msg.sender,
+                address(Exchange),
+                s.amountInMax
+            );
+        }
+
+        uint256 amountCredited =
+            Exchange.swapWithToken(
+                s.tokenIn,
+                tokenOut,
+                s.amountInMax + msg.value,
+                s.callee,
+                s.allowanceTarget,
+                s.data,
+                s.refundAddress
+            );
+
+        require(
+            amountCredited >= s.amountOutMin,
+            "not enough output from trade"
+        );
+
+        return amountCredited;
+    }
+
+    /************************************************
      * HELPERS
      ***********************************************/
 
@@ -261,7 +387,7 @@ contract Queue is
      * @inheritdoc IQueue
      */
     function formatClaimTokenId(uint64 epoch) external view returns (uint256) {
-        return QueueStorage._formatTokenId(epoch);
+        return QueueStorage._formatClaimTokenId(epoch);
     }
 
     /**
@@ -272,13 +398,16 @@ contract Queue is
         pure
         returns (address, uint64)
     {
-        return QueueStorage._parseTokenId(tokenId);
+        return QueueStorage._parseClaimTokenId(tokenId);
     }
 
     /************************************************
      *  ERC165 SUPPORT
      ***********************************************/
 
+    /**
+     * @inheritdoc IERC165
+     */
     function supportsInterface(bytes4 interfaceId)
         external
         view
@@ -291,6 +420,17 @@ contract Queue is
      *  ERC1155 OVERRIDES
      ***********************************************/
 
+    /**
+     * @notice ERC1155 hook, called before all transfers including mint and burn
+     * @dev function should be overridden and new implementation must call super
+     * @dev called for both single and batch transfers
+     * @param operator executor of transfer
+     * @param from sender of tokens
+     * @param to receiver of tokens
+     * @param ids token IDs
+     * @param amounts quantities of tokens to transfer
+     * @param data data payload
+     */
     function _beforeTokenTransfer(
         address operator,
         address from,

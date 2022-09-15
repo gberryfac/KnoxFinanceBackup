@@ -7,6 +7,11 @@ import "@solidstate/contracts/proxy/upgradeable/UpgradeableProxyStorage.sol";
 
 import "./AuctionStorage.sol";
 
+/**
+ * @title Knox Auction Proxy Contract
+ * @dev contracts are upgradable
+ */
+
 contract AuctionProxy is UpgradeableProxyOwnable {
     using AuctionStorage for AuctionStorage.Layout;
     using OwnableStorage for OwnableStorage.Layout;

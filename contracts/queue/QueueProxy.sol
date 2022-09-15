@@ -11,6 +11,11 @@ import "../vault/IVault.sol";
 
 import "./QueueStorage.sol";
 
+/**
+ * @title Knox Queue Proxy Contract
+ * @dev contracts are upgradable
+ */
+
 contract QueueProxy is UpgradeableProxyOwnable {
     using ERC165Storage for ERC165Storage.Layout;
     using OwnableStorage for OwnableStorage.Layout;

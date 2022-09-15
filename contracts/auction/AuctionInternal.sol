@@ -8,15 +8,19 @@ import "@solidstate/contracts/token/ERC20/metadata/IERC20Metadata.sol";
 import "@solidstate/contracts/utils/IWETH.sol";
 import "@solidstate/contracts/utils/SafeERC20.sol";
 
-import "../interfaces/IPremiaPool.sol";
-
-import "../libraries/ABDKMath64x64Token.sol";
+import "../libraries/OptionMath.sol";
 import "../libraries/Helpers.sol";
+
+import "../vendor/IPremiaPool.sol";
 
 import "../vault/IVault.sol";
 
 import "./AuctionStorage.sol";
 import "./IAuctionEvents.sol";
+
+/**
+ * @title Knox Dutch Auction Internal Contract
+ */
 
 contract AuctionInternal is IAuctionEvents, OwnableInternal {
     using ABDKMath64x64 for int128;
@@ -25,9 +29,10 @@ contract AuctionInternal is IAuctionEvents, OwnableInternal {
     using ABDKMath64x64Token for uint256;
     using AuctionStorage for AuctionStorage.Layout;
     using EnumerableSet for EnumerableSet.UintSet;
-    using Helpers for uint256;
+    using OptionMath for uint256;
     using OrderBook for OrderBook.Index;
     using SafeERC20 for IERC20;
+    using SafeERC20 for IWETH;
 
     bool internal immutable isCall;
     uint8 internal immutable baseDecimals;
@@ -63,7 +68,7 @@ contract AuctionInternal is IAuctionEvents, OwnableInternal {
      ***********************************************/
 
     /**
-     * @dev Throws if called by any account other than the vault.
+     * @dev Throws if called by any account other than the vault
      */
     modifier onlyVault() {
         AuctionStorage.Layout storage l = AuctionStorage.layout();
@@ -73,6 +78,7 @@ contract AuctionInternal is IAuctionEvents, OwnableInternal {
 
     /**
      * @dev Throws if auction finalization is not allowed
+     * @param auction storage params
      */
     function _finalizeAuctionAllowed(AuctionStorage.Auction storage auction)
         internal
@@ -84,6 +90,7 @@ contract AuctionInternal is IAuctionEvents, OwnableInternal {
 
     /**
      * @dev Throws if limit orders are not allowed
+     * @param auction storage params
      */
     function _limitOrdersAllowed(AuctionStorage.Auction storage auction)
         internal
@@ -95,6 +102,7 @@ contract AuctionInternal is IAuctionEvents, OwnableInternal {
 
     /**
      * @dev Throws if market orders are not allowed
+     * @param auction storage params
      */
     function _marketOrdersAllowed(AuctionStorage.Auction storage auction)
         internal
@@ -107,6 +115,7 @@ contract AuctionInternal is IAuctionEvents, OwnableInternal {
 
     /**
      * @dev Throws if auction has not started.
+     * @param auction storage params
      */
     function _auctionHasStarted(AuctionStorage.Auction storage auction)
         private
@@ -118,6 +127,7 @@ contract AuctionInternal is IAuctionEvents, OwnableInternal {
 
     /**
      * @dev Throws if auction has ended.
+     * @param auction storage params
      */
     function _auctionHasNotEnded(AuctionStorage.Auction storage auction)
         private
@@ -129,6 +139,7 @@ contract AuctionInternal is IAuctionEvents, OwnableInternal {
 
     /**
      * @dev Throws if auction has been finalized or processed.
+     * @param status auction status
      */
     function _auctionNotFinalizedOrProcessed(AuctionStorage.Status status)
         private
@@ -148,6 +159,11 @@ contract AuctionInternal is IAuctionEvents, OwnableInternal {
      *  PRICING
      ***********************************************/
 
+    /**
+     * @notice last price paid during the auction
+     * @param auction storage params
+     * @return price as 64x64 fixed point number
+     */
     function _lastPrice64x64(AuctionStorage.Auction storage auction)
         internal
         view
@@ -156,16 +172,32 @@ contract AuctionInternal is IAuctionEvents, OwnableInternal {
         return auction.lastPrice64x64;
     }
 
+    /**
+     * @notice calculates price as a function of time
+     * @param auction storage params
+     * @return price as 64x64 fixed point number
+     */
     function _priceCurve64x64(AuctionStorage.Auction storage auction)
         internal
         view
         returns (int128)
     {
         uint256 startTime = auction.startTime;
-        uint256 totalTime = auction.totalTime;
+        uint256 totalTime = auction.endTime - auction.startTime;
 
         int128 maxPrice64x64 = auction.maxPrice64x64;
         int128 minPrice64x64 = auction.minPrice64x64;
+
+        /**
+         *
+         * price curve equation:
+         * assumes max price is always greater than min price
+         * assumes the time remaining is in the range of 0 and 1
+         * ------------------------------
+         * time_remaning_percent(t) = (t - time_start) / time_total
+         * price(t) = max_price - time_remaning_percent(t) * (max_price - min_price)
+         *
+         */
 
         if (block.timestamp <= startTime) return maxPrice64x64;
 
@@ -177,6 +209,11 @@ contract AuctionInternal is IAuctionEvents, OwnableInternal {
         return maxPrice64x64.sub(y);
     }
 
+    /**
+     * @notice clearing price of the auction
+     * @param auction storage params
+     * @return price as 64x64 fixed point number
+     */
     function _clearingPrice64x64(AuctionStorage.Auction storage auction)
         internal
         view
@@ -195,22 +232,33 @@ contract AuctionInternal is IAuctionEvents, OwnableInternal {
      *  WITHDRAW
      ***********************************************/
 
+    /**
+     * @notice withdraws any amount(s) owed to the buyer (fill and/or refund)
+     * @param l auction storage layout
+     * @param epoch epoch id
+     */
     function _withdraw(AuctionStorage.Layout storage l, uint64 epoch) internal {
         (uint256 refund, uint256 fill) =
             _previewWithdraw(l, false, epoch, msg.sender);
 
         l.epochsByBuyer[msg.sender].remove(epoch);
 
+        // fetches the exercised value of the options
         (bool expired, uint256 exercisedAmount) =
             _getExerciseAmount(l, epoch, fill);
 
         if (expired) {
-            // If expired ITM, adjust refund
-            if (exercisedAmount > 0) refund += exercisedAmount;
+            if (exercisedAmount > 0) {
+                // if expired ITM, adjust refund by the amount exercised
+                refund += exercisedAmount;
+            }
+
+            // set fill to 0, buyer will not receive any long tokens
             fill = 0;
         }
 
         if (fill > 0) {
+            // transfers long tokens to msg.sender
             Pool.safeTransferFrom(
                 address(this),
                 msg.sender,
@@ -221,12 +269,20 @@ contract AuctionInternal is IAuctionEvents, OwnableInternal {
         }
 
         if (refund > 0) {
+            // transfers refunded premium to msg.sender
             ERC20.safeTransfer(msg.sender, refund);
         }
 
         emit OrderWithdrawn(epoch, msg.sender, refund, fill);
     }
 
+    /**
+     * @notice calculates amount(s) owed to the buyer
+     * @param epoch epoch id
+     * @param buyer address of buyer
+     * @return amount refunded
+     * @return amount filled
+     */
     function _previewWithdraw(uint64 epoch, address buyer)
         internal
         returns (uint256, uint256)
@@ -235,6 +291,14 @@ contract AuctionInternal is IAuctionEvents, OwnableInternal {
         return _previewWithdraw(l, true, epoch, buyer);
     }
 
+    /**
+     * @notice traverses the orderbook and returns the refund and fill amounts
+     * @param l auction storage layout
+     * @param epoch epoch id
+     * @param buyer address of buyer
+     * @return amount refunded
+     * @return amount filled
+     */
     function _previewWithdraw(
         AuctionStorage.Layout storage l,
         bool isPreview,
@@ -253,37 +317,50 @@ contract AuctionInternal is IAuctionEvents, OwnableInternal {
         uint256 next = orderbook._head();
         uint256 length = orderbook._length();
 
+        // traverse the order book and return orders placed by the buyer
         for (uint256 i = 1; i <= length; i++) {
             OrderBook.Data memory data = orderbook._getOrderById(next);
             next = orderbook._getNextOrder(next);
 
             if (data.buyer == buyer) {
-                // if lastPrice64x64 == type(int128).max, auction is cancelled, only send refund
                 if (
                     lastPrice64x64 < type(int128).max &&
                     data.price64x64 >= lastPrice64x64
                 ) {
+                    // if the auction has not been cancelled, and the order price is greater than or
+                    // equal to the last price, fill the order and calculate the refund amount
                     uint256 paid = data.price64x64.mulu(data.size);
                     uint256 cost = lastPrice64x64.mulu(data.size);
 
                     if (
                         totalContractsSold + data.size >= auction.totalContracts
                     ) {
+                        // if part of the current order exceeds the total contracts available, partially
+                        // fill the order, and refund the remainder
                         uint256 remainder =
                             auction.totalContracts - totalContractsSold;
 
                         cost = lastPrice64x64.mulu(remainder);
                         fill += remainder;
                     } else {
+                        // otherwise, fill the entire order
                         fill += data.size;
                     }
 
+                    // the refund takes the difference between the amount paid and the "true" cost of
+                    // of the order. the "true" cost can be calculated when the clearing price has been
+                    // set.
                     refund += paid - cost;
                 } else {
+                    // if last price >= type(int128).max, auction has been cancelled, only send refund
+                    // if price < last price, the bid is too low, only send refund
                     refund += data.price64x64.mulu(data.size);
                 }
 
-                if (!isPreview) orderbook._remove(data.id);
+                if (!isPreview) {
+                    // when a withdrawal is made, remove the order from the order book
+                    orderbook._remove(data.id);
+                }
             }
 
             totalContractsSold += data.size;
@@ -296,6 +373,12 @@ contract AuctionInternal is IAuctionEvents, OwnableInternal {
      *  FINALIZE AUCTION
      ***********************************************/
 
+    /**
+     * @notice traverses the orderbook and checks if the auction has reached 100% utilization
+     * @param l auction storage layout
+     * @param epoch epoch id
+     * @return true if the auction has reached 100% utilization
+     */
     function _processOrders(AuctionStorage.Layout storage l, uint64 epoch)
         private
         returns (bool)
@@ -316,10 +399,15 @@ contract AuctionInternal is IAuctionEvents, OwnableInternal {
         uint256 totalContractsSold;
         int128 lastPrice64x64;
 
+        // traverse the order book and sum the contracts sold until the utilization == 100% or
+        // the end of the orderbook has been reached.
         for (uint256 i = 1; i <= length; i++) {
             OrderBook.Data memory data = orderbook._getOrderById(next);
+            next = orderbook._getNextOrder(next);
 
-            // check if the last "active" order has been reached
+            // orders in the order book are sorted by price in a descending order. if the
+            // order price < clearing price the last order which should be accepeted has
+            // been reached.
             if (data.price64x64 < _clearingPrice64x64(auction)) break;
 
             // checks if utilization >= 100%
@@ -330,31 +418,39 @@ contract AuctionInternal is IAuctionEvents, OwnableInternal {
             }
 
             totalContractsSold += data.size;
-            next = orderbook._getNextOrder(next);
             lastPrice64x64 = data.price64x64;
         }
+
+        /**
+         * sets the last price reached in the order book equal to the last price paid in the auction.
+         *
+         *
+         * Orderbook | price curve == 96
+         * ---------
+         * id -  price
+         * 0  -  100
+         * 1  -  97 --- last price
+         * 2  -  95
+         * */
 
         auction.lastPrice64x64 = lastPrice64x64;
         auction.totalContractsSold = totalContractsSold;
         return false;
     }
 
+    /**
+     * @notice determines whether the auction has reached finality. the end criteria for the auction are
+     * met if the auction has reached 100% utilization or the end time has been exceeded.
+     * @param l auction storage layout
+     * @param auction storage params
+     * @param epoch epoch id
+     */
     function _finalizeAuction(
         AuctionStorage.Layout storage l,
         AuctionStorage.Auction storage auction,
         uint64 epoch
     ) internal {
-        if (
-            auction.maxPrice64x64 <= 0 ||
-            auction.minPrice64x64 <= 0 ||
-            auction.maxPrice64x64 <= auction.minPrice64x64
-        ) {
-            l.auctions[epoch].lastPrice64x64 = type(int128).max;
-            auction.status = AuctionStorage.Status.FINALIZED;
-            emit AuctionStatusSet(epoch, auction.status);
-        } else if (
-            _processOrders(l, epoch) || block.timestamp > auction.endTime
-        ) {
+        if (_processOrders(l, epoch) || block.timestamp > auction.endTime) {
             auction.status = AuctionStorage.Status.FINALIZED;
             emit AuctionStatusSet(epoch, auction.status);
         }
@@ -364,17 +460,25 @@ contract AuctionInternal is IAuctionEvents, OwnableInternal {
      *  VIEW
      ***********************************************/
 
+    /**
+     * @notice gets the total number of contracts that can be sold during the auction
+     * @param auction storage params
+     * @return total contracts available
+     */
     function _getTotalContracts(AuctionStorage.Auction storage auction)
         internal
         view
         returns (uint256)
     {
         if (auction.totalContracts <= 0) {
+            // if the total contracts has not been set for the auction, the vault contract
+            // will be queried and the amount will be determined from the collateral in the vault.
+
             uint256 totalCollateral = Vault.totalCollateral();
             int128 strike64x64 = auction.strike64x64;
 
             return
-                totalCollateral._fromCollateralToContracts(
+                totalCollateral.fromContractsToCollateral(
                     isCall,
                     baseDecimals,
                     strike64x64
@@ -388,6 +492,13 @@ contract AuctionInternal is IAuctionEvents, OwnableInternal {
      *  PURCHASE HELPERS
      ***********************************************/
 
+    /**
+     * @notice checks whether the limit order parameters are valid and returns the cost
+     * @param l auction storage layout
+     * @param price64x64 max price as 64x64 fixed point number
+     * @param size amount of contracts
+     * @return cost of the order given the size and price
+     */
     function _validateLimitOrder(
         AuctionStorage.Layout storage l,
         int128 price64x64,
@@ -400,6 +511,15 @@ contract AuctionInternal is IAuctionEvents, OwnableInternal {
         return cost;
     }
 
+    /**
+     * @notice checks whether the market order parameters are valid and returns the price and cost
+     * @param l auction storage layout
+     * @param auction storage params
+     * @param size amount of contracts
+     * @param maxCost max cost of buyer is willing to pay
+     * @return price established by the price curve
+     * @return cost of the order given the size and price
+     */
     function _validateMarketOrder(
         AuctionStorage.Layout storage l,
         AuctionStorage.Auction storage auction,
@@ -415,20 +535,36 @@ contract AuctionInternal is IAuctionEvents, OwnableInternal {
         return (price64x64, cost);
     }
 
+    /**
+     * @notice transfers the premium to the buyer if a refund is due, ortherwise, pull funds
+     * from buyer if funds are owed to the auction contract.
+     * @param credited amount already paid by the buyer
+     * @param cost total amount which must be paid by the buyer
+     * @param buyer account being debited or credited
+     */
     function _transferAssets(
         uint256 credited,
         uint256 cost,
-        address receiver
+        address buyer
     ) internal {
         if (credited > cost) {
-            // refund buyer1 the amount overpaid
-            ERC20.safeTransfer(receiver, credited - cost);
+            // refund buyer the amount overpaid
+            ERC20.safeTransfer(buyer, credited - cost);
         } else if (cost > credited) {
             // an approve() by the msg.sender is required beforehand
-            ERC20.safeTransferFrom(receiver, address(this), cost - credited);
+            ERC20.safeTransferFrom(buyer, address(this), cost - credited);
         }
     }
 
+    /**
+     * @notice checks whether the market order parameters are valid and returns the price and cost
+     * @param l auction storage layout
+     * @param auction storage params
+     * @param epoch epoch id
+     * @param price64x64 max price as 64x64 fixed point number
+     * @param size amount of contracts
+     * @param isLimitOrder true, if the order is a limit order
+     */
     function _addOrder(
         AuctionStorage.Layout storage l,
         AuctionStorage.Auction storage auction,
@@ -448,16 +584,21 @@ contract AuctionInternal is IAuctionEvents, OwnableInternal {
         emit OrderAdded(epoch, id, msg.sender, price64x64, size, isLimitOrder);
     }
 
+    /**
+     * @notice wraps ETH sent to the contract and credits the amount, if the collateral asset
+     * is not WETH, the transaction will revert
+     * @param amount total collateral deposited
+     * @return credited amount
+     */
     function _wrapNativeToken(uint256 amount) internal returns (uint256) {
         uint256 credit;
 
         if (msg.value > 0) {
-            require(
-                address(ERC20) == address(WETH),
-                "collateral token != wETH"
-            );
+            require(address(ERC20) == address(WETH), "collateral != wETH");
 
             if (msg.value > amount) {
+                // if the ETH amount is greater than the amount needed, it will be sent
+                // back to the msg.sender
                 unchecked {
                     (bool success, ) =
                         payable(msg.sender).call{value: msg.value - amount}("");
@@ -476,6 +617,14 @@ contract AuctionInternal is IAuctionEvents, OwnableInternal {
         return credit;
     }
 
+    /**
+     * @notice pull token from user, send to exchangeHelper trigger a trade from
+     * ExchangeHelper, and credits the amount
+     * @param Exchange ExchangeHelper contract interface
+     * @param s swap arguments
+     * @param tokenOut token to swap for. should always equal to the collateral asset
+     * @return credited amount
+     */
     function _swapForPoolTokens(
         IExchangeHelper Exchange,
         IExchangeHelper.SwapArgs calldata s,
@@ -484,7 +633,7 @@ contract AuctionInternal is IAuctionEvents, OwnableInternal {
         if (msg.value > 0) {
             require(s.tokenIn == address(WETH), "tokenIn != wETH");
             WETH.deposit{value: msg.value}();
-            WETH.transfer(address(Exchange), msg.value);
+            WETH.safeTransfer(address(Exchange), msg.value);
         }
 
         if (s.amountInMax > 0) {
@@ -522,7 +671,8 @@ contract AuctionInternal is IAuctionEvents, OwnableInternal {
      * @notice calculates the expected proceeds of the option if it has expired
      * @param epoch epoch id
      * @param size amount of contracts
-     * @return true if the option has expired, the exercise amount.
+     * @return true if the option has expired
+     * @return the exercised amount
      */
     function _getExerciseAmount(
         AuctionStorage.Layout storage l,
@@ -543,7 +693,10 @@ contract AuctionInternal is IAuctionEvents, OwnableInternal {
             amount = spot64x64.sub(strike64x64).div(spot64x64).mulu(size);
         } else if (!isCall && strike64x64 > spot64x64) {
             uint256 value = strike64x64.sub(spot64x64).mulu(size);
-            amount = ABDKMath64x64Token.toBaseTokenAmount(
+
+            // converts the value to the base asset amount, this is particularly important where the
+            // the decimals of the underlying are different from the base (e.g. wBTC/DAI)
+            amount = OptionMath.toBaseTokenAmount(
                 underlyingDecimals,
                 baseDecimals,
                 value

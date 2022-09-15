@@ -9,12 +9,16 @@ import "@solidstate/contracts/token/ERC1155/enumerable/ERC1155EnumerableInternal
 import "@solidstate/contracts/utils/IWETH.sol";
 import "@solidstate/contracts/utils/SafeERC20.sol";
 
-import "../interfaces/IPremiaPool.sol";
+import "../vendor/IPremiaPool.sol";
 
 import "../vault/IVault.sol";
 
 import "./IQueueEvents.sol";
 import "./QueueStorage.sol";
+
+/**
+ * @title Knox Queue Internal Contract
+ */
 
 contract QueueInternal is
     ERC1155BaseInternal,
@@ -61,109 +65,35 @@ contract QueueInternal is
     }
 
     /************************************************
-     *  ADMIN
-     ***********************************************/
-
-    /**
-     * @notice sets a new max TVL for deposits
-     * @param newMaxTVL is the new TVL limit for deposits
-     */
-    function _setMaxTVL(uint256 newMaxTVL) internal {
-        QueueStorage.Layout storage l = QueueStorage.layout();
-        require(newMaxTVL > 0, "value exceeds minimum");
-        l.maxTVL = newMaxTVL;
-        emit MaxTVLSet(l.epoch, l.maxTVL, newMaxTVL, msg.sender);
-    }
-
-    /**
-     * @notice sets a new Exchange Helper contract
-     * @param newExchangeHelper is the new Exchange Helper contract address
-     */
-    function _setExchangeHelper(address newExchangeHelper) internal {
-        QueueStorage.Layout storage l = QueueStorage.layout();
-
-        require(newExchangeHelper != address(0), "address not provided");
-        require(
-            newExchangeHelper != address(l.Exchange),
-            "new address equals old"
-        );
-
-        emit ExchangeHelperSet(
-            address(l.Exchange),
-            newExchangeHelper,
-            msg.sender
-        );
-
-        l.Exchange = IExchangeHelper(newExchangeHelper);
-    }
-
-    /************************************************
      *  DEPOSIT
      ***********************************************/
 
     /**
-     * @notice deposits collateral asset
+     * @notice validates the deposit, redeems claim tokens for vault shares and mints claim
+     * tokens 1:1 for collateral deposited
+     * @param l queue storage layout
      * @param amount total collateral deposited
-     * @param receiver claim token recipient
      */
-    function _deposit(uint256 amount, address receiver) internal {
-        QueueStorage.Layout storage l = QueueStorage.layout();
-        uint256 credited = _wrapNativeToken(amount);
-        // an approve() by the msg.sender is required beforehand
-        ERC20.safeTransferFrom(receiver, address(this), amount - credited);
-        _deposit(l, amount, receiver);
-    }
-
-    /**
-     * @notice swaps into the collateral asset and deposits the proceeds
-     * @param s exchange arguments
-     * @param receiver claim token recipient
-     */
-    function _swapAndDeposit(
-        IExchangeHelper.SwapArgs calldata s,
-        address receiver
-    ) internal {
-        QueueStorage.Layout storage l = QueueStorage.layout();
-        uint256 credited = _swapForPoolTokens(l.Exchange, s, address(ERC20));
-        _deposit(l, credited, receiver);
-    }
-
-    function _deposit(
-        QueueStorage.Layout storage l,
-        uint256 amount,
-        address receiver
-    ) private {
-        uint256 totalWithDepositedAmount =
-            Vault.totalAssets() + ERC20.balanceOf(address(this));
-
-        require(totalWithDepositedAmount <= l.maxTVL, "maxTVL exceeded");
+    function _deposit(QueueStorage.Layout storage l, uint256 amount) internal {
         require(amount > 0, "value exceeds minimum");
 
-        // redeems shares from previous epochs
-        _redeemMax(receiver, msg.sender);
+        // the maximum total value locked is the sum of collateral assets held in
+        // the queue and the vault. if a deposit exceeds the max TVL, the transaction
+        // should revert.
+        uint256 totalWithDepositedAmount =
+            Vault.totalAssets() + ERC20.balanceOf(address(this));
+        require(totalWithDepositedAmount <= l.maxTVL, "maxTVL exceeded");
+
+        // prior to making a new deposit, the vault will redeem all available claim tokens
+        // in exchange for the pro-rata vault shares
+        _redeemMax(msg.sender, msg.sender);
 
         uint256 currentTokenId = QueueStorage._getCurrentTokenId();
-        _mint(receiver, currentTokenId, amount, "");
 
-        emit Deposit(l.epoch, receiver, msg.sender, amount);
-    }
+        // the queue mints claim tokens 1:1 with collateral deposited
+        _mint(msg.sender, currentTokenId, amount, "");
 
-    /************************************************
-     *  CANCEL
-     ***********************************************/
-
-    /**
-     * @notice cancels deposit, refunds collateral asset
-     * @dev cancellation must be made within the same epoch as the deposit
-     * @param amount total collateral which will be withdrawn
-     */
-    function _cancel(uint256 amount) internal {
-        uint256 currentTokenId = QueueStorage._getCurrentTokenId();
-        _burn(msg.sender, currentTokenId, amount);
-        ERC20.safeTransfer(msg.sender, amount);
-
-        uint64 epoch = QueueStorage._getEpoch();
-        emit Cancel(epoch, msg.sender, amount);
+        emit Deposit(l.epoch, msg.sender, amount);
     }
 
     /************************************************
@@ -183,16 +113,18 @@ contract QueueInternal is
     ) internal {
         uint256 currentTokenId = QueueStorage._getCurrentTokenId();
 
+        // claim tokens cannot be redeemed within the same epoch that they were minted
         require(
             tokenId != currentTokenId,
             "current claim token cannot be redeemed"
         );
 
         uint256 balance = _balanceOf(owner, tokenId);
-
         uint256 unredeemedShares = _previewUnredeemed(tokenId, owner);
 
+        // burns claim tokens held by owner
         _burn(owner, tokenId, balance);
+        // transfers unredeemed share amount to the receiver
         require(Vault.transfer(receiver, unredeemedShares), "transfer failed");
 
         uint64 epoch = QueueStorage._getEpoch();
@@ -217,51 +149,6 @@ contract QueueInternal is
     }
 
     /************************************************
-     *  PROCESS LAST EPOCH
-     ***********************************************/
-
-    /**
-     * @notice syncs queue epoch with vault epoch
-     * @param epoch current epoch of vault
-     */
-    function _syncEpoch(uint64 epoch) internal {
-        QueueStorage.Layout storage l = QueueStorage.layout();
-        l.epoch = epoch;
-        emit EpochSet(l.epoch, msg.sender);
-    }
-
-    /**
-     * @notice transfers deposited collateral to vault, calculates the price per share
-     */
-    function _processDeposits() internal {
-        uint256 deposits = ERC20.balanceOf(address(this));
-
-        ERC20.approve(address(Vault), deposits);
-        uint256 shares = Vault.deposit(deposits, address(this));
-
-        uint256 currentTokenId = QueueStorage._getCurrentTokenId();
-        uint256 claimTokenSupply = _totalSupply(currentTokenId);
-        uint256 pricePerShare = ONE_SHARE;
-
-        if (shares == 0) {
-            pricePerShare = 0;
-        } else if (claimTokenSupply > 0) {
-            pricePerShare = (pricePerShare * shares) / claimTokenSupply;
-        }
-
-        QueueStorage.Layout storage l = QueueStorage.layout();
-        l.pricePerShare[currentTokenId] = pricePerShare;
-
-        emit ProcessQueuedDeposits(
-            l.epoch,
-            deposits,
-            pricePerShare,
-            shares,
-            claimTokenSupply
-        );
-    }
-
-    /************************************************
      *  VIEW
      ***********************************************/
 
@@ -282,78 +169,20 @@ contract QueueInternal is
     }
 
     /************************************************
-     *  DEPOSIT HELPERS
-     ***********************************************/
-
-    function _wrapNativeToken(uint256 amount) private returns (uint256) {
-        uint256 credit;
-
-        if (msg.value > 0) {
-            require(
-                address(ERC20) == address(WETH),
-                "collateral token != wETH"
-            );
-
-            if (msg.value > amount) {
-                unchecked {
-                    (bool success, ) =
-                        payable(msg.sender).call{value: msg.value - amount}("");
-
-                    require(success, "ETH refund failed");
-
-                    credit = amount;
-                }
-            } else {
-                credit = msg.value;
-            }
-
-            WETH.deposit{value: credit}();
-        }
-
-        return credit;
-    }
-
-    function _swapForPoolTokens(
-        IExchangeHelper Exchange,
-        IExchangeHelper.SwapArgs calldata s,
-        address tokenOut
-    ) private returns (uint256) {
-        if (msg.value > 0) {
-            require(s.tokenIn == address(WETH), "tokenIn != wETH");
-            WETH.deposit{value: msg.value}();
-            WETH.transfer(address(Exchange), msg.value);
-        }
-
-        if (s.amountInMax > 0) {
-            IERC20(s.tokenIn).safeTransferFrom(
-                msg.sender,
-                address(Exchange),
-                s.amountInMax
-            );
-        }
-
-        uint256 amountCredited =
-            Exchange.swapWithToken(
-                s.tokenIn,
-                tokenOut,
-                s.amountInMax + msg.value,
-                s.callee,
-                s.allowanceTarget,
-                s.data,
-                s.refundAddress
-            );
-
-        require(
-            amountCredited >= s.amountOutMin,
-            "not enough output from trade"
-        );
-
-        return amountCredited;
-    }
-
-    /************************************************
      *  ERC1155 OVERRIDES
      ***********************************************/
+
+    /**
+     * @notice ERC1155 hook, called before all transfers including mint and burn
+     * @dev function should be overridden and new implementation must call super
+     * @dev called for both single and batch transfers
+     * @param operator executor of transfer
+     * @param from sender of tokens
+     * @param to receiver of tokens
+     * @param ids token IDs
+     * @param amounts quantities of tokens to transfer
+     * @param data data payload
+     */
 
     function _beforeTokenTransfer(
         address operator,

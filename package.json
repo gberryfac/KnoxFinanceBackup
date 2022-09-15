@@ -22,6 +22,7 @@
     "@nomiclabs/hardhat-waffle": "^2.0.2",
     "@premia/utils": "^0.0.4",
     "@primitivefi/hardhat-dodoc": "^0.2.3",
+    "@solidstate/abdk-math-extensions": "^1.0.0",
     "@solidstate/contracts": "^0.0.35",
     "@solidstate/spec": "^0.0.35",
     "@typechain/ethers-v5": "^9.0.0",
