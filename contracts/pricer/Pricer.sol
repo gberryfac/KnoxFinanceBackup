@@ -86,11 +86,12 @@ contract Pricer is IPricer, PricerInternal {
         int128 timeToMaturity64x64 = _getTimeToMaturity64x64(expiry);
         require(timeToMaturity64x64 > 0, "tau <= 0");
 
-        int128 iv_atm = _getAnnualizedVolatility64x64(
-            spot64x64,
-            spot64x64,
-            timeToMaturity64x64
-        );
+        int128 iv_atm =
+            _getAnnualizedVolatility64x64(
+                spot64x64,
+                spot64x64,
+                timeToMaturity64x64
+            );
         require(iv_atm > 0, "iv_atm <= 0");
 
         int128 v = iv_atm.mul(timeToMaturity64x64.sqrt());
