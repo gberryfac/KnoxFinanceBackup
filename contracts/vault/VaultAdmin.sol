@@ -204,13 +204,13 @@ contract VaultAdmin is IVaultAdmin, VaultInternal {
     }
 
     /************************************************
-     *  INITIALIZE NEXT EPOCH
+     *  INITIALIZE EPOCH
      ***********************************************/
 
     /**
      * @inheritdoc IVaultAdmin
      */
-    function initializeNextEpoch() external onlyKeeper {
+    function initializeEpoch() external onlyKeeper {
         VaultStorage.Layout storage l = VaultStorage.layout();
 
         // skips epoch 0 as there will be no net income, and the lastTotalAsset balance

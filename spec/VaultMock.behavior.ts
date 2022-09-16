@@ -151,7 +151,7 @@ export function describeBehaviorOfVaultMock(
 
           // init epoch 1
           await time.fastForwardToFriday8AM();
-          await knoxUtil.initializeNextEpoch();
+          await knoxUtil.initializeEpoch();
 
           // auction 0 starts
           await time.increaseTo(startTime);
@@ -251,7 +251,7 @@ export function describeBehaviorOfVaultMock(
 
           // init epoch 1
           await time.fastForwardToFriday8AM();
-          await knoxUtil.initializeNextEpoch();
+          await knoxUtil.initializeEpoch();
 
           // auction 0 starts
           await time.increaseTo(startTime);

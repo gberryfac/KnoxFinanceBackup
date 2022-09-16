@@ -414,7 +414,7 @@ export function describeBehaviorOfVaultAdmin(
       it("should set auction start to option expiry if epoch > 0", async () => {
         // init epoch 1
         await time.fastForwardToFriday8AM();
-        await knoxUtil.initializeNextEpoch();
+        await knoxUtil.initializeEpoch();
 
         // init auction 1
         await time.fastForwardToThursday8AM();
@@ -440,7 +440,7 @@ export function describeBehaviorOfVaultAdmin(
       });
     });
 
-    describe("#initializeNextEpoch()", () => {
+    describe("#initializeEpoch()", () => {
       let epoch: BigNumber;
       let startTime: BigNumber;
 
@@ -461,7 +461,7 @@ export function describeBehaviorOfVaultAdmin(
 
         // init epoch 1
         await time.fastForwardToFriday8AM();
-        await knoxUtil.initializeNextEpoch();
+        await knoxUtil.initializeEpoch();
 
         // auction 0 starts
         await time.increaseTo(startTime);
@@ -490,7 +490,7 @@ export function describeBehaviorOfVaultAdmin(
       });
 
       it("should revert if !keeper", async () => {
-        await expect(vault.initializeNextEpoch()).to.be.revertedWith("!keeper");
+        await expect(vault.initializeEpoch()).to.be.revertedWith("!keeper");
       });
 
       it("should set state parameters and increment epoch", async () => {
@@ -502,7 +502,7 @@ export function describeBehaviorOfVaultAdmin(
         assert.bnEqual(vaultEpochBefore, BigNumber.from(epoch));
         assert.bnGt(totalShortContractsBefore, BigNumber.from(0));
 
-        await vault.connect(signers.keeper).initializeNextEpoch();
+        await vault.connect(signers.keeper).initializeEpoch();
 
         const queueEpochAfter = await queue.getEpoch();
         const vaultEpochAfter = await vault.getEpoch();
@@ -577,7 +577,7 @@ export function describeBehaviorOfVaultAdmin(
 
         // init epoch 1
         await time.fastForwardToFriday8AM();
-        await knoxUtil.initializeNextEpoch();
+        await knoxUtil.initializeEpoch();
 
         // auction 0 starts
         await time.increaseTo(startTime);

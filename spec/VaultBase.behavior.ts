@@ -147,7 +147,7 @@ export function describeBehaviorOfVaultBase(
 
           // init epoch 1
           await time.fastForwardToFriday8AM();
-          await knoxUtil.initializeNextEpoch();
+          await knoxUtil.initializeEpoch();
 
           // auction 0 starts
           await time.increaseTo(startTime);
@@ -191,7 +191,7 @@ export function describeBehaviorOfVaultBase(
 
           // init epoch 1
           await time.fastForwardToFriday8AM();
-          await knoxUtil.initializeNextEpoch();
+          await knoxUtil.initializeEpoch();
 
           // auction 0 starts
           await time.increaseTo(startTime);
@@ -265,7 +265,7 @@ export function describeBehaviorOfVaultBase(
           await knoxUtil.processExpiredOptions();
 
           // init epoch 2
-          await knoxUtil.initializeNextEpoch();
+          await knoxUtil.initializeEpoch();
 
           await queue.connect(signers.lp1)["redeemMax()"]();
 
@@ -326,7 +326,7 @@ export function describeBehaviorOfVaultBase(
           await knoxUtil.processExpiredOptions();
 
           // init epoch 2
-          await knoxUtil.initializeNextEpoch();
+          await knoxUtil.initializeEpoch();
 
           await queue.connect(signers.lp1)["redeemMax()"]();
 
@@ -532,7 +532,7 @@ export function describeBehaviorOfVaultBase(
 
           // init epoch 1
           await time.fastForwardToFriday8AM();
-          await knoxUtil.initializeNextEpoch();
+          await knoxUtil.initializeEpoch();
 
           // auction 0 starts
           await time.increaseTo(startTime);
@@ -576,7 +576,7 @@ export function describeBehaviorOfVaultBase(
 
           // init epoch 1
           await time.fastForwardToFriday8AM();
-          await knoxUtil.initializeNextEpoch();
+          await knoxUtil.initializeEpoch();
 
           // auction 0 starts
           await time.increaseTo(startTime);
@@ -650,7 +650,7 @@ export function describeBehaviorOfVaultBase(
           await knoxUtil.processExpiredOptions();
 
           // init epoch 2
-          await knoxUtil.initializeNextEpoch();
+          await knoxUtil.initializeEpoch();
 
           await queue.connect(signers.lp1)["redeemMax()"]();
 
@@ -711,7 +711,7 @@ export function describeBehaviorOfVaultBase(
           await knoxUtil.processExpiredOptions();
 
           // init epoch 2
-          await knoxUtil.initializeNextEpoch();
+          await knoxUtil.initializeEpoch();
 
           await queue.connect(signers.lp1)["redeemMax()"]();
 

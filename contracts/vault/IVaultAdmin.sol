@@ -83,13 +83,13 @@ interface IVaultAdmin {
     function initializeAuction() external;
 
     /************************************************
-     *  INITIALIZE NEXT EPOCH
+     *  INITIALIZE EPOCH
      ***********************************************/
 
     /**
-     * @notice initializes the next epoch
+     * @notice initializes the epoch
      */
-    function initializeNextEpoch() external;
+    function initializeEpoch() external;
 
     /************************************************
      *  SET AUCTION PRICES

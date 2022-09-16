@@ -255,14 +255,14 @@ export class KnoxUtil {
     await pool.processExpired(expiredOption.longTokenId, balances);
   }
 
-  async initializeNextEpoch() {
+  async initializeEpoch() {
     const vault = this.vaultUtil.vault;
     const epoch = await vault.getEpoch();
 
     const maxPrice64x64 = fixedFromFloat(this.params.price.max);
     const minPrice64x64 = fixedFromFloat(this.params.price.min);
 
-    await vault.connect(this.signers.keeper).initializeNextEpoch();
+    await vault.connect(this.signers.keeper).initializeEpoch();
 
     await this.auction
       .connect(this.signers.vault)

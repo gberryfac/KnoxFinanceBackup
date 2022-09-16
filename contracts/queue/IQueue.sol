@@ -111,7 +111,7 @@ interface IQueue is IERC165, IERC1155, IERC1155Enumerable, IQueueEvents {
     function redeemMax(address receiver, address owner) external;
 
     /************************************************
-     *  INITIALIZE NEXT EPOCH
+     *  INITIALIZE EPOCH
      ***********************************************/
 
     /**
