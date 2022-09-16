@@ -24,7 +24,6 @@ contract Queue is
     using ERC165Storage for ERC165Storage.Layout;
     using QueueStorage for QueueStorage.Layout;
     using SafeERC20 for IERC20;
-    using SafeERC20 for IWETH;
 
     constructor(
         bool isCall,
@@ -244,6 +243,13 @@ contract Queue is
     /**
      * @inheritdoc IQueue
      */
+    function formatClaimTokenId(uint64 epoch) external view returns (uint256) {
+        return QueueStorage._formatClaimTokenId(epoch);
+    }
+
+    /**
+     * @inheritdoc IQueue
+     */
     function getCurrentTokenId() external view returns (uint256) {
         return QueueStorage._getCurrentTokenId();
     }
@@ -272,6 +278,17 @@ contract Queue is
     /**
      * @inheritdoc IQueue
      */
+    function parseClaimTokenId(uint256 tokenId)
+        external
+        pure
+        returns (address, uint64)
+    {
+        return QueueStorage._parseClaimTokenId(tokenId);
+    }
+
+    /**
+     * @inheritdoc IQueue
+     */
     function previewUnredeemed(uint256 tokenId)
         external
         view
@@ -289,111 +306,6 @@ contract Queue is
         returns (uint256)
     {
         return _previewUnredeemed(tokenId, account);
-    }
-
-    /************************************************
-     *  DEPOSIT HELPERS
-     ***********************************************/
-
-    /**
-     * @notice wraps ETH sent to the contract and credits the amount, if the collateral asset
-     * is not WETH, the transaction will revert
-     * @param amount total collateral deposited
-     * @return credited amount
-     */
-    function _wrapNativeToken(uint256 amount) private returns (uint256) {
-        uint256 credit;
-
-        if (msg.value > 0) {
-            require(address(ERC20) == address(WETH), "collateral != wETH");
-
-            if (msg.value > amount) {
-                // if the ETH amount is greater than the amount needed, it will be sent
-                // back to the msg.sender
-                unchecked {
-                    (bool success, ) =
-                        payable(msg.sender).call{value: msg.value - amount}("");
-
-                    require(success, "ETH refund failed");
-
-                    credit = amount;
-                }
-            } else {
-                credit = msg.value;
-            }
-
-            WETH.deposit{value: credit}();
-        }
-
-        return credit;
-    }
-
-    /**
-     * @notice pull token from user, send to exchangeHelper trigger a trade from
-     * ExchangeHelper, and credits the amount
-     * @param Exchange ExchangeHelper contract interface
-     * @param s swap arguments
-     * @param tokenOut token to swap for. should always equal to the collateral asset
-     * @return credited amount
-     */
-    function _swapForPoolTokens(
-        IExchangeHelper Exchange,
-        IExchangeHelper.SwapArgs calldata s,
-        address tokenOut
-    ) private returns (uint256) {
-        if (msg.value > 0) {
-            require(s.tokenIn == address(WETH), "tokenIn != wETH");
-            WETH.deposit{value: msg.value}();
-            WETH.safeTransfer(address(Exchange), msg.value);
-        }
-
-        if (s.amountInMax > 0) {
-            IERC20(s.tokenIn).safeTransferFrom(
-                msg.sender,
-                address(Exchange),
-                s.amountInMax
-            );
-        }
-
-        uint256 amountCredited =
-            Exchange.swapWithToken(
-                s.tokenIn,
-                tokenOut,
-                s.amountInMax + msg.value,
-                s.callee,
-                s.allowanceTarget,
-                s.data,
-                s.refundAddress
-            );
-
-        require(
-            amountCredited >= s.amountOutMin,
-            "not enough output from trade"
-        );
-
-        return amountCredited;
-    }
-
-    /************************************************
-     * HELPERS
-     ***********************************************/
-
-    /**
-     * @inheritdoc IQueue
-     */
-    function formatClaimTokenId(uint64 epoch) external view returns (uint256) {
-        return QueueStorage._formatClaimTokenId(epoch);
-    }
-
-    /**
-     * @inheritdoc IQueue
-     */
-    function parseClaimTokenId(uint256 tokenId)
-        external
-        pure
-        returns (address, uint64)
-    {
-        return QueueStorage._parseClaimTokenId(tokenId);
     }
 
     /************************************************
