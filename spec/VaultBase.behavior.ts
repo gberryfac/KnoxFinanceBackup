@@ -143,7 +143,7 @@ export function describeBehaviorOfVaultBase(
           await queue.connect(signers.lp1)["deposit(uint256)"](params.deposit);
 
           // init epoch 0 auction
-          let [startTime, , epoch] = await knoxUtil.setAndInitializeAuction();
+          let [startTime, , epoch] = await knoxUtil.initializeAuction();
 
           // init epoch 1
           await time.fastForwardToFriday8AM();
@@ -187,7 +187,7 @@ export function describeBehaviorOfVaultBase(
           await queue.connect(signers.lp1)["deposit(uint256)"](params.deposit);
 
           // init epoch 0 auction
-          let [startTime, , epoch] = await knoxUtil.setAndInitializeAuction();
+          let [startTime, , epoch] = await knoxUtil.initializeAuction();
 
           // init epoch 1
           await time.fastForwardToFriday8AM();
@@ -257,7 +257,7 @@ export function describeBehaviorOfVaultBase(
             .setWithdrawalFee64x64(fixedFromFloat(0.02));
 
           // init auction 1
-          await knoxUtil.setAndInitializeAuction();
+          await knoxUtil.initializeAuction();
           await time.fastForwardToFriday8AM();
           await time.increase(100);
 
@@ -319,7 +319,7 @@ export function describeBehaviorOfVaultBase(
           );
 
           // init auction 1
-          await knoxUtil.setAndInitializeAuction();
+          await knoxUtil.initializeAuction();
           await time.fastForwardToFriday8AM();
           await time.increase(100);
 
@@ -530,7 +530,7 @@ export function describeBehaviorOfVaultBase(
           await queue.connect(signers.lp1)["deposit(uint256)"](params.deposit);
 
           // init epoch 0 auction
-          let [startTime, , epoch] = await knoxUtil.setAndInitializeAuction();
+          let [startTime, , epoch] = await knoxUtil.initializeAuction();
 
           // init epoch 1
           await time.fastForwardToFriday8AM();
@@ -574,7 +574,7 @@ export function describeBehaviorOfVaultBase(
           await queue.connect(signers.lp1)["deposit(uint256)"](params.deposit);
 
           // init epoch 0 auction
-          let [startTime, , epoch] = await knoxUtil.setAndInitializeAuction();
+          let [startTime, , epoch] = await knoxUtil.initializeAuction();
 
           // init epoch 1
           await time.fastForwardToFriday8AM();
@@ -644,7 +644,7 @@ export function describeBehaviorOfVaultBase(
             .setWithdrawalFee64x64(fixedFromFloat(0.02));
 
           // init auction 1
-          await knoxUtil.setAndInitializeAuction();
+          await knoxUtil.initializeAuction();
           await time.fastForwardToFriday8AM();
           await time.increase(100);
 
@@ -706,7 +706,7 @@ export function describeBehaviorOfVaultBase(
           );
 
           // init auction 1
-          await knoxUtil.setAndInitializeAuction();
+          await knoxUtil.initializeAuction();
           await time.fastForwardToFriday8AM();
           await time.increase(100);
 

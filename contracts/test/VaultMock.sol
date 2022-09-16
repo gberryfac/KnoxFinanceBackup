@@ -14,8 +14,17 @@ contract VaultMock is VaultBase {
 
     constructor(bool isCall, address pool) VaultBase(isCall, pool) {}
 
+    function setOptionParameters()
+        external
+        returns (VaultStorage.Option memory)
+    {
+        VaultStorage.Layout storage l = VaultStorage.layout();
+        return _setOptionParameters(l);
+    }
+
     function withdrawReservedLiquidity() external {
-        _withdrawReservedLiquidity();
+        VaultStorage.Layout storage l = VaultStorage.layout();
+        _withdrawReservedLiquidity(l);
     }
 
     function getFriday(uint256 timestamp) external pure returns (uint256) {

@@ -100,7 +100,7 @@ export function describeBehaviorOfAuction(
     });
 
     const setupSimpleAuction = async (processAuction: boolean) => {
-      const [startTime, , epoch] = await knoxUtil.setAndInitializeAuction();
+      const [startTime, , epoch] = await knoxUtil.initializeAuction();
 
       await time.fastForwardToFriday8AM();
       await knoxUtil.initializeNextEpoch();
@@ -126,7 +126,7 @@ export function describeBehaviorOfAuction(
     };
 
     const setupAdvancedAuction = async (processAuction: boolean) => {
-      const [startTime] = await knoxUtil.setAndInitializeAuction();
+      const [startTime] = await knoxUtil.initializeAuction();
 
       let epoch = await vault.getEpoch();
 
@@ -392,7 +392,7 @@ export function describeBehaviorOfAuction(
         let epoch: BigNumber;
 
         time.revertToSnapshotAfterEach(async () => {
-          [startTime, , epoch] = await knoxUtil.setAndInitializeAuction();
+          [startTime, , epoch] = await knoxUtil.initializeAuction();
           await time.increaseTo(startTime);
         });
 
@@ -497,8 +497,7 @@ export function describeBehaviorOfAuction(
         let epoch: BigNumber;
 
         time.revertToSnapshotAfterEach(async () => {
-          [startTime, endTime, epoch] =
-            await knoxUtil.setAndInitializeAuction();
+          [startTime, endTime, epoch] = await knoxUtil.initializeAuction();
 
           await auction
             .connect(signers.vault)
@@ -545,7 +544,7 @@ export function describeBehaviorOfAuction(
         let epoch: BigNumber;
 
         time.revertToSnapshotAfterEach(async () => {
-          [, endTime, epoch] = await knoxUtil.setAndInitializeAuction();
+          [, endTime, epoch] = await knoxUtil.initializeAuction();
         });
 
         it("should revert if auction expires", async () => {
@@ -806,7 +805,7 @@ export function describeBehaviorOfAuction(
         let epoch: BigNumber;
 
         time.revertToSnapshotAfterEach(async () => {
-          [startTime, , epoch] = await knoxUtil.setAndInitializeAuction();
+          [startTime, , epoch] = await knoxUtil.initializeAuction();
           await time.fastForwardToFriday8AM();
           await knoxUtil.initializeNextEpoch();
         });
@@ -832,7 +831,7 @@ export function describeBehaviorOfAuction(
 
       describe("else if finalized", () => {
         time.revertToSnapshotAfterEach(async () => {
-          const [, endTime, epoch] = await knoxUtil.setAndInitializeAuction();
+          const [, endTime, epoch] = await knoxUtil.initializeAuction();
 
           await time.fastForwardToFriday8AM();
           await knoxUtil.initializeNextEpoch();
@@ -876,7 +875,7 @@ export function describeBehaviorOfAuction(
         let path: string[];
 
         time.revertToSnapshotAfterEach(async () => {
-          [, , epoch] = await knoxUtil.setAndInitializeAuction();
+          [, , epoch] = await knoxUtil.initializeAuction();
 
           tokenIn = uni.tokenIn;
 
@@ -1247,7 +1246,7 @@ export function describeBehaviorOfAuction(
         let epoch: BigNumber;
 
         time.revertToSnapshotAfterEach(async () => {
-          [, endTime, epoch] = await knoxUtil.setAndInitializeAuction();
+          [, endTime, epoch] = await knoxUtil.initializeAuction();
           await asset
             .connect(signers.buyer1)
             .approve(addresses.auction, ethers.constants.MaxUint256);
@@ -1343,7 +1342,7 @@ export function describeBehaviorOfAuction(
         let epoch: BigNumber;
 
         time.revertToSnapshotAfterEach(async () => {
-          [startTime, , epoch] = await knoxUtil.setAndInitializeAuction();
+          [startTime, , epoch] = await knoxUtil.initializeAuction();
           await time.fastForwardToFriday8AM();
           await knoxUtil.initializeNextEpoch();
         });
@@ -1385,7 +1384,7 @@ export function describeBehaviorOfAuction(
 
       describe("else if finalized", () => {
         time.revertToSnapshotAfterEach(async () => {
-          const [, endTime, epoch] = await knoxUtil.setAndInitializeAuction();
+          const [, endTime, epoch] = await knoxUtil.initializeAuction();
 
           await asset
             .connect(signers.buyer1)
@@ -1434,7 +1433,7 @@ export function describeBehaviorOfAuction(
 
       describe("else if auction has not started", () => {
         time.revertToSnapshotAfterEach(async () => {
-          await knoxUtil.setAndInitializeAuction();
+          await knoxUtil.initializeAuction();
           await time.fastForwardToFriday8AM();
           await knoxUtil.initializeNextEpoch();
         });
@@ -1452,7 +1451,7 @@ export function describeBehaviorOfAuction(
         let epoch: BigNumber;
 
         time.revertToSnapshotAfterEach(async () => {
-          [startTime, , epoch] = await knoxUtil.setAndInitializeAuction();
+          [startTime, , epoch] = await knoxUtil.initializeAuction();
           await time.fastForwardToFriday8AM();
           await knoxUtil.initializeNextEpoch();
           await time.increaseTo(startTime);
@@ -1733,7 +1732,7 @@ export function describeBehaviorOfAuction(
 
       describe("else if finalized", () => {
         time.revertToSnapshotAfterEach(async () => {
-          const [, endTime, epoch] = await knoxUtil.setAndInitializeAuction();
+          const [, endTime, epoch] = await knoxUtil.initializeAuction();
 
           await asset
             .connect(signers.buyer1)
@@ -1780,7 +1779,7 @@ export function describeBehaviorOfAuction(
         let path: string[];
 
         time.revertToSnapshotAfterEach(async () => {
-          [startTime, , epoch] = await knoxUtil.setAndInitializeAuction();
+          [startTime, , epoch] = await knoxUtil.initializeAuction();
           await time.fastForwardToFriday8AM();
           await knoxUtil.initializeNextEpoch();
           await time.increaseTo(startTime);
@@ -2172,7 +2171,7 @@ export function describeBehaviorOfAuction(
 
       describe("else if auction has not started", () => {
         time.revertToSnapshotAfterEach(async () => {
-          await knoxUtil.setAndInitializeAuction();
+          await knoxUtil.initializeAuction();
           await time.fastForwardToFriday8AM();
           await knoxUtil.initializeNextEpoch();
         });
@@ -2190,8 +2189,7 @@ export function describeBehaviorOfAuction(
         let epoch: BigNumber;
 
         time.revertToSnapshotAfterEach(async () => {
-          [startTime, endTime, epoch] =
-            await knoxUtil.setAndInitializeAuction();
+          [startTime, endTime, epoch] = await knoxUtil.initializeAuction();
         });
 
         it("should emit AuctionStatusSet event if utilization == %100", async () => {
@@ -2217,7 +2215,7 @@ export function describeBehaviorOfAuction(
 
       describe("else if finalized", () => {
         time.revertToSnapshotAfterEach(async () => {
-          const [, endTime] = await knoxUtil.setAndInitializeAuction();
+          const [, endTime] = await knoxUtil.initializeAuction();
           await time.fastForwardToFriday8AM();
           await knoxUtil.initializeNextEpoch();
           await time.increaseTo(endTime.add(1));
@@ -2319,7 +2317,7 @@ export function describeBehaviorOfAuction(
         let epoch: BigNumber;
 
         time.revertToSnapshotAfterEach(async () => {
-          [, endTime, epoch] = await knoxUtil.setAndInitializeAuction();
+          [, endTime, epoch] = await knoxUtil.initializeAuction();
 
           await time.fastForwardToFriday8AM();
           await knoxUtil.initializeNextEpoch();
@@ -2482,7 +2480,7 @@ export function describeBehaviorOfAuction(
         let longTokenId: BigNumber;
 
         time.revertToSnapshotAfterEach(async () => {
-          [, , epoch] = await knoxUtil.setAndInitializeAuction();
+          [, , epoch] = await knoxUtil.initializeAuction();
           [, , longTokenId] = await vault.getOption(epoch);
 
           await asset
@@ -3183,7 +3181,7 @@ export function describeBehaviorOfAuction(
 
     describe("#getTotalContracts(uint64)", () => {
       time.revertToSnapshotAfterEach(async () => {
-        await knoxUtil.setAndInitializeAuction();
+        await knoxUtil.initializeAuction();
       });
 
       it("should return the total contracts available", async () => {

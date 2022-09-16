@@ -1,7 +1,7 @@
 import { ethers } from "hardhat";
 const { provider } = ethers;
 import { BigNumber } from "ethers";
-import { fixedFromFloat } from "@premia/utils";
+import { fixedFromFloat, formatTokenId, TokenType } from "@premia/utils";
 
 import moment from "moment-timezone";
 moment.tz.setDefault("UTC");
@@ -66,6 +66,64 @@ export function describeBehaviorOfVaultMock(
     describe("__internal", () => {
       time.revertToSnapshotAfterEach(async () => {});
 
+      describe("#_setOptionParameters()", () => {
+        time.revertToSnapshotAfterEach(async () => {});
+
+        it("should set parameters for next option", async () => {
+          await vault.setOptionParameters();
+
+          const epoch = await vault.getEpoch();
+          const option = await vault.getOption(epoch);
+
+          const nextWeek = (await time.now()) + 604800;
+          const expectedExpiry = BigNumber.from(
+            await time.getFriday8AM(nextWeek)
+          );
+
+          assert.bnEqual(option.expiry, expectedExpiry);
+
+          const expectedStrike = fixedFromFloat(
+            params.underlying.oracle.price / params.base.oracle.price
+          );
+
+          assert.bnEqual(option.strike64x64, expectedStrike);
+
+          let longTokenType: TokenType;
+          let shortTokenType: TokenType;
+
+          longTokenType = params.isCall
+            ? TokenType.LongCall
+            : TokenType.LongPut;
+          shortTokenType = params.isCall
+            ? TokenType.ShortCall
+            : TokenType.ShortPut;
+
+          const expectedLongTokenId = BigNumber.from(
+            formatTokenId({
+              tokenType: longTokenType,
+              maturity: expectedExpiry,
+              strike64x64: expectedStrike,
+            })
+          );
+
+          assert.bnEqual(option.longTokenId, expectedLongTokenId);
+
+          shortTokenType = params.isCall
+            ? TokenType.ShortCall
+            : TokenType.ShortPut;
+
+          const expectedShortTokenId = BigNumber.from(
+            formatTokenId({
+              tokenType: shortTokenType,
+              maturity: expectedExpiry,
+              strike64x64: expectedStrike,
+            })
+          );
+
+          assert.bnEqual(option.shortTokenId, expectedShortTokenId);
+        });
+      });
+
       describe("#_withdrawReservedLiquidity()", () => {
         time.revertToSnapshotAfterEach(async () => {
           await vault
@@ -80,7 +138,7 @@ export function describeBehaviorOfVaultMock(
           await queue.connect(signers.lp1)["deposit(uint256)"](params.deposit);
 
           // init epoch 0 auction
-          let [startTime, , epoch] = await knoxUtil.setAndInitializeAuction();
+          let [startTime, , epoch] = await knoxUtil.initializeAuction();
 
           // init epoch 1
           await time.fastForwardToFriday8AM();
@@ -104,7 +162,7 @@ export function describeBehaviorOfVaultMock(
           await vault.connect(signers.keeper).processAuction();
 
           // init auction 1
-          await knoxUtil.setAndInitializeAuction();
+          await knoxUtil.initializeAuction();
 
           await time.fastForwardToFriday8AM();
           await time.increase(100);
@@ -135,7 +193,7 @@ export function describeBehaviorOfVaultMock(
             addresses.vault
           );
 
-          await vault.connect(signers.keeper)["withdrawReservedLiquidity()"]();
+          await vault["withdrawReservedLiquidity()"]();
 
           const reservedLiquidityAfter = await pool.balanceOf(
             addresses.vault,

@@ -78,11 +78,6 @@ interface IVaultAdmin {
      ***********************************************/
 
     /**
-     * @notice sets the parameters for the next option to be sold
-     */
-    function setOptionParameters() external;
-
-    /**
      * @notice initializes the auction
      */
     function initializeAuction() external;

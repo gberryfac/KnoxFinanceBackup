@@ -259,7 +259,7 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
         l.totalWithdrawals += assetAmount;
 
         // removes any reserved liquidty from pool in the event an option has been exercised
-        _withdrawReservedLiquidity();
+        _withdrawReservedLiquidity(l);
 
         // LPs may withdraw funds at any time and receive a proportion of the assets held in
         // the vault. this means that a withdrawal can be mixture of collateral assets and
@@ -293,11 +293,63 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
      ***********************************************/
 
     /**
-     * @notice removes reserved liquidity from Premia pool
+     * @notice sets the parameters for the next option to be sold
+     * @param l vault storage layout
+     * @return the next option to be sold
      */
-    function _withdrawReservedLiquidity() internal {
-        VaultStorage.Layout storage l = VaultStorage.layout();
+    function _setOptionParameters(VaultStorage.Layout storage l)
+        internal
+        returns (VaultStorage.Option memory)
+    {
+        // sets the expiry for the next Friday
+        uint64 expiry = uint64(_getNextFriday(block.timestamp));
 
+        // calculates the delta strike price
+        int128 strike64x64 =
+            l.Pricer.getDeltaStrikePrice64x64(l.isCall, expiry, l.delta64x64);
+
+        // rounds the delta strike price
+        strike64x64 = l.Pricer.snapToGrid64x64(l.isCall, strike64x64);
+
+        // sets parameters for the next option
+        VaultStorage.Option storage option = l.options[l.epoch];
+        option.expiry = expiry;
+        option.strike64x64 = strike64x64;
+
+        TokenType longTokenType =
+            l.isCall ? TokenType.LONG_CALL : TokenType.LONG_PUT;
+
+        // get the formatted long token id
+        option.longTokenId = _formatTokenId(longTokenType, expiry, strike64x64);
+
+        TokenType shortTokenType =
+            l.isCall ? TokenType.SHORT_CALL : TokenType.SHORT_PUT;
+
+        // get the formatted short token id
+        option.shortTokenId = _formatTokenId(
+            shortTokenType,
+            expiry,
+            strike64x64
+        );
+
+        emit OptionParametersSet(
+            l.epoch,
+            option.expiry,
+            option.strike64x64,
+            option.longTokenId,
+            option.shortTokenId
+        );
+
+        return option;
+    }
+
+    /**
+     * @notice removes reserved liquidity from Premia pool
+     * @param l vault storage layout
+     */
+    function _withdrawReservedLiquidity(VaultStorage.Layout storage l)
+        internal
+    {
         // gets the vaults reserved liquidity balance
         uint256 reservedLiquidity =
             Pool.balanceOf(

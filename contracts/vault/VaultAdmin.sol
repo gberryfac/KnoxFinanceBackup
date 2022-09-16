@@ -175,55 +175,9 @@ contract VaultAdmin is IVaultAdmin, VaultInternal {
     /**
      * @inheritdoc IVaultAdmin
      */
-    function setOptionParameters() external onlyKeeper {
-        VaultStorage.Layout storage l = VaultStorage.layout();
-
-        // sets the expiry for the next Friday
-        uint64 expiry = uint64(_getNextFriday(block.timestamp));
-
-        // calculates the delta strike price
-        int128 strike64x64 =
-            l.Pricer.getDeltaStrikePrice64x64(l.isCall, expiry, l.delta64x64);
-
-        // rounds the delta strike price
-        strike64x64 = l.Pricer.snapToGrid64x64(l.isCall, strike64x64);
-
-        // sets parameters for the next option
-        VaultStorage.Option storage option = l.options[l.epoch];
-        option.expiry = expiry;
-        option.strike64x64 = strike64x64;
-
-        TokenType longTokenType =
-            l.isCall ? TokenType.LONG_CALL : TokenType.LONG_PUT;
-
-        // get the formatted long token id
-        option.longTokenId = _formatTokenId(longTokenType, expiry, strike64x64);
-
-        TokenType shortTokenType =
-            l.isCall ? TokenType.SHORT_CALL : TokenType.SHORT_PUT;
-
-        // get the formatted short token id
-        option.shortTokenId = _formatTokenId(
-            shortTokenType,
-            expiry,
-            strike64x64
-        );
-
-        emit OptionParametersSet(
-            l.epoch,
-            option.expiry,
-            option.strike64x64,
-            option.longTokenId,
-            option.shortTokenId
-        );
-    }
-
-    /**
-     * @inheritdoc IVaultAdmin
-     */
     function initializeAuction() external onlyKeeper {
         VaultStorage.Layout storage l = VaultStorage.layout();
-        VaultStorage.Option storage option = l.options[l.epoch];
+        VaultStorage.Option memory option = _setOptionParameters(l);
 
         // auctions begin on Friday
         uint256 startTimestamp = _getFriday(block.timestamp);
@@ -257,11 +211,11 @@ contract VaultAdmin is IVaultAdmin, VaultInternal {
      * @inheritdoc IVaultAdmin
      */
     function collectPerformanceFee() external onlyKeeper {
+        VaultStorage.Layout storage l = VaultStorage.layout();
+
         // pool must return all available "reserved liquidity" to the vault after the
         // option expires and before performance fee can be collected
-        _withdrawReservedLiquidity();
-
-        VaultStorage.Layout storage l = VaultStorage.layout();
+        _withdrawReservedLiquidity(l);
 
         uint256 netIncome;
         uint256 feeInCollateral;

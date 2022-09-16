@@ -1,7 +1,6 @@
 import { ethers } from "hardhat";
 import { BigNumber } from "ethers";
-import { parseUnits } from "ethers/lib/utils";
-import { fixedFromFloat, formatTokenId, TokenType } from "@premia/utils";
+import { fixedFromFloat } from "@premia/utils";
 
 import chai, { expect } from "chai";
 import chaiAlmost from "chai-almost";
@@ -28,7 +27,6 @@ import {
 } from "../types";
 
 import {
-  almost,
   assert,
   time,
   types,
@@ -380,66 +378,6 @@ export function describeBehaviorOfVaultAdmin(
       });
     });
 
-    describe("#setOptionParameters()", () => {
-      time.revertToSnapshotAfterEach(async () => {});
-
-      it("should revert if !keeper", async () => {
-        await expect(vault.setOptionParameters()).to.be.revertedWith("!keeper");
-      });
-
-      it("should set parameters for next option", async () => {
-        await vault.connect(signers.keeper).setOptionParameters();
-
-        const epoch = await vault.getEpoch();
-        const option = await vault.getOption(epoch);
-
-        const nextWeek = (await time.now()) + 604800;
-        const expectedExpiry = BigNumber.from(
-          await time.getFriday8AM(nextWeek)
-        );
-
-        assert.bnEqual(option.expiry, expectedExpiry);
-
-        const expectedStrike = fixedFromFloat(
-          params.underlying.oracle.price / params.base.oracle.price
-        );
-
-        assert.bnEqual(option.strike64x64, expectedStrike);
-
-        let longTokenType: TokenType;
-        let shortTokenType: TokenType;
-
-        longTokenType = params.isCall ? TokenType.LongCall : TokenType.LongPut;
-        shortTokenType = params.isCall
-          ? TokenType.ShortCall
-          : TokenType.ShortPut;
-
-        const expectedLongTokenId = BigNumber.from(
-          formatTokenId({
-            tokenType: longTokenType,
-            maturity: expectedExpiry,
-            strike64x64: expectedStrike,
-          })
-        );
-
-        assert.bnEqual(option.longTokenId, expectedLongTokenId);
-
-        shortTokenType = params.isCall
-          ? TokenType.ShortCall
-          : TokenType.ShortPut;
-
-        const expectedShortTokenId = BigNumber.from(
-          formatTokenId({
-            tokenType: shortTokenType,
-            maturity: expectedExpiry,
-            strike64x64: expectedStrike,
-          })
-        );
-
-        assert.bnEqual(option.shortTokenId, expectedShortTokenId);
-      });
-    });
-
     describe("#initializeAuction()", () => {
       let epoch;
       let option;
@@ -447,7 +385,6 @@ export function describeBehaviorOfVaultAdmin(
       time.revertToSnapshotAfterEach(async () => {
         // init auction 0
         await time.fastForwardToThursday8AM();
-        await vault.connect(signers.keeper).setOptionParameters();
         await vault.connect(signers.keeper).initializeAuction();
 
         epoch = await vault.getEpoch();
@@ -482,7 +419,6 @@ export function describeBehaviorOfVaultAdmin(
 
         // init auction 1
         await time.fastForwardToThursday8AM();
-        await vault.connect(signers.keeper).setOptionParameters();
         await vault.connect(signers.keeper).initializeAuction();
 
         epoch = await vault.getEpoch();
@@ -519,7 +455,7 @@ export function describeBehaviorOfVaultAdmin(
         await queue.connect(signers.lp1)["deposit(uint256)"](params.deposit);
 
         // init epoch 0 auction
-        let [startTime, , epoch] = await knoxUtil.setAndInitializeAuction();
+        let [startTime, , epoch] = await knoxUtil.initializeAuction();
 
         // init epoch 1
         await time.fastForwardToFriday8AM();
@@ -545,7 +481,7 @@ export function describeBehaviorOfVaultAdmin(
         await vault.connect(signers.keeper).processAuction();
 
         // init auction 1
-        await knoxUtil.setAndInitializeAuction();
+        await knoxUtil.initializeAuction();
 
         await time.fastForwardToFriday8AM();
         await time.increase(100);
@@ -626,7 +562,7 @@ export function describeBehaviorOfVaultAdmin(
         await queue.connect(signers.lp1)["deposit(uint256)"](params.deposit);
 
         // init epoch 0 auction
-        [startTime, , epoch] = await knoxUtil.setAndInitializeAuction();
+        [startTime, , epoch] = await knoxUtil.initializeAuction();
 
         // init epoch 1
         await time.fastForwardToFriday8AM();
@@ -652,7 +588,7 @@ export function describeBehaviorOfVaultAdmin(
         await vault.connect(signers.keeper).processAuction();
 
         // init auction 1
-        [, , epoch] = await knoxUtil.setAndInitializeAuction();
+        [, , epoch] = await knoxUtil.initializeAuction();
 
         await time.fastForwardToFriday8AM();
         await time.increase(100);
@@ -695,7 +631,7 @@ export function describeBehaviorOfVaultAdmin(
         await vault.connect(signers.deployer).setPricer(pricer.address);
 
         // init epoch 0 auction
-        await knoxUtil.setAndInitializeAuction();
+        await knoxUtil.initializeAuction();
 
         // init epoch 1
         await time.fastForwardToFriday8AM();
@@ -742,7 +678,7 @@ export function describeBehaviorOfVaultAdmin(
         await queue.connect(signers.lp1)["deposit(uint256)"](params.deposit);
 
         // init epoch 0 auction
-        [startTime, , epoch] = await knoxUtil.setAndInitializeAuction();
+        [startTime, , epoch] = await knoxUtil.initializeAuction();
 
         // init epoch 1
         await time.fastForwardToFriday8AM();

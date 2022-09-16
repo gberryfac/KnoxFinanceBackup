@@ -225,12 +225,11 @@ export class KnoxUtil {
     });
   }
 
-  async setAndInitializeAuction(): Promise<[BigNumber, BigNumber, BigNumber]> {
+  async initializeAuction(): Promise<[BigNumber, BigNumber, BigNumber]> {
     const block = await provider.getBlock(await provider.getBlockNumber());
     await time.increaseTo(await time.getThursday8AM(block.timestamp));
 
     const vault = this.vaultUtil.vault;
-    await vault.connect(this.signers.keeper).setOptionParameters();
     await vault.connect(this.signers.keeper).initializeAuction();
 
     const epoch = await vault.getEpoch();
