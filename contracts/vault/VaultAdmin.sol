@@ -10,7 +10,6 @@ import "./VaultInternal.sol";
 
 contract VaultAdmin is IVaultAdmin, VaultInternal {
     using ABDKMath64x64 for int128;
-    using Helpers for uint256;
     using OptionMath for uint256;
     using SafeERC20 for IERC20;
     using VaultStorage for VaultStorage.Layout;
@@ -180,7 +179,7 @@ contract VaultAdmin is IVaultAdmin, VaultInternal {
         VaultStorage.Layout storage l = VaultStorage.layout();
 
         // sets the expiry for the next Friday
-        uint64 expiry = uint64(block.timestamp.getNextFriday());
+        uint64 expiry = uint64(_getNextFriday(block.timestamp));
 
         // calculates the delta strike price
         int128 strike64x64 =
@@ -227,7 +226,7 @@ contract VaultAdmin is IVaultAdmin, VaultInternal {
         VaultStorage.Option storage option = l.options[l.epoch];
 
         // auctions begin on Friday
-        uint256 startTimestamp = Helpers.getFriday(block.timestamp);
+        uint256 startTimestamp = _getFriday(block.timestamp);
 
         // offsets the start and end times by a fixed amount
         uint256 startTime = startTimestamp + l.startOffset;

@@ -9,7 +9,6 @@ import "@solidstate/contracts/utils/IWETH.sol";
 import "@solidstate/contracts/utils/SafeERC20.sol";
 
 import "../libraries/OptionMath.sol";
-import "../libraries/Helpers.sol";
 
 import "../vendor/IPremiaPool.sol";
 

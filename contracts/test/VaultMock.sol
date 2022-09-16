@@ -17,4 +17,12 @@ contract VaultMock is VaultBase {
     function withdrawReservedLiquidity() external {
         _withdrawReservedLiquidity();
     }
+
+    function getFriday(uint256 timestamp) external pure returns (uint256) {
+        return _getFriday(timestamp);
+    }
+
+    function getNextFriday(uint256 timestamp) external pure returns (uint256) {
+        return _getNextFriday(timestamp);
+    }
 }
