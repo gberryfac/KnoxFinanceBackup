@@ -22,7 +22,6 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
     using ABDKMath64x64 for uint256;
     using OptionMath for int128;
     using OptionMath for uint256;
-    using Helpers for uint256;
     using SafeERC20 for IERC20;
     using VaultStorage for VaultStorage.Layout;
 
@@ -91,124 +90,6 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
             require(l.auctionProcessed, "auction has not been processed");
         }
         _;
-    }
-
-    /************************************************
-     *  INITIALIZE AUCTION
-     ***********************************************/
-
-    /**
-     * @notice sets the parameters for the next option to be sold
-     */
-    function _setOptionParameters() internal {
-        VaultStorage.Layout storage l = VaultStorage.layout();
-
-        // sets the expiry for the next Friday
-        uint64 expiry = uint64(block.timestamp.getNextFriday());
-
-        // calculates the delta strike price
-        int128 strike64x64 =
-            l.Pricer.getDeltaStrikePrice64x64(l.isCall, expiry, l.delta64x64);
-
-        // rounds the delta strike price
-        strike64x64 = l.Pricer.snapToGrid64x64(l.isCall, strike64x64);
-
-        // sets parameters for the next option
-        VaultStorage.Option storage option = l.options[l.epoch];
-        option.expiry = expiry;
-        option.strike64x64 = strike64x64;
-
-        TokenType longTokenType =
-            l.isCall ? TokenType.LONG_CALL : TokenType.LONG_PUT;
-
-        // get the formatted long token id
-        option.longTokenId = _formatTokenId(longTokenType, expiry, strike64x64);
-
-        TokenType shortTokenType =
-            l.isCall ? TokenType.SHORT_CALL : TokenType.SHORT_PUT;
-
-        // get the formatted short token id
-        option.shortTokenId = _formatTokenId(
-            shortTokenType,
-            expiry,
-            strike64x64
-        );
-
-        emit OptionParametersSet(
-            l.epoch,
-            option.expiry,
-            option.strike64x64,
-            option.longTokenId,
-            option.shortTokenId
-        );
-    }
-
-    /**
-     * @notice initializes auction
-     */
-    function _initializeAuction() internal {
-        VaultStorage.Layout storage l = VaultStorage.layout();
-        VaultStorage.Option storage option = l.options[l.epoch];
-
-        // auctions begin on Friday
-        uint256 startTimestamp = Helpers.getFriday(block.timestamp);
-
-        // offsets the start and end times by a fixed amount
-        uint256 startTime = startTimestamp + l.startOffset;
-        uint256 endTime = startTimestamp + l.endOffset;
-
-        // resets withdrawal lock, reactivates when auction starts
-        l.startTime = startTime;
-        l.auctionProcessed = false;
-
-        // initializes the auction using the option parameters and start/end times
-        l.Auction.initialize(
-            AuctionStorage.InitAuction(
-                l.epoch,
-                option.expiry,
-                option.strike64x64,
-                option.longTokenId,
-                startTime,
-                endTime
-            )
-        );
-    }
-
-    /************************************************
-     *  COLLECT PERFORMANCE FEE
-     ***********************************************/
-
-    /**
-     * @notice collects performance fees on epoch net income
-     */
-    function _collectPerformanceFee() internal {
-        _withdrawReservedLiquidity();
-
-        VaultStorage.Layout storage l = VaultStorage.layout();
-
-        uint256 netIncome;
-        uint256 feeInCollateral;
-
-        // adjusts total assets to account for assets withdrawn during the epoch
-        uint256 adjustedTotalAssets = _totalAssets() + l.totalWithdrawals;
-
-        if (adjustedTotalAssets > l.lastTotalAssets) {
-            // collect performance fee ONLY if the vault returns a positive net income
-            // if the net income is negative, last week's option expired ITM past breakeven,
-            // and the vault took a loss so we do not collect performance fee for last week
-            netIncome = adjustedTotalAssets - l.lastTotalAssets;
-
-            // calculate the performance fee denominated in the collateral asset
-            feeInCollateral = l.performanceFee64x64.mulu(netIncome);
-
-            // send collected fee to recipient wallet
-            ERC20.safeTransfer(l.feeRecipient, feeInCollateral);
-        }
-
-        // reset totalWithdrawals
-        l.totalWithdrawals = 0;
-
-        emit PerformanceFeeCollected(_lastEpoch(l), netIncome, feeInCollateral);
     }
 
     /************************************************
@@ -636,7 +517,7 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
         TokenType tokenType,
         uint64 maturity,
         int128 strike64x64
-    ) private pure returns (uint256 tokenId) {
+    ) internal pure returns (uint256 tokenId) {
         tokenId =
             (uint256(tokenType) << 248) +
             (uint256(maturity) << 128) +
