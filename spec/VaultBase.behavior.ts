@@ -215,8 +215,7 @@ export function describeBehaviorOfVaultBase(
 
         it("should permit withdrawals after withdrawal lock has been reset", async () => {
           // init auction 1
-          await time.fastForwardToThursday8AM();
-          let [startTime] = await knoxUtil.setAndInitializeAuction();
+          let [startTime] = await knoxUtil.initializeAuction();
 
           await queue
             .connect(signers.lp1)
@@ -603,8 +602,7 @@ export function describeBehaviorOfVaultBase(
 
         it("should permit withdrawals after withdrawal lock has been reset", async () => {
           // init auction 1
-          await time.fastForwardToThursday8AM();
-          let [startTime] = await knoxUtil.setAndInitializeAuction();
+          let [startTime] = await knoxUtil.initializeAuction();
 
           await queue
             .connect(signers.lp1)
