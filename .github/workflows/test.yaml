@@ -10,10 +10,6 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      MAINNET_MNEMONIC: ${{ secrets.MAINNET_MNEMONIC }}
-      MAINNET_URI: ${{ secrets.MAINNET_URI }}
-      TEST_MNEMONIC: ${{ secrets.TEST_MNEMONIC }}
-      TEST_URI: ${{ secrets.TEST_URI }}
       ARBITRUM_URI: ${{ secrets.ARBITRUM_URI }}
 
     steps:

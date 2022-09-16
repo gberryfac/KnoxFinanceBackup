@@ -8,16 +8,13 @@
 
 Create a `.env` file with the following values defined:
 
-| Key                    | Description                                                   |
-| ---------------------- | ------------------------------------------------------------- |
-| `CHAINID`              | sets the default chain id                                     |
-| `MAINNET_URI`          | API key Mainnet node                                          |
-| `ARBITRUM_URI`         | API key Arbitrum node                                         |
-| `MAINNET_GOERLI_URI`   | API key Mainnet Goerli node                                   |
-| `ARBITRUM_RINKEBY_URI` | API key Arbitrum Rinkeby node                                 |
-| `DODOC_ON_COMPILE`     | if `true`, docs will be generated on every compilation        |
-| `REPORT_GAS`           | if `true`, a gas report will be generated after running tests |
-| `SIZER_ON_COMPILE`     | if `true`, contract sizes will be output on every compilation |
+| Key                | Description                                                   |
+| ------------------ | ------------------------------------------------------------- |
+| `CHAINID`          | sets the default chain id                                     |
+| `ARBITRUM_URI`     | API key Arbitrum node                                         |
+| `DODOC_ON_COMPILE` | if `true`, docs will be generated on every compilation        |
+| `REPORT_GAS`       | if `true`, a gas report will be generated after running tests |
+| `SIZER_ON_COMPILE` | if `true`, contract sizes will be output on every compilation |
 
 ## Development
 
@@ -81,8 +78,8 @@ Create a `.env.prod` file with the following values defined:
 | `WETH`              | wETH contract address                        |
 | `IS_CALL`           | option type (Call or Put)                    |
 | `MAX_TVL`           | maximum vault total value locked (e.g. 1000) |
-| `DELTA`             | option delta (e.g. 0.4)                      |
-| `DELTA_OFFSET`      | option delta offset (e.g. 0.05)              |
+| `DELTA`             | option delta (e.g. 0.2)                      |
+| `DELTA_OFFSET`      | option delta offset (e.g. 0.1)               |
 | `RESERVE_RATE`      | reserve rate (e.g. 0.001)                    |
 | `PERFORMANCE_FEE`   | performance fee percentage (e.g. 0.2)        |
 | `WITHDRAWAL_FEE`    | withdrawal fee percentage (e.g. 0.02)        |

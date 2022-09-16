@@ -16,7 +16,6 @@ require("dotenv").config({ path: "./.env.prod" });
 import { TEST_URI, BLOCK_NUMBER } from "./constants";
 
 let {
-  MAINNET_URI,
   ARBITRUM_URI,
   DODOC_ON_COMPILE,
   REPORT_GAS,
@@ -79,10 +78,6 @@ const config: HardhatUserConfig = {
         blockNumber: BLOCK_NUMBER[CHAINID],
       },
     },
-    mainnet: {
-      url: MAINNET_URI,
-      chainId: CHAINID,
-    },
     arbitrum: {
       url: ARBITRUM_URI,
       chainId: CHAINID,
@@ -121,7 +116,6 @@ const config: HardhatUserConfig = {
 };
 
 if (DEPLOYER_KEY != null) {
-  config.networks.mainnet.accounts = [DEPLOYER_KEY];
   config.networks.arbitrum.accounts = [DEPLOYER_KEY];
 }
 
