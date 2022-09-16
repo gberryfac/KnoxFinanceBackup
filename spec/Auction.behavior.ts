@@ -44,6 +44,10 @@ export function describeBehaviorOfAuction(
   skips?: string[]
 ) {
   describe("::Auction", () => {
+    // Contract Utilities
+    let knoxUtil: KnoxUtil;
+    let poolUtil: PoolUtil;
+
     // Signers and Addresses
     let addresses: types.Addresses;
     let signers: types.Signers;
@@ -54,10 +58,6 @@ export function describeBehaviorOfAuction(
     let vault: IVaultMock;
     let pool: IPremiaPool;
     let weth: MockERC20;
-
-    // Contract Utilities
-    let knoxUtil: KnoxUtil;
-    let poolUtil: PoolUtil;
 
     // Pool Utilities
     let uni: uniswap.IUniswap;
@@ -74,6 +74,7 @@ export function describeBehaviorOfAuction(
 
     before(async () => {
       knoxUtil = await getKnoxUtil();
+      poolUtil = knoxUtil.poolUtil;
 
       signers = knoxUtil.signers;
       addresses = knoxUtil.addresses;
@@ -83,7 +84,6 @@ export function describeBehaviorOfAuction(
       pool = knoxUtil.poolUtil.pool;
       auction = knoxUtil.auction;
 
-      poolUtil = knoxUtil.poolUtil;
       weth = poolUtil.weth;
       uni = knoxUtil.uni;
 

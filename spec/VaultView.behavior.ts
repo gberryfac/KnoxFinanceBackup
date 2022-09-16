@@ -1,10 +1,3 @@
-import { Block } from "@ethersproject/abstract-provider";
-
-import chai, { expect } from "chai";
-import chaiAlmost from "chai-almost";
-
-chai.use(chaiAlmost());
-
 import moment from "moment-timezone";
 moment.tz.setDefault("UTC");
 
@@ -22,6 +15,10 @@ export function describeBehaviorOfVaultView(
   skips?: string[]
 ) {
   describe("::VaultView", () => {
+    // Contract Utilities
+    let knoxUtil: KnoxUtil;
+    let poolUtil: PoolUtil;
+
     // Signers and Addresses
     let addresses: types.Addresses;
     let signers: types.Signers;
@@ -32,17 +29,11 @@ export function describeBehaviorOfVaultView(
     let vault: IVaultMock;
     let pool: IPremiaPool;
 
-    // Contract Utilities
-    let knoxUtil: KnoxUtil;
-    let poolUtil: PoolUtil;
-
-    // Test Suite Globals
-    let block: Block;
-
     const params = getParams();
 
     before(async () => {
       knoxUtil = await getKnoxUtil();
+      poolUtil = knoxUtil.poolUtil;
 
       signers = knoxUtil.signers;
       addresses = knoxUtil.addresses;
@@ -51,8 +42,6 @@ export function describeBehaviorOfVaultView(
       vault = knoxUtil.vaultUtil.vault;
       pool = knoxUtil.poolUtil.pool;
       auction = knoxUtil.auction;
-
-      poolUtil = knoxUtil.poolUtil;
     });
 
     describe("#constructor()", () => {

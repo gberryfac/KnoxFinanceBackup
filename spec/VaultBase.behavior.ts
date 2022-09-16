@@ -44,6 +44,9 @@ export function describeBehaviorOfVaultBase(
   skips?: string[]
 ) {
   describe("::VaultBase", () => {
+    // Contract Utilities
+    let knoxUtil: KnoxUtil;
+
     // Signers and Addresses
     let addresses: types.Addresses;
     let signers: types.Signers;
@@ -54,9 +57,6 @@ export function describeBehaviorOfVaultBase(
     let auction: Auction;
     let vault: IVaultMock;
     let pool: IPremiaPool;
-
-    // Contract Utilities
-    let knoxUtil: KnoxUtil;
 
     const params = getParams();
 
@@ -263,7 +263,6 @@ export function describeBehaviorOfVaultBase(
 
           // process epoch 0
           await knoxUtil.processExpiredOptions();
-          await vault.connect(signers.keeper).collectPerformanceFee();
 
           // init epoch 2
           await knoxUtil.initializeNextEpoch();
@@ -325,7 +324,6 @@ export function describeBehaviorOfVaultBase(
 
           // process epoch 0
           await knoxUtil.processExpiredOptions();
-          await vault.connect(signers.keeper).collectPerformanceFee();
 
           // init epoch 2
           await knoxUtil.initializeNextEpoch();
@@ -650,7 +648,6 @@ export function describeBehaviorOfVaultBase(
 
           // process epoch 0
           await knoxUtil.processExpiredOptions();
-          await vault.connect(signers.keeper).collectPerformanceFee();
 
           // init epoch 2
           await knoxUtil.initializeNextEpoch();
@@ -712,7 +709,6 @@ export function describeBehaviorOfVaultBase(
 
           // process epoch 0
           await knoxUtil.processExpiredOptions();
-          await vault.connect(signers.keeper).collectPerformanceFee();
 
           // init epoch 2
           await knoxUtil.initializeNextEpoch();
