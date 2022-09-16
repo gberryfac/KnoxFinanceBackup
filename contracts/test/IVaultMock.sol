@@ -13,6 +13,8 @@ interface IVaultMock is IVault {
         external
         returns (VaultStorage.Option memory);
 
+    function collectPerformanceFee() external;
+
     function withdrawReservedLiquidity() external;
 
     function getFriday(uint256 timestamp) external pure returns (uint256);

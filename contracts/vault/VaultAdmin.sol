@@ -204,45 +204,6 @@ contract VaultAdmin is IVaultAdmin, VaultInternal {
     }
 
     /************************************************
-     *  COLLECT PERFORMANCE FEE
-     ***********************************************/
-
-    /**
-     * @inheritdoc IVaultAdmin
-     */
-    function collectPerformanceFee() external onlyKeeper {
-        VaultStorage.Layout storage l = VaultStorage.layout();
-
-        // pool must return all available "reserved liquidity" to the vault after the
-        // option expires and before performance fee can be collected
-        _withdrawReservedLiquidity(l);
-
-        uint256 netIncome;
-        uint256 feeInCollateral;
-
-        // adjusts total assets to account for assets withdrawn during the epoch
-        uint256 adjustedTotalAssets = _totalAssets() + l.totalWithdrawals;
-
-        if (adjustedTotalAssets > l.lastTotalAssets) {
-            // collect performance fee ONLY if the vault returns a positive net income
-            // if the net income is negative, last week's option expired ITM past breakeven,
-            // and the vault took a loss so we do not collect performance fee for last week
-            netIncome = adjustedTotalAssets - l.lastTotalAssets;
-
-            // calculate the performance fee denominated in the collateral asset
-            feeInCollateral = l.performanceFee64x64.mulu(netIncome);
-
-            // send collected fee to recipient wallet
-            ERC20.safeTransfer(l.feeRecipient, feeInCollateral);
-        }
-
-        // reset totalWithdrawals
-        l.totalWithdrawals = 0;
-
-        emit PerformanceFeeCollected(_lastEpoch(l), netIncome, feeInCollateral);
-    }
-
-    /************************************************
      *  INITIALIZE NEXT EPOCH
      ***********************************************/
 
@@ -252,8 +213,12 @@ contract VaultAdmin is IVaultAdmin, VaultInternal {
     function initializeNextEpoch() external onlyKeeper {
         VaultStorage.Layout storage l = VaultStorage.layout();
 
-        // when the queue processes its deposits, it will send the enitre balance to the vault
-        // in exchange for a pro-rata share of the vault tokens.
+        // skips epoch 0 as there will be no net income, and the lastTotalAsset balance
+        // will not be set
+        if (l.epoch > 0) _collectPerformanceFee(l);
+
+        // when the queue processes its deposits, it will send the enitre balance to
+        // the vault in exchange for a pro-rata share of the vault tokens.
         l.Queue.processDeposits();
 
         // increment the epoch id

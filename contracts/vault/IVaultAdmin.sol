@@ -83,16 +83,6 @@ interface IVaultAdmin {
     function initializeAuction() external;
 
     /************************************************
-     *  COLLECT PERFORMANCE FEE
-     ***********************************************/
-
-    /**
-     * @notice collects performance fees on epoch net income
-     * @dev reserved liquidity must be returned to vault prior to being called
-     */
-    function collectPerformanceFee() external;
-
-    /************************************************
      *  INITIALIZE NEXT EPOCH
      ***********************************************/
 

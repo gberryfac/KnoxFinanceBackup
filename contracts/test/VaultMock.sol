@@ -22,6 +22,11 @@ contract VaultMock is VaultBase {
         return _setOptionParameters(l);
     }
 
+    function collectPerformanceFee() external {
+        VaultStorage.Layout storage l = VaultStorage.layout();
+        _collectPerformanceFee(l);
+    }
+
     function withdrawReservedLiquidity() external {
         VaultStorage.Layout storage l = VaultStorage.layout();
         _withdrawReservedLiquidity(l);

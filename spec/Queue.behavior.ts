@@ -60,6 +60,10 @@ export async function describeBehaviorOfQueue(
   skips?: string[]
 ) {
   describe("::Queue", () => {
+    // Contract Utilities
+    let knoxUtil: KnoxUtil;
+    let poolUtil: PoolUtil;
+
     // Signers and Addresses
     let addresses: types.Addresses;
     let signers: types.Signers;
@@ -69,10 +73,6 @@ export async function describeBehaviorOfQueue(
     let queue: Queue;
     let vault: IVaultMock;
     let weth: MockERC20;
-    let poolUtil: PoolUtil;
-
-    // Contract Utilities
-    let knoxUtil: KnoxUtil;
 
     // Pool Utilities
     let uni: uniswap.IUniswap;
@@ -82,6 +82,7 @@ export async function describeBehaviorOfQueue(
 
     before(async () => {
       knoxUtil = await getKnoxUtil();
+      poolUtil = knoxUtil.poolUtil;
 
       signers = knoxUtil.signers;
       addresses = knoxUtil.addresses;
@@ -90,7 +91,6 @@ export async function describeBehaviorOfQueue(
       vault = knoxUtil.vaultUtil.vault;
       queue = knoxUtil.queue;
 
-      poolUtil = knoxUtil.poolUtil;
       weth = poolUtil.weth;
       uni = knoxUtil.uni;
 
@@ -248,7 +248,7 @@ export async function describeBehaviorOfQueue(
       });
 
       it("should redeem vault shares if LP deposited in past epoch", async () => {
-        await knoxUtil.initializeAuction();
+        const [, endTime] = await knoxUtil.initializeAuction();
 
         await asset
           .connect(signers.lp1)
@@ -266,6 +266,10 @@ export async function describeBehaviorOfQueue(
 
         await time.fastForwardToFriday8AM();
         await knoxUtil.initializeNextEpoch();
+
+        await time.increaseTo(endTime);
+        await vault.connect(signers.keeper).processAuction();
+
         await knoxUtil.initializeAuction();
 
         await asset
@@ -833,7 +837,7 @@ export async function describeBehaviorOfQueue(
       let tokenId3: BigNumber;
 
       time.revertToSnapshotAfterEach(async () => {
-        await knoxUtil.initializeAuction();
+        let [, endTime] = await knoxUtil.initializeAuction();
 
         await asset
           .connect(signers.lp1)
@@ -846,7 +850,10 @@ export async function describeBehaviorOfQueue(
         await time.fastForwardToFriday8AM();
         await knoxUtil.initializeNextEpoch();
 
-        await knoxUtil.initializeAuction();
+        await time.increaseTo(endTime);
+        await vault.connect(signers.keeper).processAuction();
+
+        [, endTime] = await knoxUtil.initializeAuction();
 
         await asset
           .connect(signers.lp1)
@@ -859,7 +866,10 @@ export async function describeBehaviorOfQueue(
         await time.fastForwardToFriday8AM();
         await knoxUtil.initializeNextEpoch();
 
-        await knoxUtil.initializeAuction();
+        await time.increaseTo(endTime);
+        await vault.connect(signers.keeper).processAuction();
+
+        [, endTime] = await knoxUtil.initializeAuction();
 
         await asset
           .connect(signers.lp1)
@@ -871,6 +881,9 @@ export async function describeBehaviorOfQueue(
 
         await time.fastForwardToFriday8AM();
         await knoxUtil.initializeNextEpoch();
+
+        await time.increaseTo(endTime);
+        await vault.connect(signers.keeper).processAuction();
       });
 
       it("should burn all claim tokens when shares are redeemed", async () => {
@@ -915,8 +928,10 @@ export async function describeBehaviorOfQueue(
       });
 
       describe("else", () => {
+        let endTime: BigNumber;
+
         time.revertToSnapshotAfterEach(async () => {
-          await knoxUtil.initializeAuction();
+          [, endTime] = await knoxUtil.initializeAuction();
 
           await asset
             .connect(signers.lp1)
@@ -953,15 +968,21 @@ export async function describeBehaviorOfQueue(
         });
 
         it("should calculate price per share correctly", async () => {
+          // disable performance fees
+          await vault.connect(signers.deployer).setPerformanceFee64x64(0);
+
           let tokenId = await queue.getCurrentTokenId();
 
-          await vault.connect(signers.keeper).initializeNextEpoch();
+          await knoxUtil.initializeNextEpoch();
+
+          await time.increaseTo(endTime);
+          await vault.connect(signers.keeper).processAuction();
 
           let pricePerShare = await queue.getPricePerShare(tokenId);
 
           assert.bnEqual(pricePerShare, parseUnits("1", 18));
 
-          await knoxUtil.initializeAuction();
+          [, endTime] = await knoxUtil.initializeAuction();
 
           // simluate vault profits, dilute shares by half
           await asset
@@ -985,7 +1006,10 @@ export async function describeBehaviorOfQueue(
           tokenId = await queue.getCurrentTokenId();
 
           await time.fastForwardToFriday8AM();
-          await vault.connect(signers.keeper).initializeNextEpoch();
+          await knoxUtil.initializeNextEpoch();
+
+          await time.increaseTo(endTime);
+          await vault.connect(signers.keeper).processAuction();
 
           pricePerShare = await queue.getPricePerShare(tokenId);
 
@@ -1008,7 +1032,7 @@ export async function describeBehaviorOfQueue(
           .connect(signers.deployer)
           .transfer(addresses.vault, params.deposit.mul(4));
 
-        await knoxUtil.initializeAuction();
+        let [, endTime] = await knoxUtil.initializeAuction();
 
         await asset
           .connect(signers.lp1)
@@ -1025,10 +1049,13 @@ export async function describeBehaviorOfQueue(
         // totalSupply = 0
         await vault.connect(signers.keeper).initializeNextEpoch();
 
+        await time.increaseTo(endTime);
+        await vault.connect(signers.keeper).processAuction();
+
         shares = await queue["previewUnredeemed(uint256)"](tokenId);
         assert.bnEqual(shares, params.deposit);
 
-        await knoxUtil.initializeAuction();
+        [, endTime] = await knoxUtil.initializeAuction();
 
         await asset
           .connect(signers.lp1)
@@ -1044,6 +1071,9 @@ export async function describeBehaviorOfQueue(
         // totalAssets = 50,000
         // totalSupply = 10,000
         await vault.connect(signers.keeper).initializeNextEpoch();
+
+        await time.increaseTo(endTime);
+        await vault.connect(signers.keeper).processAuction();
 
         shares = await queue["previewUnredeemed(uint256)"](tokenId);
 

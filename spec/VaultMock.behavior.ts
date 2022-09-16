@@ -13,7 +13,14 @@ import {
 
 import { Auction, IPremiaPool, IVaultMock, MockERC20, Queue } from "../types";
 
-import { assert, time, types, KnoxUtil } from "../test/utils";
+import {
+  assert,
+  time,
+  types,
+  KnoxUtil,
+  PoolUtil,
+  getEventArgs,
+} from "../test/utils";
 
 interface VaultMockBehaviorArgs {
   getKnoxUtil: () => Promise<KnoxUtil>;
@@ -25,6 +32,10 @@ export function describeBehaviorOfVaultMock(
   skips?: string[]
 ) {
   describe("::VaultMock", () => {
+    // Contract Utilities
+    let knoxUtil: KnoxUtil;
+    let poolUtil: PoolUtil;
+
     // Signers and Addresses
     let addresses: types.Addresses;
     let signers: types.Signers;
@@ -36,9 +47,6 @@ export function describeBehaviorOfVaultMock(
     let vault: IVaultMock;
     let pool: IPremiaPool;
 
-    // Contract Utilities
-    let knoxUtil: KnoxUtil;
-
     let thisFriday: moment.Moment;
     let nextFriday: moment.Moment;
 
@@ -46,6 +54,7 @@ export function describeBehaviorOfVaultMock(
 
     before(async () => {
       knoxUtil = await getKnoxUtil();
+      poolUtil = knoxUtil.poolUtil;
 
       signers = knoxUtil.signers;
       addresses = knoxUtil.addresses;
@@ -121,6 +130,106 @@ export function describeBehaviorOfVaultMock(
           );
 
           assert.bnEqual(option.shortTokenId, expectedShortTokenId);
+        });
+      });
+
+      describe("#_collectPerformanceFee()", () => {
+        time.revertToSnapshotAfterEach(async () => {
+          await vault
+            .connect(signers.deployer)
+            .setPerformanceFee64x64(fixedFromFloat(0.2));
+
+          // lp1 deposits into queue
+          await asset
+            .connect(signers.lp1)
+            .approve(addresses.queue, params.deposit);
+
+          await queue.connect(signers.lp1)["deposit(uint256)"](params.deposit);
+
+          // init epoch 0 auction
+          let [startTime, , epoch] = await knoxUtil.initializeAuction();
+
+          // init epoch 1
+          await time.fastForwardToFriday8AM();
+          await knoxUtil.initializeNextEpoch();
+
+          // auction 0 starts
+          await time.increaseTo(startTime);
+
+          // buyer1 purchases all available options
+          await asset
+            .connect(signers.buyer1)
+            .approve(addresses.auction, ethers.constants.MaxUint256);
+
+          await auction
+            .connect(signers.buyer1)
+            .addMarketOrder(
+              epoch,
+              await auction.getTotalContracts(epoch),
+              ethers.constants.MaxUint256
+            );
+
+          // process auction 0
+          await vault.connect(signers.keeper).processAuction();
+
+          // init auction 1
+          await knoxUtil.initializeAuction();
+
+          await time.fastForwardToFriday8AM();
+          await time.increase(100);
+        });
+
+        it("should not collect performance fees if option expires far-ITM", async () => {
+          let underlyingPrice = params.underlying.oracle.price;
+          let intrinsicValue = underlyingPrice * 0.5;
+
+          // Make sure options expire ITM
+          let spot = params.isCall
+            ? underlyingPrice + intrinsicValue
+            : underlyingPrice - intrinsicValue;
+
+          await poolUtil.underlyingSpotPriceOracle.mock.latestAnswer.returns(
+            spot
+          );
+
+          // process epoch 0
+          await knoxUtil.processExpiredOptions();
+
+          const feeRecipientBalanceBefore = await asset.balanceOf(
+            addresses.feeRecipient
+          );
+
+          await vault.connect(signers.keeper).collectPerformanceFee();
+
+          const feeRecipientBalanceAfter = await asset.balanceOf(
+            addresses.feeRecipient
+          );
+
+          assert.bnEqual(feeRecipientBalanceAfter, feeRecipientBalanceBefore);
+        });
+
+        it("should collect performance fees if option expires ATM", async () => {
+          // process epoch 0
+
+          await knoxUtil.processExpiredOptions();
+
+          const feeRecipientBalanceBefore = await asset.balanceOf(
+            addresses.feeRecipient
+          );
+
+          const tx = await vault
+            .connect(signers.keeper)
+            .collectPerformanceFee();
+          const args = await getEventArgs(tx, "PerformanceFeeCollected");
+
+          const feeRecipientBalanceAfter = await asset.balanceOf(
+            addresses.feeRecipient
+          );
+
+          assert.bnEqual(
+            feeRecipientBalanceAfter.sub(feeRecipientBalanceBefore),
+            args.feeInCollateral
+          );
         });
       });
 

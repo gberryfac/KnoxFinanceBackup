@@ -344,6 +344,42 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
     }
 
     /**
+     * @notice collects performance fees on epoch net income
+     * @dev auction must be processed before fees can be collected, do not call
+     * this function on epoch 0
+     * @param l vault storage layout
+     */
+    function _collectPerformanceFee(VaultStorage.Layout storage l) internal {
+        // pool must return all available "reserved liquidity" to the vault after the
+        // option expires and before performance fee can be collected
+        _withdrawReservedLiquidity(l);
+
+        uint256 netIncome;
+        uint256 feeInCollateral;
+
+        // adjusts total assets to account for assets withdrawn during the epoch
+        uint256 adjustedTotalAssets = _totalAssets() + l.totalWithdrawals;
+
+        if (adjustedTotalAssets > l.lastTotalAssets) {
+            // collect performance fee ONLY if the vault returns a positive net income
+            // if the net income is negative, last week's option expired ITM past breakeven,
+            // and the vault took a loss so we do not collect performance fee for last week
+            netIncome = adjustedTotalAssets - l.lastTotalAssets;
+
+            // calculate the performance fee denominated in the collateral asset
+            feeInCollateral = l.performanceFee64x64.mulu(netIncome);
+
+            // send collected fee to recipient wallet
+            ERC20.safeTransfer(l.feeRecipient, feeInCollateral);
+        }
+
+        // reset totalWithdrawals
+        l.totalWithdrawals = 0;
+
+        emit PerformanceFeeCollected(_lastEpoch(l), netIncome, feeInCollateral);
+    }
+
+    /**
      * @notice removes reserved liquidity from Premia pool
      * @param l vault storage layout
      */
