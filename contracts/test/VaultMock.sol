@@ -32,6 +32,11 @@ contract VaultMock is VaultBase {
         _withdrawReservedLiquidity(l);
     }
 
+    function setAuctionPrices() external {
+        VaultStorage.Layout storage l = VaultStorage.layout();
+        _setAuctionPrices(l);
+    }
+
     function getFriday(uint256 timestamp) external pure returns (uint256) {
         return _getFriday(timestamp);
     }

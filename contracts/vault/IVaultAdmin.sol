@@ -92,15 +92,6 @@ interface IVaultAdmin {
     function initializeEpoch() external;
 
     /************************************************
-     *  SET AUCTION PRICES
-     ***********************************************/
-
-    /**
-     * @notice calculates and sets the auction prices
-     */
-    function setAuctionPrices() external;
-
-    /************************************************
      *  PROCESS AUCTION
      ***********************************************/
 

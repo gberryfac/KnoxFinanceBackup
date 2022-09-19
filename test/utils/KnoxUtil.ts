@@ -4,7 +4,6 @@ const { provider } = ethers;
 const { hexConcat, hexZeroPad } = ethers.utils;
 
 import { fixedFromFloat } from "@premia/utils";
-import { deployMockContract } from "ethereum-waffle";
 
 import { PREMIA_EXCHANGE_HELPER } from "../../constants";
 
@@ -14,6 +13,7 @@ import {
   Queue,
   Auction__factory,
   AuctionProxy__factory,
+  PricerMock__factory,
   Queue__factory,
   QueueProxy__factory,
 } from "../../types";
@@ -107,21 +107,12 @@ export class KnoxUtil {
     addresses.exchange = PREMIA_EXCHANGE_HELPER[chainId];
 
     // deploy mock Pricer
-    const mockVolatilityOracle = await deployMockContract(
-      signers.deployer as any,
-      [
-        "function getAnnualizedVolatility64x64(address,address,int128,int128,int128) external view returns (int128)",
-      ]
-    );
+    const mockPricer = await new PricerMock__factory(signers.deployer).deploy();
 
-    await mockVolatilityOracle.mock.getAnnualizedVolatility64x64.returns(
-      fixedFromFloat("0.9")
+    await mockPricer.setDelta64x64(
+      fixedFromFloat(params.delta),
+      fixedFromFloat(params.delta).sub(fixedFromFloat(params.deltaOffset))
     );
-
-    const mockPricer = await deployMockContract(signers.deployer as any, [
-      "function getDeltaStrikePrice64x64(bool,uint64,int128) external view returns (int128)",
-      "function snapToGrid64x64(bool,int128) external view returns (int128)",
-    ]);
 
     const underlyingPrice = params.underlying.oracle.price;
     const basePrice = params.base.oracle.price;
@@ -129,8 +120,16 @@ export class KnoxUtil {
     const strike = underlyingPrice / basePrice;
     const strike64x64 = fixedFromFloat(strike);
 
-    await mockPricer.mock.getDeltaStrikePrice64x64.returns(strike64x64);
-    await mockPricer.mock.snapToGrid64x64.returns(strike64x64);
+    const offsetStrike64x64 = params.isCall
+      ? fixedFromFloat(strike + strike / 10)
+      : fixedFromFloat(strike - strike / 10);
+
+    await mockPricer.setStrikePrices64x64(strike64x64, offsetStrike64x64);
+
+    await mockPricer.setPrices64x64(
+      fixedFromFloat(params.price.max),
+      fixedFromFloat(params.price.min)
+    );
 
     addresses.pricer = mockPricer.address;
 
@@ -257,15 +256,6 @@ export class KnoxUtil {
 
   async initializeEpoch() {
     const vault = this.vaultUtil.vault;
-    const epoch = await vault.getEpoch();
-
-    const maxPrice64x64 = fixedFromFloat(this.params.price.max);
-    const minPrice64x64 = fixedFromFloat(this.params.price.min);
-
     await vault.connect(this.signers.keeper).initializeEpoch();
-
-    await this.auction
-      .connect(this.signers.vault)
-      .setAuctionPrices(epoch, maxPrice64x64, minPrice64x64);
   }
 }

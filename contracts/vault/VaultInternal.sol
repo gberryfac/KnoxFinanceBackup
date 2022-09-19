@@ -404,6 +404,99 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
     }
 
     /**
+     * @notice calculates and sets the auction prices
+     * @param l vault storage layout
+     */
+    function _setAuctionPrices(VaultStorage.Layout storage l) internal {
+        VaultStorage.Option memory lastOption = _lastOption(l);
+
+        // assumes that the strike price has been set
+        require(lastOption.strike64x64 > 0, "delta strike unset");
+
+        // the delta offset is used to calculate an offset strike price which should always be
+        // further OTM.
+
+        // calculates the delta strike price using the offset delta
+        int128 offsetStrike64x64 =
+            l.Pricer.getDeltaStrikePrice64x64(
+                l.isCall,
+                lastOption.expiry,
+                l.delta64x64.sub(l.deltaOffset64x64)
+            );
+
+        // fetches the spot price of the underlying
+        int128 spot64x64 = l.Pricer.latestAnswer64x64();
+
+        // fetches the time to maturity of the option
+        int128 timeToMaturity64x64 =
+            l.Pricer.getTimeToMaturity64x64(lastOption.expiry);
+
+        /**
+         * it is assumed that the rounded strike price will always be further ITM than the offset
+         * strike price. the further ITM option will always be more expensive and will therefore
+         * be used to determine the max price of the auction. likewise, the offset strike price
+         * (further OTM) should resemble a cheaper option and it is therefore used as the min
+         * option price in our auction.
+         *
+         *
+         * Call Option
+         * -----------
+         * Strike    Rounded Strike             Offset Strike
+         *   |  ---------> |                          |
+         *   |             |                          |
+         * -----------------------Price------------------------>
+         *
+         *
+         * Put Option
+         * -----------
+         * Offset Strike              Rounded Strike    Strike
+         *       |                           | <--------- |
+         *       |                           |            |
+         * -----------------------Price------------------------>
+         *
+         *
+         */
+
+        // calculates the auction max price using the strike price further (ITM)
+        int128 maxPrice64x64 =
+            l.Pricer.getBlackScholesPrice64x64(
+                spot64x64,
+                lastOption.strike64x64,
+                timeToMaturity64x64,
+                l.isCall
+            );
+
+        // calculates the auction min price using the offset strike price further (OTM)
+        int128 minPrice64x64 =
+            l.Pricer.getBlackScholesPrice64x64(
+                spot64x64,
+                offsetStrike64x64,
+                timeToMaturity64x64,
+                l.isCall
+            );
+
+        if (l.isCall) {
+            // denominates price in the collateral asset
+            maxPrice64x64 = maxPrice64x64.div(spot64x64);
+            minPrice64x64 = minPrice64x64.div(spot64x64);
+        }
+
+        uint64 epoch = _lastEpoch(l);
+
+        emit AuctionPricesSet(
+            epoch,
+            lastOption.strike64x64,
+            offsetStrike64x64,
+            spot64x64,
+            timeToMaturity64x64,
+            maxPrice64x64,
+            minPrice64x64
+        );
+
+        l.Auction.setAuctionPrices(epoch, maxPrice64x64, minPrice64x64);
+    }
+
+    /**
      * @notice calculates the total amount of collateral and short contracts to distribute
      * @param l vault storage layout
      * @param assetAmount quantity of assets to withdraw

@@ -17,6 +17,8 @@ interface IVaultMock is IVault {
 
     function withdrawReservedLiquidity() external;
 
+    function setAuctionPrices() external;
+
     function getFriday(uint256 timestamp) external pure returns (uint256);
 
     function getNextFriday(uint256 timestamp) external pure returns (uint256);

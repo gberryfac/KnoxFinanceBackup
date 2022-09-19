@@ -17,23 +17,9 @@ import {
   BASE_RESERVED_LIQ_TOKEN_ID,
 } from "../constants";
 
-import {
-  Auction,
-  IPremiaPool,
-  IVaultMock,
-  MockERC20,
-  Queue,
-  Pricer__factory,
-} from "../types";
+import { Auction, IPremiaPool, IVaultMock, MockERC20, Queue } from "../types";
 
-import {
-  assert,
-  time,
-  types,
-  KnoxUtil,
-  PoolUtil,
-  getEventArgs,
-} from "../test/utils";
+import { assert, time, types, KnoxUtil, PoolUtil } from "../test/utils";
 
 interface VaultAdminBehaviorArgs {
   getKnoxUtil: () => Promise<KnoxUtil>;
@@ -513,45 +499,6 @@ export function describeBehaviorOfVaultAdmin(
         assert.bnEqual(queueEpochAfter, BigNumber.from(epoch));
         assert.bnEqual(vaultEpochAfter, BigNumber.from(epoch));
         assert.bnEqual(totalShortContractsAfter, BigNumber.from(0));
-      });
-    });
-
-    describe("#setAuctionPrices()", () => {
-      time.revertToSnapshotAfterEach(async () => {
-        const pricer = await new Pricer__factory(signers.deployer).deploy(
-          params.pool.address,
-          params.pool.volatility
-        );
-
-        await vault.connect(signers.deployer).setPricer(pricer.address);
-
-        // init epoch 0 auction
-        await knoxUtil.initializeAuction();
-
-        // init epoch 1
-        await time.fastForwardToFriday8AM();
-      });
-
-      it("should revert if !keeper", async () => {
-        await expect(vault.setAuctionPrices()).to.be.revertedWith("!keeper");
-      });
-
-      // note: it is possible for the offset strike to end up being further ITM than
-      // the strike this may occur if the strike is rounded above/below the offset
-      // strike. if the delta offset is too small the likelihood of this happening
-      // increases.
-      it("should set the offset strike price further OTM than the strike price", async () => {
-        const tx = await vault.connect(signers.keeper).setAuctionPrices();
-        const args = await getEventArgs(tx, "AuctionPricesSet");
-        params.isCall
-          ? assert.bnGt(args.offsetStrike64x64, args.strike64x64)
-          : assert.bnGt(args.strike64x64, args.offsetStrike64x64);
-      });
-
-      it("should set max price greater than the min price", async () => {
-        const tx = await vault.connect(signers.keeper).setAuctionPrices();
-        const args = await getEventArgs(tx, "AuctionPricesSet");
-        assert.bnGt(args.maxPrice64x64, args.minPrice64x64);
       });
     });
 

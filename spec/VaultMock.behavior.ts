@@ -3,6 +3,8 @@ const { provider } = ethers;
 import { BigNumber } from "ethers";
 import { fixedFromFloat, formatTokenId, TokenType } from "@premia/utils";
 
+import { expect } from "chai";
+
 import moment from "moment-timezone";
 moment.tz.setDefault("UTC");
 
@@ -11,7 +13,14 @@ import {
   BASE_RESERVED_LIQ_TOKEN_ID,
 } from "../constants";
 
-import { Auction, IPremiaPool, IVaultMock, MockERC20, Queue } from "../types";
+import {
+  Auction,
+  IPremiaPool,
+  IVaultMock,
+  MockERC20,
+  Queue,
+  Pricer__factory,
+} from "../types";
 
 import {
   assert,
@@ -199,7 +208,7 @@ export function describeBehaviorOfVaultMock(
             addresses.feeRecipient
           );
 
-          await vault.connect(signers.keeper).collectPerformanceFee();
+          await vault.collectPerformanceFee();
 
           const feeRecipientBalanceAfter = await asset.balanceOf(
             addresses.feeRecipient
@@ -217,9 +226,7 @@ export function describeBehaviorOfVaultMock(
             addresses.feeRecipient
           );
 
-          const tx = await vault
-            .connect(signers.keeper)
-            .collectPerformanceFee();
+          const tx = await vault.collectPerformanceFee();
           const args = await getEventArgs(tx, "PerformanceFeeCollected");
 
           const feeRecipientBalanceAfter = await asset.balanceOf(
@@ -319,6 +326,41 @@ export function describeBehaviorOfVaultMock(
             reservedLiquidityBefore.add(vaultCollateralBalanceBefore),
             vaultCollateralBalanceAfter
           );
+        });
+      });
+
+      describe("#_setAuctionPrices()", () => {
+        time.revertToSnapshotAfterEach(async () => {
+          const pricer = await new Pricer__factory(signers.deployer).deploy(
+            params.pool.address,
+            params.pool.volatility
+          );
+
+          await vault.connect(signers.deployer).setPricer(pricer.address);
+
+          // init epoch 0 auction
+          await knoxUtil.initializeAuction();
+
+          // init epoch 1
+          await time.fastForwardToFriday8AM();
+        });
+
+        // note: it is possible for the offset strike to end up being further ITM than
+        // the strike this may occur if the strike is rounded above/below the offset
+        // strike. if the delta offset is too small the likelihood of this happening
+        // increases.
+        it("should set the offset strike price further OTM than the strike price", async () => {
+          const tx = await vault.setAuctionPrices();
+          const args = await getEventArgs(tx, "AuctionPricesSet");
+          params.isCall
+            ? assert.bnGt(args.offsetStrike64x64, args.strike64x64)
+            : assert.bnGt(args.strike64x64, args.offsetStrike64x64);
+        });
+
+        it("should set max price greater than the min price", async () => {
+          const tx = await vault.setAuctionPrices();
+          const args = await getEventArgs(tx, "AuctionPricesSet");
+          assert.bnGt(args.maxPrice64x64, args.minPrice64x64);
         });
       });
 
