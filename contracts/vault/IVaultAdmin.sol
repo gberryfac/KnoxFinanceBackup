@@ -78,7 +78,7 @@ interface IVaultAdmin {
      ***********************************************/
 
     /**
-     * @notice initializes the auction
+     * @notice sets the option parameters which will be sold, then initializes the auction
      */
     function initializeAuction() external;
 
@@ -87,7 +87,9 @@ interface IVaultAdmin {
      ***********************************************/
 
     /**
-     * @notice initializes the epoch
+     * @notice collects performance fee from epoch income, processes the queued deposits,
+     * increments the epoch id, then sets the auction prices
+     * @dev it assumed that an auction has already been initialized
      */
     function initializeEpoch() external;
 
@@ -97,8 +99,8 @@ interface IVaultAdmin {
 
     /**
      * @notice processes the auction when it has been finalized
-     * @dev divestment timestamp must be set in Premia pool, otherwise exercised options
-     * will be moved to free liquidity queue
+     * @dev it assumed that an auction has already been initialized and the auction prices
+     * have been set
      */
     function processAuction() external;
 }

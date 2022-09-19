@@ -289,7 +289,159 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
     }
 
     /************************************************
-     *  HELPERS
+     *  WITHDRAW HELPERS
+     ***********************************************/
+
+    /**
+     * @notice calculates the total amount of collateral and short contracts to distribute
+     * @param l vault storage layout
+     * @param assetAmount quantity of assets to withdraw
+     * @return distribution amount in collateral asset
+     * @return distribution amount in the short contracts
+     */
+    function _calculateDistributions(
+        VaultStorage.Layout storage l,
+        uint256 assetAmount
+    ) private view returns (uint256, uint256) {
+        uint256 totalAssets = _totalAssets();
+
+        uint256 collateralAmount =
+            _calculateDistributionAmount(
+                assetAmount,
+                _totalCollateral(),
+                totalAssets
+            );
+
+        VaultStorage.Option memory lastOption = _lastOption(l);
+
+        uint256 totalShortAsCollateral = _totalShortAsCollateral();
+
+        // calculates the distribution of short contracts denominated as collateral
+        uint256 shortAsCollateral =
+            _calculateDistributionAmount(
+                assetAmount,
+                totalShortAsCollateral,
+                totalAssets
+            );
+
+        // converts the collateral amount back to short contracts.
+        uint256 shortContracts =
+            shortAsCollateral.fromContractsToCollateral(
+                l.isCall,
+                l.baseDecimals,
+                lastOption.strike64x64
+            );
+
+        return (collateralAmount, shortContracts);
+    }
+
+    /**
+     * @notice calculates the distribution amount
+     * @param assetAmount quantity of assets to withdraw
+     * @param collateralAmount quantity of asset collateral held by vault
+     * @param totalAssets total amount of assets held by vault, denominated in collateral asset
+     * @return distribution amount, denominated in the collateral asset
+     */
+    function _calculateDistributionAmount(
+        uint256 assetAmount,
+        uint256 collateralAmount,
+        uint256 totalAssets
+    ) private pure returns (uint256) {
+        // calculates the ratio of collateral to total assets
+        int128 assetRatio64x64 =
+            collateralAmount > 0
+                ? collateralAmount.divu(totalAssets)
+                : int128(0);
+        // calculates the amount of the asset which should be withdrawn
+        return assetRatio64x64 > 0 ? assetRatio64x64.mulu(assetAmount) : 0;
+    }
+
+    /**
+     * @notice calculates, deducts, and transfers withdrawal fees to the fee recipient
+     * @param l vault storage layout
+     * @param collateralAmount quantity of asset collateral to deduct fees from
+     * @param shortContracts quantity of short contracts to deduct fees from
+     * @return remaining collateral amount with fees deducted
+     * @return remaining short contract amount with fees deducted
+     */
+    function _collectWithdrawalFee(
+        VaultStorage.Layout storage l,
+        uint256 collateralAmount,
+        uint256 shortContracts
+    ) private returns (uint256, uint256) {
+        // calculates the collateral fee
+        uint256 feeInCollateral = l.withdrawalFee64x64.mulu(collateralAmount);
+
+        // calculates the short contract fee
+        uint256 feesInShortContracts =
+            l.withdrawalFee64x64.mulu(shortContracts);
+
+        VaultStorage.Option memory lastOption = _lastOption(l);
+        uint64 epoch = _lastEpoch(l);
+
+        // transfers the fees to the fee recipient
+        _transferCollateralAndShortAssets(
+            epoch,
+            feeInCollateral,
+            feesInShortContracts,
+            lastOption.shortTokenId,
+            l.feeRecipient
+        );
+
+        emit WithdrawalFeeCollected(
+            epoch,
+            feeInCollateral,
+            feesInShortContracts
+        );
+
+        // deducts the fee from collateral and short contract amounts
+        return (
+            collateralAmount - feeInCollateral,
+            shortContracts - feesInShortContracts
+        );
+    }
+
+    /**
+     * @notice transfers collateral and short contract tokens to receiver
+     * @param epoch vault storage layout
+     * @param collateralAmount quantity of asset collateral to deduct fees from
+     * @param shortContracts quantity of short contracts to deduct fees from
+     * @param shortTokenId quantity of short contracts to deduct fees from
+     * @param receiver quantity of short contracts to deduct fees from
+     */
+    function _transferCollateralAndShortAssets(
+        uint64 epoch,
+        uint256 collateralAmount,
+        uint256 shortContracts,
+        uint256 shortTokenId,
+        address receiver
+    ) private {
+        if (collateralAmount > 0) {
+            // transfers collateral to receiver
+            ERC20.safeTransfer(receiver, collateralAmount);
+        }
+
+        if (shortContracts > 0) {
+            // transfers short contracts to receiver
+            Pool.safeTransferFrom(
+                address(this),
+                receiver,
+                shortTokenId,
+                shortContracts,
+                ""
+            );
+        }
+
+        emit DistributionSent(
+            epoch,
+            collateralAmount,
+            shortContracts,
+            receiver
+        );
+    }
+
+    /************************************************
+     *  ADMIN HELPERS
      ***********************************************/
 
     /**
@@ -496,153 +648,43 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
         l.Auction.setAuctionPrices(epoch, maxPrice64x64, minPrice64x64);
     }
 
-    /**
-     * @notice calculates the total amount of collateral and short contracts to distribute
-     * @param l vault storage layout
-     * @param assetAmount quantity of assets to withdraw
-     * @return distribution amount in collateral asset
-     * @return distribution amount in the short contracts
-     */
-    function _calculateDistributions(
-        VaultStorage.Layout storage l,
-        uint256 assetAmount
-    ) private view returns (uint256, uint256) {
-        uint256 totalAssets = _totalAssets();
+    /************************************************
+     *  PREMIA HELPERS
+     ***********************************************/
 
-        uint256 collateralAmount =
-            _calculateDistributionAmount(
-                assetAmount,
-                _totalCollateral(),
-                totalAssets
-            );
-
-        VaultStorage.Option memory lastOption = _lastOption(l);
-
-        uint256 totalShortAsCollateral = _totalShortAsCollateral();
-
-        // calculates the distribution of short contracts denominated as collateral
-        uint256 shortAsCollateral =
-            _calculateDistributionAmount(
-                assetAmount,
-                totalShortAsCollateral,
-                totalAssets
-            );
-
-        // converts the collateral amount back to short contracts.
-        uint256 shortContracts =
-            shortAsCollateral.fromContractsToCollateral(
-                l.isCall,
-                l.baseDecimals,
-                lastOption.strike64x64
-            );
-
-        return (collateralAmount, shortContracts);
+    // Premia ERC1155 token types
+    enum TokenType {
+        UNDERLYING_FREE_LIQ,
+        BASE_FREE_LIQ,
+        UNDERLYING_RESERVED_LIQ,
+        BASE_RESERVED_LIQ,
+        LONG_CALL,
+        SHORT_CALL,
+        LONG_PUT,
+        SHORT_PUT
     }
 
     /**
-     * @notice calculates the distribution amount
-     * @param assetAmount quantity of assets to withdraw
-     * @param collateralAmount quantity of asset collateral held by vault
-     * @param totalAssets total amount of assets held by vault, denominated in collateral asset
-     * @return distribution amount, denominated in the collateral asset
+     * @notice calculate ERC1155 token id for given option parameters
+     * @param tokenType TokenType enum
+     * @param maturity timestamp of option maturity
+     * @param strike64x64 64x64 fixed point representation of strike price
+     * @return tokenId token id
      */
-    function _calculateDistributionAmount(
-        uint256 assetAmount,
-        uint256 collateralAmount,
-        uint256 totalAssets
-    ) private pure returns (uint256) {
-        // calculates the ratio of collateral to total assets
-        int128 assetRatio64x64 =
-            collateralAmount > 0
-                ? collateralAmount.divu(totalAssets)
-                : int128(0);
-        // calculates the amount of the asset which should be withdrawn
-        return assetRatio64x64 > 0 ? assetRatio64x64.mulu(assetAmount) : 0;
+    function _formatTokenId(
+        TokenType tokenType,
+        uint64 maturity,
+        int128 strike64x64
+    ) internal pure returns (uint256 tokenId) {
+        tokenId =
+            (uint256(tokenType) << 248) +
+            (uint256(maturity) << 128) +
+            uint256(int256(strike64x64));
     }
 
-    /**
-     * @notice calculates, deducts, and transfers withdrawal fees to the fee recipient
-     * @param l vault storage layout
-     * @param collateralAmount quantity of asset collateral to deduct fees from
-     * @param shortContracts quantity of short contracts to deduct fees from
-     * @return remaining collateral amount with fees deducted
-     * @return remaining short contract amount with fees deducted
-     */
-    function _collectWithdrawalFee(
-        VaultStorage.Layout storage l,
-        uint256 collateralAmount,
-        uint256 shortContracts
-    ) private returns (uint256, uint256) {
-        // calculates the collateral fee
-        uint256 feeInCollateral = l.withdrawalFee64x64.mulu(collateralAmount);
-
-        // calculates the short contract fee
-        uint256 feesInShortContracts =
-            l.withdrawalFee64x64.mulu(shortContracts);
-
-        VaultStorage.Option memory lastOption = _lastOption(l);
-        uint64 epoch = _lastEpoch(l);
-
-        // transfers the fees to the fee recipient
-        _transferCollateralAndShortAssets(
-            epoch,
-            feeInCollateral,
-            feesInShortContracts,
-            lastOption.shortTokenId,
-            l.feeRecipient
-        );
-
-        emit WithdrawalFeeCollected(
-            epoch,
-            feeInCollateral,
-            feesInShortContracts
-        );
-
-        // deducts the fee from collateral and short contract amounts
-        return (
-            collateralAmount - feeInCollateral,
-            shortContracts - feesInShortContracts
-        );
-    }
-
-    /**
-     * @notice transfers collateral and short contract tokens to receiver
-     * @param epoch vault storage layout
-     * @param collateralAmount quantity of asset collateral to deduct fees from
-     * @param shortContracts quantity of short contracts to deduct fees from
-     * @param shortTokenId quantity of short contracts to deduct fees from
-     * @param receiver quantity of short contracts to deduct fees from
-     */
-    function _transferCollateralAndShortAssets(
-        uint64 epoch,
-        uint256 collateralAmount,
-        uint256 shortContracts,
-        uint256 shortTokenId,
-        address receiver
-    ) private {
-        if (collateralAmount > 0) {
-            // transfers collateral to receiver
-            ERC20.safeTransfer(receiver, collateralAmount);
-        }
-
-        if (shortContracts > 0) {
-            // transfers short contracts to receiver
-            Pool.safeTransferFrom(
-                address(this),
-                receiver,
-                shortTokenId,
-                shortContracts,
-                ""
-            );
-        }
-
-        emit DistributionSent(
-            epoch,
-            collateralAmount,
-            shortContracts,
-            receiver
-        );
-    }
+    /************************************************
+     *  HELPERS
+     ***********************************************/
 
     /**
      * @notice gets the last epoch
@@ -713,39 +755,5 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
             friday8am += 7 days;
         }
         return friday8am;
-    }
-
-    /************************************************
-     *  PREMIA HELPERS
-     ***********************************************/
-
-    // Premia ERC1155 token types
-    enum TokenType {
-        UNDERLYING_FREE_LIQ,
-        BASE_FREE_LIQ,
-        UNDERLYING_RESERVED_LIQ,
-        BASE_RESERVED_LIQ,
-        LONG_CALL,
-        SHORT_CALL,
-        LONG_PUT,
-        SHORT_PUT
-    }
-
-    /**
-     * @notice calculate ERC1155 token id for given option parameters
-     * @param tokenType TokenType enum
-     * @param maturity timestamp of option maturity
-     * @param strike64x64 64x64 fixed point representation of strike price
-     * @return tokenId token id
-     */
-    function _formatTokenId(
-        TokenType tokenType,
-        uint64 maturity,
-        int128 strike64x64
-    ) internal pure returns (uint256 tokenId) {
-        tokenId =
-            (uint256(tokenType) << 248) +
-            (uint256(maturity) << 128) +
-            uint256(int256(strike64x64));
     }
 }
