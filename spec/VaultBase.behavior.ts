@@ -8,7 +8,7 @@ import { expect } from "chai";
 import moment from "moment-timezone";
 moment.tz.setDefault("UTC");
 
-import { Auction, IPremiaPool, IVault, MockERC20, Queue } from "../types";
+import { Auction, IPremiaPool, IVaultMock, MockERC20, Queue } from "../types";
 
 import { almost, assert, math, time, types, KnoxUtil } from "../test/utils";
 import { fixedFromFloat } from "@premia/utils";
@@ -44,6 +44,9 @@ export function describeBehaviorOfVaultBase(
   skips?: string[]
 ) {
   describe("::VaultBase", () => {
+    // Contract Utilities
+    let knoxUtil: KnoxUtil;
+
     // Signers and Addresses
     let addresses: types.Addresses;
     let signers: types.Signers;
@@ -52,11 +55,8 @@ export function describeBehaviorOfVaultBase(
     let asset: MockERC20;
     let queue: Queue;
     let auction: Auction;
-    let vault: IVault;
+    let vault: IVaultMock;
     let pool: IPremiaPool;
-
-    // Contract Utilities
-    let knoxUtil: KnoxUtil;
 
     const params = getParams();
 
@@ -133,634 +133,776 @@ export function describeBehaviorOfVaultBase(
     });
 
     describe("#withdraw(uint256,address,address)", () => {
-      time.revertToSnapshotAfterEach(async () => {
-        // lp1 deposits into queue
-        await asset
-          .connect(signers.lp1)
-          .approve(addresses.queue, params.deposit);
+      describe("if auction has started but not processed", () => {
+        time.revertToSnapshotAfterEach(async () => {
+          // lp1 deposits into queue
+          await asset
+            .connect(signers.lp1)
+            .approve(addresses.queue, params.deposit);
 
-        await queue.connect(signers.lp1)["deposit(uint256)"](params.deposit);
+          await queue.connect(signers.lp1)["deposit(uint256)"](params.deposit);
 
-        // init epoch 0 auction
-        let [startTime, , epoch] = await knoxUtil.setAndInitializeAuction();
+          // init epoch 0 auction
+          let [startTime, , epoch] = await knoxUtil.initializeAuction();
 
-        // init epoch 1
-        await time.fastForwardToFriday8AM();
-        await knoxUtil.initializeNextEpoch();
+          // init epoch 1
+          await time.fastForwardToFriday8AM();
+          await knoxUtil.initializeEpoch();
 
-        // auction 0 starts
-        await time.increaseTo(startTime);
+          // auction 0 starts
+          await time.increaseTo(startTime);
 
-        // buyer1 purchases all available options
-        await asset
-          .connect(signers.buyer1)
-          .approve(addresses.auction, ethers.constants.MaxUint256);
+          // buyer1 purchases all available options
+          await asset
+            .connect(signers.buyer1)
+            .approve(addresses.auction, ethers.constants.MaxUint256);
 
-        await auction
-          .connect(signers.buyer1)
-          .addMarketOrder(
-            epoch,
-            await auction.getTotalContracts(epoch),
-            ethers.constants.MaxUint256
+          await auction
+            .connect(signers.buyer1)
+            .addMarketOrder(
+              epoch,
+              await auction.getTotalContracts(epoch),
+              ethers.constants.MaxUint256
+            );
+        });
+
+        it("should revert", async () => {
+          await queue
+            .connect(signers.lp1)
+            .setApprovalForAll(addresses.vault, true);
+
+          await expect(
+            vault.connect(signers.lp1).withdraw(0, addresses.lp1, addresses.lp1)
+          ).to.be.revertedWith("auction has not been processed");
+        });
+      });
+
+      describe("else if auction has been processed", () => {
+        time.revertToSnapshotAfterEach(async () => {
+          // lp1 deposits into queue
+          await asset
+            .connect(signers.lp1)
+            .approve(addresses.queue, params.deposit);
+
+          await queue.connect(signers.lp1)["deposit(uint256)"](params.deposit);
+
+          // init epoch 0 auction
+          let [startTime, , epoch] = await knoxUtil.initializeAuction();
+
+          // init epoch 1
+          await time.fastForwardToFriday8AM();
+          await knoxUtil.initializeEpoch();
+
+          // auction 0 starts
+          await time.increaseTo(startTime);
+
+          // buyer1 purchases all available options
+          await asset
+            .connect(signers.buyer1)
+            .approve(addresses.auction, ethers.constants.MaxUint256);
+
+          await auction
+            .connect(signers.buyer1)
+            .addMarketOrder(
+              epoch,
+              await auction.getTotalContracts(epoch),
+              ethers.constants.MaxUint256
+            );
+
+          // process auction 0
+          await vault.connect(signers.keeper).processAuction();
+        });
+
+        it("should permit withdrawals after withdrawal lock has been reset", async () => {
+          // init auction 1
+          let [startTime] = await knoxUtil.initializeAuction();
+
+          await queue
+            .connect(signers.lp1)
+            .setApprovalForAll(addresses.vault, true);
+
+          await vault
+            .connect(signers.lp1)
+            .withdraw(0, addresses.lp1, addresses.lp1);
+
+          // auction 1 starts
+          await time.increaseTo(startTime);
+
+          // lock should activate when auction starts
+          await expect(
+            vault.connect(signers.lp1).withdraw(0, addresses.lp1, addresses.lp1)
+          ).to.be.revertedWith("auction has not been processed");
+        });
+
+        it("should redeem max vault shares from queue", async () => {
+          const lpVaultSharesBefore = await vault.balanceOf(addresses.lp1);
+
+          await queue
+            .connect(signers.lp1)
+            .setApprovalForAll(addresses.vault, true);
+
+          await vault
+            .connect(signers.lp1)
+            .withdraw(0, addresses.lp1, addresses.lp1);
+
+          const lpVaultSharesAfter = await vault.balanceOf(addresses.lp1);
+
+          assert.bnEqual(lpVaultSharesBefore, BigNumber.from(0));
+          assert.bnEqual(lpVaultSharesAfter, params.deposit);
+        });
+
+        it("should collect withdrawal fees in collateral tokens only to LP between epoch end and auction start", async () => {
+          await vault
+            .connect(signers.deployer)
+            .setWithdrawalFee64x64(fixedFromFloat(0.02));
+
+          // init auction 1
+          await knoxUtil.initializeAuction();
+          await time.fastForwardToFriday8AM();
+          await time.increase(100);
+
+          // process epoch 0
+          await knoxUtil.processExpiredOptions();
+
+          // init epoch 2
+          await knoxUtil.initializeEpoch();
+
+          await queue.connect(signers.lp1)["redeemMax()"]();
+
+          const lpCollateralBalanceBefore = await asset.balanceOf(
+            addresses.lp1
+          );
+          const feeRecipientCollateralBalanceBefore = await asset.balanceOf(
+            addresses.feeRecipient
           );
 
-        // process auction 0
-        await vault.connect(signers.keeper).processAuction();
-      });
+          const totalCollateral = await vault.totalCollateral();
+          let totalDistributionInCollateral = math.bnToNumber(totalCollateral);
+
+          const feeInCollateral = totalDistributionInCollateral * 0.02;
+
+          totalDistributionInCollateral =
+            totalDistributionInCollateral - feeInCollateral;
+
+          // lp1 withdraws from vault
+          await queue
+            .connect(signers.lp1)
+            .setApprovalForAll(addresses.vault, true);
+
+          const assetAmount = await vault
+            .connect(signers.lp1)
+            .maxWithdraw(addresses.lp1);
 
-      it.skip("should revert if auction is in progress", async () => {});
+          await vault
+            .connect(signers.lp1)
+            .withdraw(assetAmount, addresses.lp1, addresses.lp1);
 
-      it("should redeem max vault shares from queue", async () => {
-        const lpVaultSharesBefore = await vault.balanceOf(addresses.lp1);
+          const lpCollateralBalanceAfter = await asset.balanceOf(addresses.lp1);
+          const feeRecipientCollateralBalanceAfter = await asset.balanceOf(
+            addresses.feeRecipient
+          );
 
-        await queue
-          .connect(signers.lp1)
-          .setApprovalForAll(addresses.vault, true);
+          assert.equal(math.bnToNumber(feeRecipientCollateralBalanceBefore), 0);
+          almost(feeRecipientCollateralBalanceAfter, feeInCollateral);
 
-        await vault
-          .connect(signers.lp1)
-          .withdraw(0, addresses.lp1, addresses.lp1);
+          // distribution includes collateral without premiums
+          almost(
+            lpCollateralBalanceAfter.sub(lpCollateralBalanceBefore),
+            totalDistributionInCollateral
+          );
+        });
 
-        const lpVaultSharesAfter = await vault.balanceOf(addresses.lp1);
+        it("should distribute collateral tokens only to LP between epoch end and auction start", async () => {
+          const shortTokenId = await pool["tokensByAccount(address)"](
+            addresses.vault
+          );
 
-        assert.bnEqual(lpVaultSharesBefore, BigNumber.from(0));
-        assert.bnEqual(lpVaultSharesAfter, params.deposit);
-      });
+          // init auction 1
+          await knoxUtil.initializeAuction();
+          await time.fastForwardToFriday8AM();
+          await time.increase(100);
 
-      it("should collect withdrawal fees in collateral tokens only to LP between epoch end and auction start", async () => {
-        await vault
-          .connect(signers.deployer)
-          .setWithdrawalFee64x64(fixedFromFloat(0.02));
+          // process epoch 0
+          await knoxUtil.processExpiredOptions();
 
-        // init auction 1
-        await knoxUtil.setAndInitializeAuction();
-        await time.fastForwardToFriday8AM();
-        await time.increase(100);
+          // init epoch 2
+          await knoxUtil.initializeEpoch();
 
-        // process epoch 0
-        await knoxUtil.processExpiredOptions();
-        await vault.connect(signers.keeper).processLastEpoch();
+          await queue.connect(signers.lp1)["redeemMax()"]();
 
-        // init epoch 2
-        await knoxUtil.initializeNextEpoch();
+          const lpCollateralBalanceBefore = await asset.balanceOf(
+            addresses.lp1
+          );
 
-        await queue.connect(signers.lp1)["redeemMax()"]();
+          const totalCollateral = await vault.totalCollateral();
+          let totalDistributionInCollateral = math.bnToNumber(totalCollateral);
 
-        const lpCollateralBalanceBefore = await asset.balanceOf(addresses.lp1);
-        const feeRecipientCollateralBalanceBefore = await asset.balanceOf(
-          addresses.feeRecipient
-        );
+          // lp1 withdraws from vault
+          await queue
+            .connect(signers.lp1)
+            .setApprovalForAll(addresses.vault, true);
 
-        const totalCollateral = await vault.totalCollateral();
-        let totalDistributionInCollateral = math.bnToNumber(totalCollateral);
+          const assetAmount = await vault
+            .connect(signers.lp1)
+            .maxWithdraw(addresses.lp1);
 
-        const feeInCollateral = totalDistributionInCollateral * 0.02;
+          await vault
+            .connect(signers.lp1)
+            .withdraw(assetAmount, addresses.lp1, addresses.lp1);
+
+          const lpVaultSharesAfter = await vault.balanceOf(addresses.lp1);
+          const lpCollateralBalanceAfter = await asset.balanceOf(addresses.lp1);
 
-        totalDistributionInCollateral =
-          totalDistributionInCollateral - feeInCollateral;
+          const vaultShortBalanceAfter = await pool.balanceOf(
+            addresses.vault,
+            shortTokenId[0]
+          );
 
-        // lp1 withdraws from vault
-        await queue
-          .connect(signers.lp1)
-          .setApprovalForAll(addresses.vault, true);
+          const lpShortBalanceAfter = await pool.balanceOf(
+            addresses.lp1,
+            shortTokenId[0]
+          );
 
-        const assetAmount = await vault
-          .connect(signers.lp1)
-          .maxWithdraw(addresses.lp1);
+          assert.equal(math.bnToNumber(lpVaultSharesAfter), 0);
+          assert.equal(math.bnToNumber(vaultShortBalanceAfter), 0);
+          assert.equal(math.bnToNumber(lpShortBalanceAfter), 0);
 
-        await vault
-          .connect(signers.lp1)
-          .withdraw(assetAmount, addresses.lp1, addresses.lp1);
+          // distribution includes collateral without premiums
+          almost(
+            lpCollateralBalanceAfter.sub(lpCollateralBalanceBefore),
+            totalDistributionInCollateral
+          );
+        });
 
-        const lpCollateralBalanceAfter = await asset.balanceOf(addresses.lp1);
-        const feeRecipientCollateralBalanceAfter = await asset.balanceOf(
-          addresses.feeRecipient
-        );
+        it("should collect withdrawal fees in collateral and short tokens to LP after auction ends", async () => {
+          await vault
+            .connect(signers.deployer)
+            .setWithdrawalFee64x64(fixedFromFloat(0.02));
 
-        assert.equal(math.bnToNumber(feeRecipientCollateralBalanceBefore), 0);
-        almost(feeRecipientCollateralBalanceAfter, feeInCollateral);
+          await queue.connect(signers.lp1)["redeemMax()"]();
 
-        // distribution includes collateral without premiums
-        almost(
-          lpCollateralBalanceAfter.sub(lpCollateralBalanceBefore),
-          totalDistributionInCollateral
-        );
-      });
+          const shortTokenId = await pool["tokensByAccount(address)"](
+            addresses.vault
+          );
 
-      it("should distribute collateral tokens only to LP between epoch end and auction start", async () => {
-        const shortTokenId = await pool["tokensByAccount(address)"](
-          addresses.vault
-        );
+          const lpCollateralBalanceBefore = await asset.balanceOf(
+            addresses.lp1
+          );
 
-        // init auction 1
-        await knoxUtil.setAndInitializeAuction();
-        await time.fastForwardToFriday8AM();
-        await time.increase(100);
+          const totalCollateral = await vault.totalCollateral();
 
-        // process epoch 0
-        await knoxUtil.processExpiredOptions();
-        await vault.connect(signers.keeper).processLastEpoch();
+          let totalDistributionInCollateral = math.bnToNumber(totalCollateral);
 
-        // init epoch 2
-        await knoxUtil.initializeNextEpoch();
+          const feeInCollateral = totalDistributionInCollateral * 0.02;
+          totalDistributionInCollateral =
+            totalDistributionInCollateral - feeInCollateral;
 
-        await queue.connect(signers.lp1)["redeemMax()"]();
+          const totalShortContracts = await vault.totalShortAsContracts();
 
-        const lpCollateralBalanceBefore = await asset.balanceOf(addresses.lp1);
+          let totalDistributionInShortContracts =
+            math.bnToNumber(totalShortContracts);
 
-        const totalCollateral = await vault.totalCollateral();
-        let totalDistributionInCollateral = math.bnToNumber(totalCollateral);
+          const feeInShortContracts = totalDistributionInShortContracts * 0.02;
+          totalDistributionInShortContracts =
+            totalDistributionInShortContracts - feeInShortContracts;
 
-        // lp1 withdraws from vault
-        await queue
-          .connect(signers.lp1)
-          .setApprovalForAll(addresses.vault, true);
+          // lp1 withdraws from vault
+          await queue
+            .connect(signers.lp1)
+            .setApprovalForAll(addresses.vault, true);
 
-        const assetAmount = await vault
-          .connect(signers.lp1)
-          .maxWithdraw(addresses.lp1);
+          const assetAmount = await vault
+            .connect(signers.lp1)
+            .maxWithdraw(addresses.lp1);
 
-        await vault
-          .connect(signers.lp1)
-          .withdraw(assetAmount, addresses.lp1, addresses.lp1);
+          await vault
+            .connect(signers.lp1)
+            .withdraw(assetAmount, addresses.lp1, addresses.lp1);
 
-        const lpVaultSharesAfter = await vault.balanceOf(addresses.lp1);
-        const lpCollateralBalanceAfter = await asset.balanceOf(addresses.lp1);
+          const lpCollateralBalanceAfter = await asset.balanceOf(addresses.lp1);
 
-        const vaultShortBalanceAfter = await pool.balanceOf(
-          addresses.vault,
-          shortTokenId[0]
-        );
+          const feeRecipientCollateralBalanceAfter = await asset.balanceOf(
+            addresses.feeRecipient
+          );
 
-        const lpShortBalanceAfter = await pool.balanceOf(
-          addresses.lp1,
-          shortTokenId[0]
-        );
+          const lpShortBalanceAfter = await pool.balanceOf(
+            addresses.lp1,
+            shortTokenId[0]
+          );
 
-        assert.equal(math.bnToNumber(lpVaultSharesAfter), 0);
-        assert.equal(math.bnToNumber(vaultShortBalanceAfter), 0);
-        assert.equal(math.bnToNumber(lpShortBalanceAfter), 0);
+          const feeRecipientShortBalanceAfter = await pool.balanceOf(
+            addresses.feeRecipient,
+            shortTokenId[0]
+          );
 
-        // distribution includes collateral without premiums
-        almost(
-          lpCollateralBalanceAfter.sub(lpCollateralBalanceBefore),
-          totalDistributionInCollateral
-        );
-      });
+          assert.equal(
+            math.bnToNumber(feeRecipientShortBalanceAfter),
+            feeInShortContracts
+          );
 
-      it("should collect withdrawal fees in collateral and short tokens to LP after auction ends", async () => {
-        await vault
-          .connect(signers.deployer)
-          .setWithdrawalFee64x64(fixedFromFloat(0.02));
+          almost(feeRecipientCollateralBalanceAfter, feeInCollateral);
+          almost(lpShortBalanceAfter, totalDistributionInShortContracts);
 
-        await queue.connect(signers.lp1)["redeemMax()"]();
+          // distribution contains collateral and premiums earned from auction
+          almost(
+            lpCollateralBalanceAfter.sub(lpCollateralBalanceBefore),
+            totalDistributionInCollateral
+          );
+        });
 
-        const shortTokenId = await pool["tokensByAccount(address)"](
-          addresses.vault
-        );
+        it("should distribute collateral and short tokens to LP after auction ends", async () => {
+          await queue.connect(signers.lp1)["redeemMax()"]();
 
-        const lpCollateralBalanceBefore = await asset.balanceOf(addresses.lp1);
+          const shortTokenId = await pool["tokensByAccount(address)"](
+            addresses.vault
+          );
 
-        const totalCollateral = await vault.totalCollateral();
+          const lpCollateralBalanceBefore = await asset.balanceOf(
+            addresses.lp1
+          );
 
-        let totalDistributionInCollateral = math.bnToNumber(totalCollateral);
+          const totalCollateral = await vault.totalCollateral();
 
-        const feeInCollateral = totalDistributionInCollateral * 0.02;
-        totalDistributionInCollateral =
-          totalDistributionInCollateral - feeInCollateral;
+          let totalDistributionInCollateral = math.bnToNumber(totalCollateral);
 
-        const totalShortContracts = await vault.totalShortAsContracts();
+          const totalShortContracts = await vault.totalShortAsContracts();
 
-        let totalDistributionInShortContracts =
-          math.bnToNumber(totalShortContracts);
+          let totalDistributionInShortContracts =
+            math.bnToNumber(totalShortContracts);
 
-        const feeInShortContracts = totalDistributionInShortContracts * 0.02;
-        totalDistributionInShortContracts =
-          totalDistributionInShortContracts - feeInShortContracts;
+          // lp1 redeems from vault
+          await queue
+            .connect(signers.lp1)
+            .setApprovalForAll(addresses.vault, true);
 
-        // lp1 withdraws from vault
-        await queue
-          .connect(signers.lp1)
-          .setApprovalForAll(addresses.vault, true);
+          const assetAmount = await vault
+            .connect(signers.lp1)
+            .maxWithdraw(addresses.lp1);
 
-        const assetAmount = await vault
-          .connect(signers.lp1)
-          .maxWithdraw(addresses.lp1);
+          await vault
+            .connect(signers.lp1)
+            .withdraw(assetAmount, addresses.lp1, addresses.lp1);
 
-        await vault
-          .connect(signers.lp1)
-          .withdraw(assetAmount, addresses.lp1, addresses.lp1);
+          const lpVaultSharesAfter = await vault.balanceOf(addresses.lp1);
+          const lpCollateralBalanceAfter = await asset.balanceOf(addresses.lp1);
 
-        const lpCollateralBalanceAfter = await asset.balanceOf(addresses.lp1);
+          const vaultShortBalanceAfter = await pool.balanceOf(
+            addresses.vault,
+            shortTokenId[0]
+          );
 
-        const feeRecipientCollateralBalanceAfter = await asset.balanceOf(
-          addresses.feeRecipient
-        );
+          const lpShortBalanceAfter = await pool.balanceOf(
+            addresses.lp1,
+            shortTokenId[0]
+          );
 
-        const lpShortBalanceAfter = await pool.balanceOf(
-          addresses.lp1,
-          shortTokenId[0]
-        );
+          assert.equal(math.bnToNumber(lpVaultSharesAfter), 0);
+          almost(
+            vaultShortBalanceAfter,
+            0,
+            parseUnits("1", params.collateral.decimals - 3) // min tolerance
+          );
 
-        const feeRecipientShortBalanceAfter = await pool.balanceOf(
-          addresses.feeRecipient,
-          shortTokenId[0]
-        );
+          assert.equal(
+            math.bnToNumber(lpShortBalanceAfter),
+            totalDistributionInShortContracts
+          );
 
-        assert.equal(
-          math.bnToNumber(feeRecipientShortBalanceAfter),
-          feeInShortContracts
-        );
-
-        almost(feeRecipientCollateralBalanceAfter, feeInCollateral);
-        almost(lpShortBalanceAfter, totalDistributionInShortContracts);
-
-        // distribution contains collateral and premiums earned from auction
-        almost(
-          lpCollateralBalanceAfter.sub(lpCollateralBalanceBefore),
-          totalDistributionInCollateral
-        );
-      });
-
-      it("should distribute collateral and short tokens to LP after auction ends", async () => {
-        await queue.connect(signers.lp1)["redeemMax()"]();
-
-        const shortTokenId = await pool["tokensByAccount(address)"](
-          addresses.vault
-        );
-
-        const lpCollateralBalanceBefore = await asset.balanceOf(addresses.lp1);
-
-        const totalCollateral = await vault.totalCollateral();
-
-        let totalDistributionInCollateral = math.bnToNumber(totalCollateral);
-
-        const totalShortContracts = await vault.totalShortAsContracts();
-
-        let totalDistributionInShortContracts =
-          math.bnToNumber(totalShortContracts);
-
-        // lp1 redeems from vault
-        await queue
-          .connect(signers.lp1)
-          .setApprovalForAll(addresses.vault, true);
-
-        const assetAmount = await vault
-          .connect(signers.lp1)
-          .maxWithdraw(addresses.lp1);
-
-        await vault
-          .connect(signers.lp1)
-          .withdraw(assetAmount, addresses.lp1, addresses.lp1);
-
-        const lpVaultSharesAfter = await vault.balanceOf(addresses.lp1);
-        const lpCollateralBalanceAfter = await asset.balanceOf(addresses.lp1);
-
-        const vaultShortBalanceAfter = await pool.balanceOf(
-          addresses.vault,
-          shortTokenId[0]
-        );
-
-        const lpShortBalanceAfter = await pool.balanceOf(
-          addresses.lp1,
-          shortTokenId[0]
-        );
-
-        assert.equal(math.bnToNumber(lpVaultSharesAfter), 0);
-        almost(
-          vaultShortBalanceAfter,
-          0,
-          parseUnits("1", params.collateral.decimals - 3) // min tolerance
-        );
-
-        assert.equal(
-          math.bnToNumber(lpShortBalanceAfter),
-          totalDistributionInShortContracts
-        );
-
-        // distribution contains collateral and premiums earned from auction
-        almost(
-          lpCollateralBalanceAfter.sub(lpCollateralBalanceBefore),
-          totalDistributionInCollateral
-        );
+          // distribution contains collateral and premiums earned from auction
+          almost(
+            lpCollateralBalanceAfter.sub(lpCollateralBalanceBefore),
+            totalDistributionInCollateral
+          );
+        });
       });
     });
 
     describe("#redeem(uint256,address,address)", () => {
-      time.revertToSnapshotAfterEach(async () => {
-        // lp1 deposits into queue
-        await asset
-          .connect(signers.lp1)
-          .approve(addresses.queue, params.deposit);
+      describe("if auction has started but not processed", () => {
+        time.revertToSnapshotAfterEach(async () => {
+          // lp1 deposits into queue
+          await asset
+            .connect(signers.lp1)
+            .approve(addresses.queue, params.deposit);
 
-        await queue.connect(signers.lp1)["deposit(uint256)"](params.deposit);
+          await queue.connect(signers.lp1)["deposit(uint256)"](params.deposit);
 
-        // init epoch 0 auction
-        let [startTime, , epoch] = await knoxUtil.setAndInitializeAuction();
+          // init epoch 0 auction
+          let [startTime, , epoch] = await knoxUtil.initializeAuction();
 
-        // init epoch 1
-        await time.fastForwardToFriday8AM();
-        await knoxUtil.initializeNextEpoch();
+          // init epoch 1
+          await time.fastForwardToFriday8AM();
+          await knoxUtil.initializeEpoch();
 
-        // auction 0 starts
-        await time.increaseTo(startTime);
+          // auction 0 starts
+          await time.increaseTo(startTime);
 
-        // buyer1 purchases all available options
-        await asset
-          .connect(signers.buyer1)
-          .approve(addresses.auction, ethers.constants.MaxUint256);
+          // buyer1 purchases all available options
+          await asset
+            .connect(signers.buyer1)
+            .approve(addresses.auction, ethers.constants.MaxUint256);
 
-        await auction
-          .connect(signers.buyer1)
-          .addMarketOrder(
-            epoch,
-            await auction.getTotalContracts(epoch),
-            ethers.constants.MaxUint256
+          await auction
+            .connect(signers.buyer1)
+            .addMarketOrder(
+              epoch,
+              await auction.getTotalContracts(epoch),
+              ethers.constants.MaxUint256
+            );
+        });
+
+        it("should revert", async () => {
+          await queue
+            .connect(signers.lp1)
+            .setApprovalForAll(addresses.vault, true);
+
+          await expect(
+            vault.connect(signers.lp1).redeem(0, addresses.lp1, addresses.lp1)
+          ).to.be.revertedWith("auction has not been processed");
+        });
+      });
+
+      describe("else if auction has been processed", () => {
+        time.revertToSnapshotAfterEach(async () => {
+          // lp1 deposits into queue
+          await asset
+            .connect(signers.lp1)
+            .approve(addresses.queue, params.deposit);
+
+          await queue.connect(signers.lp1)["deposit(uint256)"](params.deposit);
+
+          // init epoch 0 auction
+          let [startTime, , epoch] = await knoxUtil.initializeAuction();
+
+          // init epoch 1
+          await time.fastForwardToFriday8AM();
+          await knoxUtil.initializeEpoch();
+
+          // auction 0 starts
+          await time.increaseTo(startTime);
+
+          // buyer1 purchases all available options
+          await asset
+            .connect(signers.buyer1)
+            .approve(addresses.auction, ethers.constants.MaxUint256);
+
+          await auction
+            .connect(signers.buyer1)
+            .addMarketOrder(
+              epoch,
+              await auction.getTotalContracts(epoch),
+              ethers.constants.MaxUint256
+            );
+
+          // process auction 0
+          await vault.connect(signers.keeper).processAuction();
+        });
+
+        it("should permit withdrawals after withdrawal lock has been reset", async () => {
+          // init auction 1
+          let [startTime] = await knoxUtil.initializeAuction();
+
+          await queue
+            .connect(signers.lp1)
+            .setApprovalForAll(addresses.vault, true);
+
+          await vault
+            .connect(signers.lp1)
+            .redeem(0, addresses.lp1, addresses.lp1);
+
+          // auction 1 starts
+          await time.increaseTo(startTime);
+
+          // lock should activate when auction starts
+          await expect(
+            vault.connect(signers.lp1).redeem(0, addresses.lp1, addresses.lp1)
+          ).to.be.revertedWith("auction has not been processed");
+        });
+
+        it("should redeem max vault shares from queue", async () => {
+          const lpVaultSharesBefore = await vault.balanceOf(addresses.lp1);
+
+          await queue
+            .connect(signers.lp1)
+            .setApprovalForAll(addresses.vault, true);
+
+          await vault
+            .connect(signers.lp1)
+            .redeem(0, addresses.lp1, addresses.lp1);
+
+          const lpVaultSharesAfter = await vault.balanceOf(addresses.lp1);
+
+          assert.bnEqual(lpVaultSharesBefore, BigNumber.from(0));
+          assert.bnEqual(lpVaultSharesAfter, params.deposit);
+        });
+
+        it("should collect withdrawal fees in collateral tokens only to LP between epoch end and auction start", async () => {
+          await vault
+            .connect(signers.deployer)
+            .setWithdrawalFee64x64(fixedFromFloat(0.02));
+
+          // init auction 1
+          await knoxUtil.initializeAuction();
+          await time.fastForwardToFriday8AM();
+          await time.increase(100);
+
+          // process epoch 0
+          await knoxUtil.processExpiredOptions();
+
+          // init epoch 2
+          await knoxUtil.initializeEpoch();
+
+          await queue.connect(signers.lp1)["redeemMax()"]();
+
+          const lpCollateralBalanceBefore = await asset.balanceOf(
+            addresses.lp1
+          );
+          const feeRecipientCollateralBalanceBefore = await asset.balanceOf(
+            addresses.feeRecipient
           );
 
-        // process auction 0
-        await vault.connect(signers.keeper).processAuction();
-      });
+          const totalCollateral = await vault.totalCollateral();
+          let totalDistributionInCollateral = math.bnToNumber(totalCollateral);
+
+          const feeInCollateral = totalDistributionInCollateral * 0.02;
+
+          totalDistributionInCollateral =
+            totalDistributionInCollateral - feeInCollateral;
+
+          // lp1 withdraws from vault
+          await queue
+            .connect(signers.lp1)
+            .setApprovalForAll(addresses.vault, true);
+
+          const shareAmount = await vault
+            .connect(signers.lp1)
+            .maxRedeem(addresses.lp1);
 
-      it.skip("should revert if auction is in progress", async () => {});
+          await vault
+            .connect(signers.lp1)
+            .redeem(shareAmount, addresses.lp1, addresses.lp1);
 
-      it("should redeem max vault shares from queue", async () => {
-        const lpVaultSharesBefore = await vault.balanceOf(addresses.lp1);
+          const lpCollateralBalanceAfter = await asset.balanceOf(addresses.lp1);
+          const feeRecipientCollateralBalanceAfter = await asset.balanceOf(
+            addresses.feeRecipient
+          );
 
-        await queue
-          .connect(signers.lp1)
-          .setApprovalForAll(addresses.vault, true);
+          assert.equal(math.bnToNumber(feeRecipientCollateralBalanceBefore), 0);
+          almost(feeRecipientCollateralBalanceAfter, feeInCollateral);
 
-        await vault
-          .connect(signers.lp1)
-          .redeem(0, addresses.lp1, addresses.lp1);
+          // distribution includes collateral without premiums
+          almost(
+            lpCollateralBalanceAfter.sub(lpCollateralBalanceBefore),
+            totalDistributionInCollateral
+          );
+        });
 
-        const lpVaultSharesAfter = await vault.balanceOf(addresses.lp1);
+        it("should distribute collateral tokens only to LP between epoch end and auction start", async () => {
+          const shortTokenId = await pool["tokensByAccount(address)"](
+            addresses.vault
+          );
 
-        assert.bnEqual(lpVaultSharesBefore, BigNumber.from(0));
-        assert.bnEqual(lpVaultSharesAfter, params.deposit);
-      });
+          // init auction 1
+          await knoxUtil.initializeAuction();
+          await time.fastForwardToFriday8AM();
+          await time.increase(100);
 
-      it("should collect withdrawal fees in collateral tokens only to LP between epoch end and auction start", async () => {
-        await vault
-          .connect(signers.deployer)
-          .setWithdrawalFee64x64(fixedFromFloat(0.02));
+          // process epoch 0
+          await knoxUtil.processExpiredOptions();
 
-        // init auction 1
-        await knoxUtil.setAndInitializeAuction();
-        await time.fastForwardToFriday8AM();
-        await time.increase(100);
+          // init epoch 2
+          await knoxUtil.initializeEpoch();
 
-        // process epoch 0
-        await knoxUtil.processExpiredOptions();
-        await vault.connect(signers.keeper).processLastEpoch();
+          await queue.connect(signers.lp1)["redeemMax()"]();
 
-        // init epoch 2
-        await knoxUtil.initializeNextEpoch();
+          const lpCollateralBalanceBefore = await asset.balanceOf(
+            addresses.lp1
+          );
 
-        await queue.connect(signers.lp1)["redeemMax()"]();
+          const totalCollateral = await vault.totalCollateral();
+          let totalDistributionInCollateral = math.bnToNumber(totalCollateral);
 
-        const lpCollateralBalanceBefore = await asset.balanceOf(addresses.lp1);
-        const feeRecipientCollateralBalanceBefore = await asset.balanceOf(
-          addresses.feeRecipient
-        );
+          // lp1 withdraws from vault
+          await queue
+            .connect(signers.lp1)
+            .setApprovalForAll(addresses.vault, true);
 
-        const totalCollateral = await vault.totalCollateral();
-        let totalDistributionInCollateral = math.bnToNumber(totalCollateral);
+          const shareAmount = await vault
+            .connect(signers.lp1)
+            .maxRedeem(addresses.lp1);
 
-        const feeInCollateral = totalDistributionInCollateral * 0.02;
+          await vault
+            .connect(signers.lp1)
+            .redeem(shareAmount, addresses.lp1, addresses.lp1);
 
-        totalDistributionInCollateral =
-          totalDistributionInCollateral - feeInCollateral;
+          const lpVaultSharesAfter = await vault.balanceOf(addresses.lp1);
+          const lpCollateralBalanceAfter = await asset.balanceOf(addresses.lp1);
 
-        // lp1 withdraws from vault
-        await queue
-          .connect(signers.lp1)
-          .setApprovalForAll(addresses.vault, true);
+          const vaultShortBalanceAfter = await pool.balanceOf(
+            addresses.vault,
+            shortTokenId[0]
+          );
 
-        const shareAmount = await vault
-          .connect(signers.lp1)
-          .maxRedeem(addresses.lp1);
+          const lpShortBalanceAfter = await pool.balanceOf(
+            addresses.lp1,
+            shortTokenId[0]
+          );
 
-        await vault
-          .connect(signers.lp1)
-          .redeem(shareAmount, addresses.lp1, addresses.lp1);
+          assert.equal(math.bnToNumber(lpVaultSharesAfter), 0);
+          assert.equal(math.bnToNumber(vaultShortBalanceAfter), 0);
+          assert.equal(math.bnToNumber(lpShortBalanceAfter), 0);
 
-        const lpCollateralBalanceAfter = await asset.balanceOf(addresses.lp1);
-        const feeRecipientCollateralBalanceAfter = await asset.balanceOf(
-          addresses.feeRecipient
-        );
+          // distribution includes collateral without premiums
+          almost(
+            lpCollateralBalanceAfter.sub(lpCollateralBalanceBefore),
+            totalDistributionInCollateral
+          );
+        });
 
-        assert.equal(math.bnToNumber(feeRecipientCollateralBalanceBefore), 0);
-        almost(feeRecipientCollateralBalanceAfter, feeInCollateral);
+        it("should collect withdrawal fees in collateral and short tokens to LP after auction ends", async () => {
+          await vault
+            .connect(signers.deployer)
+            .setWithdrawalFee64x64(fixedFromFloat(0.02));
 
-        // distribution includes collateral without premiums
-        almost(
-          lpCollateralBalanceAfter.sub(lpCollateralBalanceBefore),
-          totalDistributionInCollateral
-        );
-      });
+          await queue.connect(signers.lp1)["redeemMax()"]();
 
-      it("should distribute collateral tokens only to LP between epoch end and auction start", async () => {
-        const shortTokenId = await pool["tokensByAccount(address)"](
-          addresses.vault
-        );
+          const shortTokenId = await pool["tokensByAccount(address)"](
+            addresses.vault
+          );
 
-        // init auction 1
-        await knoxUtil.setAndInitializeAuction();
-        await time.fastForwardToFriday8AM();
-        await time.increase(100);
+          const lpCollateralBalanceBefore = await asset.balanceOf(
+            addresses.lp1
+          );
 
-        // process epoch 0
-        await knoxUtil.processExpiredOptions();
-        await vault.connect(signers.keeper).processLastEpoch();
+          const totalCollateral = await vault.totalCollateral();
 
-        // init epoch 2
-        await knoxUtil.initializeNextEpoch();
+          let totalDistributionInCollateral = math.bnToNumber(totalCollateral);
 
-        await queue.connect(signers.lp1)["redeemMax()"]();
+          const feeInCollateral = totalDistributionInCollateral * 0.02;
+          totalDistributionInCollateral =
+            totalDistributionInCollateral - feeInCollateral;
 
-        const lpCollateralBalanceBefore = await asset.balanceOf(addresses.lp1);
+          const totalShortContracts = await vault.totalShortAsContracts();
 
-        const totalCollateral = await vault.totalCollateral();
-        let totalDistributionInCollateral = math.bnToNumber(totalCollateral);
+          let totalDistributionInShortContracts =
+            math.bnToNumber(totalShortContracts);
 
-        // lp1 withdraws from vault
-        await queue
-          .connect(signers.lp1)
-          .setApprovalForAll(addresses.vault, true);
+          const feeInShortContracts = totalDistributionInShortContracts * 0.02;
+          totalDistributionInShortContracts =
+            totalDistributionInShortContracts - feeInShortContracts;
 
-        const shareAmount = await vault
-          .connect(signers.lp1)
-          .maxRedeem(addresses.lp1);
+          // lp1 withdraws from vault
+          await queue
+            .connect(signers.lp1)
+            .setApprovalForAll(addresses.vault, true);
 
-        await vault
-          .connect(signers.lp1)
-          .redeem(shareAmount, addresses.lp1, addresses.lp1);
+          const shareAmount = await vault
+            .connect(signers.lp1)
+            .maxRedeem(addresses.lp1);
 
-        const lpVaultSharesAfter = await vault.balanceOf(addresses.lp1);
-        const lpCollateralBalanceAfter = await asset.balanceOf(addresses.lp1);
+          await vault
+            .connect(signers.lp1)
+            .redeem(shareAmount, addresses.lp1, addresses.lp1);
 
-        const vaultShortBalanceAfter = await pool.balanceOf(
-          addresses.vault,
-          shortTokenId[0]
-        );
+          const lpCollateralBalanceAfter = await asset.balanceOf(addresses.lp1);
 
-        const lpShortBalanceAfter = await pool.balanceOf(
-          addresses.lp1,
-          shortTokenId[0]
-        );
+          const feeRecipientCollateralBalanceAfter = await asset.balanceOf(
+            addresses.feeRecipient
+          );
 
-        assert.equal(math.bnToNumber(lpVaultSharesAfter), 0);
-        assert.equal(math.bnToNumber(vaultShortBalanceAfter), 0);
-        assert.equal(math.bnToNumber(lpShortBalanceAfter), 0);
+          const lpShortBalanceAfter = await pool.balanceOf(
+            addresses.lp1,
+            shortTokenId[0]
+          );
 
-        // distribution includes collateral without premiums
-        almost(
-          lpCollateralBalanceAfter.sub(lpCollateralBalanceBefore),
-          totalDistributionInCollateral
-        );
-      });
+          const feeRecipientShortBalanceAfter = await pool.balanceOf(
+            addresses.feeRecipient,
+            shortTokenId[0]
+          );
 
-      it("should collect withdrawal fees in collateral and short tokens to LP after auction ends", async () => {
-        await vault
-          .connect(signers.deployer)
-          .setWithdrawalFee64x64(fixedFromFloat(0.02));
+          assert.equal(
+            math.bnToNumber(feeRecipientShortBalanceAfter),
+            feeInShortContracts
+          );
 
-        await queue.connect(signers.lp1)["redeemMax()"]();
+          almost(feeRecipientCollateralBalanceAfter, feeInCollateral);
 
-        const shortTokenId = await pool["tokensByAccount(address)"](
-          addresses.vault
-        );
+          assert.equal(
+            math.bnToNumber(lpShortBalanceAfter),
+            totalDistributionInShortContracts
+          );
 
-        const lpCollateralBalanceBefore = await asset.balanceOf(addresses.lp1);
+          // distribution contains collateral and premiums earned from auction
+          almost(
+            lpCollateralBalanceAfter.sub(lpCollateralBalanceBefore),
+            totalDistributionInCollateral
+          );
+        });
 
-        const totalCollateral = await vault.totalCollateral();
+        it("should distribute collateral and short tokens to LP after auction ends", async () => {
+          await queue.connect(signers.lp1)["redeemMax()"]();
 
-        let totalDistributionInCollateral = math.bnToNumber(totalCollateral);
+          const shortTokenId = await pool["tokensByAccount(address)"](
+            addresses.vault
+          );
 
-        const feeInCollateral = totalDistributionInCollateral * 0.02;
-        totalDistributionInCollateral =
-          totalDistributionInCollateral - feeInCollateral;
+          const lpCollateralBalanceBefore = await asset.balanceOf(
+            addresses.lp1
+          );
 
-        const totalShortContracts = await vault.totalShortAsContracts();
+          const totalCollateral = await vault.totalCollateral();
 
-        let totalDistributionInShortContracts =
-          math.bnToNumber(totalShortContracts);
+          let totalDistributionInCollateral = math.bnToNumber(totalCollateral);
 
-        const feeInShortContracts = totalDistributionInShortContracts * 0.02;
-        totalDistributionInShortContracts =
-          totalDistributionInShortContracts - feeInShortContracts;
+          const totalShortContracts = await vault.totalShortAsContracts();
 
-        // lp1 withdraws from vault
-        await queue
-          .connect(signers.lp1)
-          .setApprovalForAll(addresses.vault, true);
+          let totalDistributionInShortContracts =
+            math.bnToNumber(totalShortContracts);
 
-        const shareAmount = await vault
-          .connect(signers.lp1)
-          .maxRedeem(addresses.lp1);
+          // lp1 redeems from vault
+          await queue
+            .connect(signers.lp1)
+            .setApprovalForAll(addresses.vault, true);
 
-        await vault
-          .connect(signers.lp1)
-          .redeem(shareAmount, addresses.lp1, addresses.lp1);
+          const shareAmount = await vault
+            .connect(signers.lp1)
+            .maxRedeem(addresses.lp1);
 
-        const lpCollateralBalanceAfter = await asset.balanceOf(addresses.lp1);
+          await vault
+            .connect(signers.lp1)
+            .redeem(shareAmount, addresses.lp1, addresses.lp1);
 
-        const feeRecipientCollateralBalanceAfter = await asset.balanceOf(
-          addresses.feeRecipient
-        );
+          const lpVaultSharesAfter = await vault.balanceOf(addresses.lp1);
+          const lpCollateralBalanceAfter = await asset.balanceOf(addresses.lp1);
 
-        const lpShortBalanceAfter = await pool.balanceOf(
-          addresses.lp1,
-          shortTokenId[0]
-        );
+          const vaultShortBalanceAfter = await pool.balanceOf(
+            addresses.vault,
+            shortTokenId[0]
+          );
 
-        const feeRecipientShortBalanceAfter = await pool.balanceOf(
-          addresses.feeRecipient,
-          shortTokenId[0]
-        );
+          const lpShortBalanceAfter = await pool.balanceOf(
+            addresses.lp1,
+            shortTokenId[0]
+          );
 
-        assert.equal(
-          math.bnToNumber(feeRecipientShortBalanceAfter),
-          feeInShortContracts
-        );
+          assert.equal(math.bnToNumber(lpVaultSharesAfter), 0);
+          almost(
+            vaultShortBalanceAfter,
+            0,
+            parseUnits("1", params.collateral.decimals - 3) // min tolerance
+          );
 
-        almost(feeRecipientCollateralBalanceAfter, feeInCollateral);
+          assert.equal(
+            math.bnToNumber(lpShortBalanceAfter),
+            totalDistributionInShortContracts
+          );
 
-        assert.equal(
-          math.bnToNumber(lpShortBalanceAfter),
-          totalDistributionInShortContracts
-        );
-
-        // distribution contains collateral and premiums earned from auction
-        almost(
-          lpCollateralBalanceAfter.sub(lpCollateralBalanceBefore),
-          totalDistributionInCollateral
-        );
-      });
-
-      it("should distribute collateral and short tokens to LP after auction ends", async () => {
-        await queue.connect(signers.lp1)["redeemMax()"]();
-
-        const shortTokenId = await pool["tokensByAccount(address)"](
-          addresses.vault
-        );
-
-        const lpCollateralBalanceBefore = await asset.balanceOf(addresses.lp1);
-
-        const totalCollateral = await vault.totalCollateral();
-
-        let totalDistributionInCollateral = math.bnToNumber(totalCollateral);
-
-        const totalShortContracts = await vault.totalShortAsContracts();
-
-        let totalDistributionInShortContracts =
-          math.bnToNumber(totalShortContracts);
-
-        // lp1 redeems from vault
-        await queue
-          .connect(signers.lp1)
-          .setApprovalForAll(addresses.vault, true);
-
-        const shareAmount = await vault
-          .connect(signers.lp1)
-          .maxRedeem(addresses.lp1);
-
-        await vault
-          .connect(signers.lp1)
-          .redeem(shareAmount, addresses.lp1, addresses.lp1);
-
-        const lpVaultSharesAfter = await vault.balanceOf(addresses.lp1);
-        const lpCollateralBalanceAfter = await asset.balanceOf(addresses.lp1);
-
-        const vaultShortBalanceAfter = await pool.balanceOf(
-          addresses.vault,
-          shortTokenId[0]
-        );
-
-        const lpShortBalanceAfter = await pool.balanceOf(
-          addresses.lp1,
-          shortTokenId[0]
-        );
-
-        assert.equal(math.bnToNumber(lpVaultSharesAfter), 0);
-        almost(
-          vaultShortBalanceAfter,
-          0,
-          parseUnits("1", params.collateral.decimals - 3) // min tolerance
-        );
-
-        assert.equal(
-          math.bnToNumber(lpShortBalanceAfter),
-          totalDistributionInShortContracts
-        );
-
-        // distribution contains collateral and premiums earned from auction
-        almost(
-          lpCollateralBalanceAfter.sub(lpCollateralBalanceBefore),
-          totalDistributionInCollateral
-        );
+          // distribution contains collateral and premiums earned from auction
+          almost(
+            lpCollateralBalanceAfter.sub(lpCollateralBalanceBefore),
+            totalDistributionInCollateral
+          );
+        });
       });
     });
   });

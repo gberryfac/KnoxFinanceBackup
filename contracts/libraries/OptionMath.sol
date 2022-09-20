@@ -6,8 +6,7 @@ import "abdk-libraries-solidity/ABDKMath64x64.sol";
 import "@solidstate/abdk-math-extensions/contracts/ABDKMath64x64Token.sol";
 
 /**
- * @title ABDK 64x64 Token Math Helper Library
- * @dev extension of ABDKMath64x64Token SolidState Solidity library
+ * @title Option Math Helper Library
  */
 
 library OptionMath {
@@ -16,9 +15,58 @@ library OptionMath {
     using ABDKMath64x64Token for int128;
     using ABDKMath64x64Token for uint256;
 
+    int256 private constant ONE = 10000000000000000000;
+
     struct Value {
         int256 value;
         int256 ruler;
+    }
+
+    /**
+     * @custom:author Yaojin Sun
+     * @notice applies ceiling to the second highest place value of a positive 64x64 fixed point number
+     * @param x 64x64 fixed point number
+     * @return rounded 64x64 fixed point number
+     */
+    function ceil64x64(int128 x) internal pure returns (int128) {
+        require(x > 0);
+
+        (int256 integer, Value[3] memory values) = _getPositivePlaceValues(x);
+
+        // if the summation of first and second values is equal to integer, the integer has already been rounded
+        if (
+            values[0].ruler *
+                values[0].value +
+                values[1].ruler *
+                values[1].value ==
+            integer
+        ) {
+            return int128((integer << 64) / ONE);
+        }
+
+        return
+            int128(
+                (((values[0].ruler * values[0].value) +
+                    (values[1].ruler * (values[1].value + 1))) << 64) / ONE
+            );
+    }
+
+    /**
+     * @custom:author Yaojin Sun
+     * @notice applies floor to the second highest place value of a positive 64x64 fixed point number
+     * @param x 64x64 fixed point number
+     * @return rounded 64x64 fixed point number
+     */
+    function floor64x64(int128 x) internal pure returns (int128) {
+        require(x > 0);
+
+        (, Value[3] memory values) = _getPositivePlaceValues(x);
+
+        // No matter whether third value is non-zero or not, we ONLY need to keep the first and second places.
+        int256 res =
+            (values[0].ruler * values[0].value) +
+                (values[1].ruler * values[1].value);
+        return int128((res << 64) / ONE);
     }
 
     function _getPositivePlaceValues(int128 x)
@@ -27,7 +75,7 @@ library OptionMath {
         returns (int256, Value[3] memory)
     {
         // move the decimal part to integer by multiplying 10...0
-        int256 integer = (int256(x) * 10000000000000000000) >> 64;
+        int256 integer = (int256(x) * ONE) >> 64;
 
         // scan and identify the highest position
         int256 ruler = 100000000000000000000000000000000000000; // 10^38
@@ -58,54 +106,6 @@ library OptionMath {
     }
 
     /**
-     * @custom:author Yaojin Sun
-     * @notice applies ceiling to the second highest place value of a positive 64x64 fixed point number
-     * @param x 64x64 fixed point number
-     * @return rounded 64x64 fixed point number
-     */
-    function ceil64x64(int128 x) internal pure returns (int128) {
-        require(x > 0);
-
-        (int256 integer, Value[3] memory values) = _getPositivePlaceValues(x);
-
-        // if the summation of first and second values is equal to integer, the integer has already been rounded
-        if (
-            values[0].ruler *
-                values[0].value +
-                values[1].ruler *
-                values[1].value ==
-            integer
-        ) {
-            return int128((integer << 64) / 10000000000000000000);
-        }
-
-        return
-            int128(
-                (((values[0].ruler * values[0].value) +
-                    (values[1].ruler * (values[1].value + 1))) << 64) /
-                    10000000000000000000
-            );
-    }
-
-    /**
-     * @custom:author Yaojin Sun
-     * @notice applies floor to the second highest place value of a positive 64x64 fixed point number
-     * @param x 64x64 fixed point number
-     * @return rounded 64x64 fixed point number
-     */
-    function floor64x64(int128 x) internal pure returns (int128) {
-        require(x > 0);
-
-        (, Value[3] memory values) = _getPositivePlaceValues(x);
-
-        // No matter whether third value is non-zero or not, we ONLY need to keep the first and second places.
-        int256 res =
-            (values[0].ruler * values[0].value) +
-                (values[1].ruler * values[1].value);
-        return int128((res << 64) / 10000000000000000000);
-    }
-
-    /**
      * @notice converts the value to the base token amount
      * @param underlyingDecimals decimal precision of the underlying asset
      * @param baseDecimals decimal precision of the base asset
@@ -121,6 +121,14 @@ library OptionMath {
         return value64x64.toDecimals(baseDecimals);
     }
 
+    /**
+     * @notice calculates the collateral asset amount from the number of contracts
+     * @param isCall option type, true if call option
+     * @param underlyingDecimals decimal precision of the underlying asset
+     * @param baseDecimals decimal precision of the base asset
+     * @param strike64x64 strike price of the option as 64x64 fixed point number
+     * @return collateral asset amount
+     */
     function fromContractsToCollateral(
         uint256 contracts,
         bool isCall,
@@ -140,6 +148,13 @@ library OptionMath {
             );
     }
 
+    /**
+     * @notice calculates number of contracts from the collateral asset amount
+     * @param isCall option type, true if call option
+     * @param baseDecimals decimal precision of the base asset
+     * @param strike64x64 strike price of the option as 64x64 fixed point number
+     * @return number of contracts
+     */
     function fromContractsToCollateral(
         uint256 collateral,
         bool isCall,

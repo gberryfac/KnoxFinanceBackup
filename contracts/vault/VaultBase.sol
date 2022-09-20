@@ -57,7 +57,7 @@ contract VaultBase is ERC4626Base, VaultInternal {
     }
 
     // this contract overrides the ERC4626 standard withdraw, and redeem functions
-    // such that they are only callable when the auction is not in progress. during
+    // such that they are only callable after the auction has been processed. during
     // the auction the vaults balance must remain constant, the auction contract
     // queries the vault for its available amount of collateral once in the beginning
     // of the auction. therefore it is required the vault's collateral amount does
@@ -75,7 +75,12 @@ contract VaultBase is ERC4626Base, VaultInternal {
         uint256 assetAmount,
         address receiver,
         address owner
-    ) internal override(ERC4626BaseInternal, VaultInternal) returns (uint256) {
+    )
+        internal
+        override(ERC4626BaseInternal, VaultInternal)
+        withdrawalsLocked
+        returns (uint256)
+    {
         return super._withdraw(assetAmount, receiver, owner);
     }
 
@@ -90,7 +95,12 @@ contract VaultBase is ERC4626Base, VaultInternal {
         uint256 shareAmount,
         address receiver,
         address owner
-    ) internal override(ERC4626BaseInternal, VaultInternal) returns (uint256) {
+    )
+        internal
+        override(ERC4626BaseInternal, VaultInternal)
+        withdrawalsLocked
+        returns (uint256)
+    {
         return super._redeem(shareAmount, receiver, owner);
     }
 }

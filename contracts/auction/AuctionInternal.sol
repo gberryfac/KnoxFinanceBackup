@@ -9,7 +9,6 @@ import "@solidstate/contracts/utils/IWETH.sol";
 import "@solidstate/contracts/utils/SafeERC20.sol";
 
 import "../libraries/OptionMath.sol";
-import "../libraries/Helpers.sol";
 
 import "../vendor/IPremiaPool.sol";
 
@@ -160,7 +159,7 @@ contract AuctionInternal is IAuctionEvents, OwnableInternal {
      ***********************************************/
 
     /**
-     * @notice last price paid during the auction
+     * @notice returns the last price paid during the auction
      * @param auction storage params
      * @return price as 64x64 fixed point number
      */
@@ -173,7 +172,7 @@ contract AuctionInternal is IAuctionEvents, OwnableInternal {
     }
 
     /**
-     * @notice calculates price as a function of time
+     * @notice calculates the current price using the price curve function
      * @param auction storage params
      * @return price as 64x64 fixed point number
      */
@@ -210,7 +209,8 @@ contract AuctionInternal is IAuctionEvents, OwnableInternal {
     }
 
     /**
-     * @notice clearing price of the auction
+     * @notice returns the current price established by the price curve if the auction
+     * is still ongoing, otherwise the last price paid is returned
      * @param auction storage params
      * @return price as 64x64 fixed point number
      */
@@ -461,7 +461,7 @@ contract AuctionInternal is IAuctionEvents, OwnableInternal {
      ***********************************************/
 
     /**
-     * @notice gets the total number of contracts that can be sold during the auction
+     * @notice calculates the total number of contracts that can be sold during the auction
      * @param auction storage params
      * @return total contracts available
      */

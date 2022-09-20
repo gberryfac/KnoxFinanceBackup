@@ -42,7 +42,7 @@ interface IPricer {
      * @param spot64x64 spot price of the underlying as 64x64 fixed point number
      * @param strike64x64 strike price of the option as 64x64 fixed point number
      * @param timeToMaturity64x64 time remaining until maturity as a 64x64 fixed point number
-     * @param isCall option type
+     * @param isCall option type, true if call option
      * @return price of the option denominated in the base as 64x64 fixed point number
      */
     function getBlackScholesPrice64x64(
@@ -54,7 +54,7 @@ interface IPricer {
 
     /**
      * @notice calculates the delta strike price
-     * @param isCall option type
+     * @param isCall option type, true if call option
      * @param expiry the expiry date as UNIX timestamp
      * @param delta64x64 option delta as 64x64 fixed point number
      * @return delta strike price as 64x64 fixed point number
@@ -67,7 +67,7 @@ interface IPricer {
 
     /**
      * @notice rounds a value to the floor or ceiling depending on option type
-     * @param isCall option type
+     * @param isCall option type, true if call option
      * @param n input value
      * @return rounded value as 64x64 fixed point number
      */

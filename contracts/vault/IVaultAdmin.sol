@@ -9,26 +9,25 @@ import "./VaultStorage.sol";
 
 interface IVaultAdmin {
     /************************************************
-     *  INITIALIZATION
+     *  ADMIN
      ***********************************************/
 
     /**
-     * @notice initializes vault with queue, auction, and pricer addresses
-     * @param initImpl initialization parameters
+     * @notice sets the new auction
+     * @dev the auction contract address must be set during the vault initialization
+     * @param newAuction address of the new auction
      */
-    function initialize(VaultStorage.InitImpl memory initImpl) external;
-
-    /************************************************
-     *  ADMIN
-     ***********************************************/
+    function setAuction(address newAuction) external;
 
     /**
      * @notice sets the start and end offsets for the auction
      * @param newStartOffset new start offset
      * @param newEndOffset new end offset
      */
-    function setAuctionWindowOffsets(uint16 newStartOffset, uint16 newEndOffset)
-        external;
+    function setAuctionWindowOffsets(
+        uint256 newStartOffset,
+        uint256 newEndOffset
+    ) external;
 
     /**
      * @notice sets the option delta value
@@ -50,9 +49,17 @@ interface IVaultAdmin {
 
     /**
      * @notice sets the new pricer
+     * @dev the pricer contract address must be set during the vault initialization
      * @param newPricer address of the new pricer
      */
     function setPricer(address newPricer) external;
+
+    /**
+     * @notice sets the new queue
+     * @dev the queue contract address must be set during the vault initialization
+     * @param newQueue address of the new queue
+     */
+    function setQueue(address newQueue) external;
 
     /**
      * @notice sets the performance fee for the vault
@@ -71,57 +78,20 @@ interface IVaultAdmin {
      ***********************************************/
 
     /**
-     * @notice sets the option parameters and initializes auction
-     */
-    function setAndInitializeAuction() external;
-
-    /**
-     * @notice sets the parameters for the next option to be sold
-     */
-    function setOptionParameters() external;
-
-    /**
-     * @notice initializes the auction
+     * @notice sets the option parameters which will be sold, then initializes the auction
      */
     function initializeAuction() external;
 
     /************************************************
-     *  PROCESS LAST EPOCH
+     *  INITIALIZE EPOCH
      ***********************************************/
 
     /**
-     * @notice withdraws reserved liquidity and collects performance fees
+     * @notice collects performance fee from epoch income, processes the queued deposits,
+     * increments the epoch id, then sets the auction prices
+     * @dev it assumed that an auction has already been initialized
      */
-    function processLastEpoch() external;
-
-    /**
-     * @notice removes reserved liquidity from Premia pool
-     */
-    function withdrawReservedLiquidity() external;
-
-    /**
-     * @notice collects performance fees on epoch net income
-     * @dev reserved liquidity must be returned to vault prior to being called
-     */
-    function collectPerformanceFee() external;
-
-    /************************************************
-     *  INITIALIZE NEXT EPOCH
-     ***********************************************/
-
-    /**
-     * @notice initializes the next epoch
-     */
-    function initializeNextEpoch() external;
-
-    /************************************************
-     *  SET AUCTION PRICES
-     ***********************************************/
-
-    /**
-     * @notice calculates and sets the auction prices
-     */
-    function setAuctionPrices() external;
+    function initializeEpoch() external;
 
     /************************************************
      *  PROCESS AUCTION
@@ -129,8 +99,8 @@ interface IVaultAdmin {
 
     /**
      * @notice processes the auction when it has been finalized
-     * @dev divestment timestamp must be set in Premia pool, otherwise exercised options
-     * will be moved to free liquidity queue
+     * @dev it assumed that an auction has already been initialized and the auction prices
+     * have been set
      */
     function processAuction() external;
 }

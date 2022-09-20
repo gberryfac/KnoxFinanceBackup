@@ -48,20 +48,24 @@ library VaultStorage {
         uint8 baseDecimals;
         // underlying asset decimals
         uint8 underlyingDecimals;
-        // vault option type (call or put)
+        // option type, true if option is a call
         bool isCall;
+        // auction processing flag, true if auction has been processed
+        bool auctionProcessed;
         // vault option delta
         int128 delta64x64;
         // vault option delta offeset
         int128 deltaOffset64x64;
         // mapping of options to epoch id (epoch id -> option)
         mapping(uint64 => Option) options;
-        // auction start offset
-        uint64 startOffset;
-        // auction end offset
-        uint64 endOffset;
         // epoch id
         uint64 epoch;
+        // auction start offset in seconds (startOffset = startTime - expiry)
+        uint256 startOffset;
+        // auction end offset in seconds (endOffset = endTime - expiry)
+        uint256 endOffset;
+        // auction start timestamp
+        uint256 startTime;
         // total asset amount withdrawn during an epoch
         uint256 totalWithdrawals;
         // total asset amount not including premiums collected from the auction
@@ -99,16 +103,16 @@ library VaultStorage {
      ***********************************************/
 
     /**
-     * @notice gets the most recent epoch id from storage
-     * @return epoch id
+     * @notice returns the current epoch
+     * @return current epoch id
      */
     function _getEpoch() internal view returns (uint64) {
         return layout().epoch;
     }
 
     /**
-     * @notice gets the most recent option from storage
-     * @return vault option
+     * @notice returns the option by epoch id
+     * @return option parameters
      */
     function _getOption(uint64 epoch) internal view returns (Option memory) {
         return layout().options[epoch];

@@ -19,37 +19,29 @@ contract VaultAdmin is IVaultAdmin, VaultInternal {
     constructor(bool isCall, address pool) VaultInternal(isCall, pool) {}
 
     /************************************************
-     *  INITIALIZATION
-     ***********************************************/
-
-    /**
-     * @inheritdoc IVaultAdmin
-     */
-    function initialize(VaultStorage.InitImpl memory initImpl)
-        external
-        onlyOwner
-    {
-        require(initImpl.auction != address(0), "address not provided");
-        require(initImpl.queue != address(0), "address not provided");
-        require(initImpl.pricer != address(0), "address not provided");
-
-        VaultStorage.Layout storage l = VaultStorage.layout();
-        l.Auction = IAuction(initImpl.auction);
-        l.Queue = IQueue(initImpl.queue);
-        l.Pricer = IPricer(initImpl.pricer);
-    }
-
-    /************************************************
      *  ADMIN
      ***********************************************/
 
     /**
      * @inheritdoc IVaultAdmin
      */
-    function setAuctionWindowOffsets(uint16 newStartOffset, uint16 newEndOffset)
-        external
-        onlyOwner
-    {
+    function setAuction(address newAuction) external onlyOwner {
+        VaultStorage.Layout storage l = VaultStorage.layout();
+        require(newAuction != address(0), "address not provided");
+        require(newAuction != address(l.Auction), "new address equals old");
+
+        emit AuctionSet(l.epoch, address(l.Auction), newAuction, msg.sender);
+
+        l.Auction = IAuction(newAuction);
+    }
+
+    /**
+     * @inheritdoc IVaultAdmin
+     */
+    function setAuctionWindowOffsets(
+        uint256 newStartOffset,
+        uint256 newEndOffset
+    ) external onlyOwner {
         VaultStorage.Layout storage l = VaultStorage.layout();
         require(newEndOffset > newStartOffset, "start offset > end offset");
 
@@ -126,6 +118,19 @@ contract VaultAdmin is IVaultAdmin, VaultInternal {
     /**
      * @inheritdoc IVaultAdmin
      */
+    function setQueue(address newQueue) external onlyOwner {
+        VaultStorage.Layout storage l = VaultStorage.layout();
+        require(newQueue != address(0), "address not provided");
+        require(newQueue != address(l.Queue), "new address equals old");
+
+        emit QueueSet(l.epoch, address(l.Queue), newQueue, msg.sender);
+
+        l.Queue = IQueue(newQueue);
+    }
+
+    /**
+     * @inheritdoc IVaultAdmin
+     */
     function setPerformanceFee64x64(int128 newPerformanceFee64x64)
         external
         onlyOwner
@@ -170,163 +175,57 @@ contract VaultAdmin is IVaultAdmin, VaultInternal {
     /**
      * @inheritdoc IVaultAdmin
      */
-    function setAndInitializeAuction() external onlyKeeper {
-        _setOptionParameters();
-        _initializeAuction();
-    }
-
-    /**
-     * @inheritdoc IVaultAdmin
-     */
-    function setOptionParameters() external onlyKeeper {
-        _setOptionParameters();
-    }
-
-    /**
-     * @inheritdoc IVaultAdmin
-     */
     function initializeAuction() external onlyKeeper {
-        _initializeAuction();
+        VaultStorage.Layout storage l = VaultStorage.layout();
+        VaultStorage.Option memory option = _setOptionParameters(l);
+
+        // auctions begin on Friday
+        uint256 startTimestamp = _getFriday(block.timestamp);
+
+        // offsets the start and end times by a fixed amount
+        uint256 startTime = startTimestamp + l.startOffset;
+        uint256 endTime = startTimestamp + l.endOffset;
+
+        // resets withdrawal lock, reactivates when auction starts
+        l.startTime = startTime;
+        l.auctionProcessed = false;
+
+        // initializes the auction using the option parameters and start/end times
+        l.Auction.initialize(
+            AuctionStorage.InitAuction(
+                l.epoch,
+                option.expiry,
+                option.strike64x64,
+                option.longTokenId,
+                startTime,
+                endTime
+            )
+        );
     }
 
     /************************************************
-     *  PROCESS LAST EPOCH
+     *  INITIALIZE EPOCH
      ***********************************************/
 
     /**
      * @inheritdoc IVaultAdmin
      */
-    function processLastEpoch() external onlyKeeper {
-        _withdrawReservedLiquidity();
-        _collectPerformanceFee();
-    }
-
-    /**
-     * @inheritdoc IVaultAdmin
-     */
-    function withdrawReservedLiquidity() external onlyKeeper {
-        _withdrawReservedLiquidity();
-    }
-
-    /**
-     * @inheritdoc IVaultAdmin
-     */
-    function collectPerformanceFee() external onlyKeeper {
-        _collectPerformanceFee();
-    }
-
-    /************************************************
-     *  INITIALIZE NEXT EPOCH
-     ***********************************************/
-
-    /**
-     * @inheritdoc IVaultAdmin
-     */
-    function initializeNextEpoch() external onlyKeeper {
+    function initializeEpoch() external onlyKeeper {
         VaultStorage.Layout storage l = VaultStorage.layout();
 
-        // when the queue processes its deposits, it will send the enitre balance to the vault
-        // in exchange for a pro-rata share of the vault tokens.
+        // skips epoch 0 as there will be no net income, and the lastTotalAsset balance
+        // will not be set
+        if (l.epoch > 0) _collectPerformanceFee(l);
+
+        // when the queue processes its deposits, it will send the enitre balance to
+        // the vault in exchange for a pro-rata share of the vault tokens.
         l.Queue.processDeposits();
 
-        // the epoch id is incremented
+        // increment the epoch id
         l.epoch = l.epoch + 1;
 
-        // the queue epoch id must remain in sync with the vault
-        l.Queue.syncEpoch(l.epoch);
-    }
-
-    /************************************************
-     *  SET AUCTION PRICES
-     ***********************************************/
-
-    /**
-     * @inheritdoc IVaultAdmin
-     */
-    function setAuctionPrices() external onlyKeeper {
-        VaultStorage.Layout storage l = VaultStorage.layout();
-        VaultStorage.Option storage option = l.options[l.epoch];
-
-        // assumes that the strike price has been set
-        require(option.strike64x64 > 0, "delta strike unset");
-
-        // the delta offset is used to calculate an offset strike price which should always be
-        // further OTM.
-
-        // calculates the delta strike price using the offset delta
-        int128 offsetStrike64x64 =
-            l.Pricer.getDeltaStrikePrice64x64(
-                l.isCall,
-                option.expiry,
-                l.delta64x64.sub(l.deltaOffset64x64)
-            );
-
-        // fetches the spot price of the underlying
-        int128 spot64x64 = l.Pricer.latestAnswer64x64();
-
-        // fetches the time to maturity of the option
-        int128 timeToMaturity64x64 =
-            l.Pricer.getTimeToMaturity64x64(option.expiry);
-
-        /**
-         * it is assumed that the rounded strike price will always be further ITM than the offset
-         * strike price. the further ITM option will always be more expensive and will therefore
-         * be used to determine the max price of the auction. likewise, the offset strike price
-         * (further OTM) should resemble a cheaper option and it is therefore used as the min
-         * option price in our auction.
-         *
-         *
-         * Call Option
-         * -----------
-         * Strike    Rounded Strike             Offset Strike
-         *   |  ---------> |                          |
-         *   |             |                          |
-         * -----------------------Price------------------------>
-         *
-         *
-         * Put Option
-         * -----------
-         * Offset Strike              Rounded Strike    Strike
-         *       |                           | <--------- |
-         *       |                           |            |
-         * -----------------------Price------------------------>
-         */
-
-        // calculates the auction max price using the strike price further (ITM)
-        int128 maxPrice64x64 =
-            l.Pricer.getBlackScholesPrice64x64(
-                spot64x64,
-                option.strike64x64,
-                timeToMaturity64x64,
-                l.isCall
-            );
-
-        // calculates the auction min price using the offset strike price further (OTM)
-        int128 minPrice64x64 =
-            l.Pricer.getBlackScholesPrice64x64(
-                spot64x64,
-                offsetStrike64x64,
-                timeToMaturity64x64,
-                l.isCall
-            );
-
-        if (l.isCall) {
-            // denominates price in the collateral asset
-            maxPrice64x64 = maxPrice64x64.div(spot64x64);
-            minPrice64x64 = minPrice64x64.div(spot64x64);
-        }
-
-        emit AuctionPricesSet(
-            l.epoch,
-            option.strike64x64,
-            offsetStrike64x64,
-            spot64x64,
-            timeToMaturity64x64,
-            maxPrice64x64,
-            minPrice64x64
-        );
-
-        l.Auction.setAuctionPrices(l.epoch, maxPrice64x64, minPrice64x64);
+        // sets the max/min auction prices
+        _setAuctionPrices(l);
     }
 
     /************************************************
@@ -391,6 +290,9 @@ contract VaultAdmin is IVaultAdmin, VaultInternal {
         Pool.setDivestmentTimestamp(divestmentTimestamp, l.isCall);
 
         l.Auction.processAuction(lastEpoch);
+
+        // deactivates withdrawal lock
+        l.auctionProcessed = true;
 
         emit AuctionProcessed(
             lastEpoch,

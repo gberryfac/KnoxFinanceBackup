@@ -5,7 +5,6 @@ import "@solidstate/contracts/access/ownable/OwnableInternal.sol";
 import "@solidstate/contracts/token/ERC4626/base/ERC4626BaseInternal.sol";
 
 import "../libraries/OptionMath.sol";
-import "../libraries/Helpers.sol";
 
 import "../vendor/IPremiaPool.sol";
 
@@ -22,7 +21,6 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
     using ABDKMath64x64 for uint256;
     using OptionMath for int128;
     using OptionMath for uint256;
-    using Helpers for uint256;
     using SafeERC20 for IERC20;
     using VaultStorage for VaultStorage.Layout;
 
@@ -58,139 +56,39 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
         _;
     }
 
-    /************************************************
-     *  INITIALIZE AUCTION
-     ***********************************************/
-
     /**
-     * @notice sets the parameters for the next option to be sold
+     * @dev Throws if called while withdrawals are locked
      */
-    function _setOptionParameters() internal {
+    modifier withdrawalsLocked() {
         VaultStorage.Layout storage l = VaultStorage.layout();
 
-        // sets the expiry for the next Friday
-        uint64 expiry = uint64(block.timestamp.getNextFriday());
+        /**
+         * the withdrawal lock is active after the auction has started and deactivated
+         * when the auction is processed.
+         *
+         * when the auction has been processed by the keeper the auctionProcessed flag
+         * is set to true, deactivating the lock.
+         *
+         * when the auction is initialized by the keeper the flag is set to false and
+         * the startTime is updated.
+         *
+         * note, the auction must start for the lock to be reactivated. i.e. if the
+         * flag is false but the auction has not started the lock is deactivated.
+         *
+         *
+         *    Auction       Auction      Auction       Auction
+         *  Initialized     Started     Processed    Initialized
+         *       |             |///Locked///|             |
+         *       |             |////////////|             |
+         * -------------------------Time--------------------------->
+         *
+         *
+         */
 
-        // calculates the delta strike price
-        int128 strike64x64 =
-            l.Pricer.getDeltaStrikePrice64x64(l.isCall, expiry, l.delta64x64);
-
-        // rounds the delta strike price
-        strike64x64 = l.Pricer.snapToGrid64x64(l.isCall, strike64x64);
-
-        // sets parameters for the next option
-        VaultStorage.Option storage option = l.options[l.epoch];
-        option.expiry = expiry;
-        option.strike64x64 = strike64x64;
-
-        TokenType longTokenType =
-            l.isCall ? TokenType.LONG_CALL : TokenType.LONG_PUT;
-
-        // get the formatted long token id
-        option.longTokenId = _formatTokenId(longTokenType, expiry, strike64x64);
-
-        TokenType shortTokenType =
-            l.isCall ? TokenType.SHORT_CALL : TokenType.SHORT_PUT;
-
-        // get the formatted short token id
-        option.shortTokenId = _formatTokenId(
-            shortTokenType,
-            expiry,
-            strike64x64
-        );
-
-        emit OptionParametersSet(
-            l.epoch,
-            option.expiry,
-            option.strike64x64,
-            option.longTokenId,
-            option.shortTokenId
-        );
-    }
-
-    /**
-     * @notice initializes auction
-     */
-    function _initializeAuction() internal {
-        VaultStorage.Layout storage l = VaultStorage.layout();
-        VaultStorage.Option storage option = l.options[l.epoch];
-
-        // auctions begin on Friday
-        uint256 startTimestamp = Helpers.getFriday(block.timestamp);
-
-        // offsets the start and end times by a fixed amount
-        uint256 startTime = startTimestamp + l.startOffset;
-        uint256 endTime = startTimestamp + l.endOffset;
-
-        // initializes the auction using the option parameters and start/end times
-        l.Auction.initialize(
-            AuctionStorage.InitAuction(
-                l.epoch,
-                option.expiry,
-                option.strike64x64,
-                option.longTokenId,
-                startTime,
-                endTime
-            )
-        );
-    }
-
-    /************************************************
-     *  PROCESS LAST EPOCH
-     ***********************************************/
-
-    /**
-     * @notice removes reserved liquidity from Premia pool
-     */
-    function _withdrawReservedLiquidity() internal {
-        VaultStorage.Layout storage l = VaultStorage.layout();
-
-        // gets the vaults reserved liquidity balance
-        uint256 reservedLiquidity =
-            Pool.balanceOf(
-                address(this),
-                l.isCall
-                    ? uint256(TokenType.UNDERLYING_RESERVED_LIQ) << 248
-                    : uint256(TokenType.BASE_RESERVED_LIQ) << 248
-            );
-
-        if (reservedLiquidity > 0) {
-            // remove reserved liquidity from the pool, if available
-            Pool.withdraw(reservedLiquidity, l.isCall);
+        if (block.timestamp >= l.startTime) {
+            require(l.auctionProcessed, "auction has not been processed");
         }
-
-        emit ReservedLiquidityWithdrawn(l.epoch, reservedLiquidity);
-    }
-
-    /**
-     * @notice collects performance fees on epoch net income
-     */
-    function _collectPerformanceFee() internal {
-        VaultStorage.Layout storage l = VaultStorage.layout();
-
-        uint256 netIncome;
-        uint256 feeInCollateral;
-
-        // adjusts total assets to account for assets withdrawn during the epoch
-        uint256 adjustedTotalAssets = _totalAssets() + l.totalWithdrawals;
-
-        if (adjustedTotalAssets > l.lastTotalAssets) {
-            // collect performance fee ONLY if the vault returns a positive net income
-            // if the net income is negative, last week's option expired ITM past breakeven,
-            // and the vault took a loss so we do not collect performance fee for last week
-            netIncome = adjustedTotalAssets - l.lastTotalAssets;
-
-            // calculate the performance fee denominated in the collateral asset
-            feeInCollateral = l.performanceFee64x64.mulu(netIncome);
-
-            // send collected fee to recipient wallet
-            ERC20.safeTransfer(l.feeRecipient, feeInCollateral);
-        }
-
-        // reset totalWithdrawals
-        l.totalWithdrawals = 0;
-
-        emit PerformanceFeeCollected(_lastEpoch(l), netIncome, feeInCollateral);
+        _;
     }
 
     /************************************************
@@ -198,7 +96,7 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
      ***********************************************/
 
     /**
-     * @notice gets the total active vault collateral
+     * @notice calculates the total active vault collateral
      * @return total vault collateral excluding the total reserves
      */
     function _totalCollateral() internal view returns (uint256) {
@@ -207,7 +105,7 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
     }
 
     /**
-     * @notice gets the short position value denominated in the collateral asset
+     * @notice calculates the short position value denominated in the collateral asset
      * @return total short position in collateral amount
      */
     function _totalShortAsCollateral() internal view returns (uint256) {
@@ -227,7 +125,7 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
     }
 
     /**
-     * @notice gets the amount in short contracts underwitten by the vault in the last epoch
+     * @notice returns the amount in short contracts underwitten by the vault
      * @return total short contracts
      */
     function _totalShortAsContracts() internal view returns (uint256) {
@@ -237,7 +135,7 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
     }
 
     /**
-     * @notice gets the total reserved collateral
+     * @notice calculates the total reserved collateral
      * @dev collateral is reserved from the auction to ensure the Vault has sufficent funds to
      * cover the APY fee
      * @return total reserved collateral
@@ -252,7 +150,7 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
      ***********************************************/
 
     /**
-     * @notice gets the total active assets by the vault denominated in the collateral asset
+     * @notice calculates the total active assets by the vault denominated in the collateral asset
      * @return total active asset amount
      */
     function _totalAssets()
@@ -361,7 +259,7 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
         l.totalWithdrawals += assetAmount;
 
         // removes any reserved liquidty from pool in the event an option has been exercised
-        _withdrawReservedLiquidity();
+        _withdrawReservedLiquidity(l);
 
         // LPs may withdraw funds at any time and receive a proportion of the assets held in
         // the vault. this means that a withdrawal can be mixture of collateral assets and
@@ -391,7 +289,7 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
     }
 
     /************************************************
-     *  HELPERS
+     *  WITHDRAW HELPERS
      ***********************************************/
 
     /**
@@ -542,30 +440,212 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
         );
     }
 
+    /************************************************
+     *  ADMIN HELPERS
+     ***********************************************/
+
     /**
-     * @notice gets the last epoch
+     * @notice sets the parameters for the next option to be sold
      * @param l vault storage layout
-     * @return last epoch
+     * @return the next option to be sold
      */
-    function _lastEpoch(VaultStorage.Layout storage l)
+    function _setOptionParameters(VaultStorage.Layout storage l)
         internal
-        view
-        returns (uint64)
+        returns (VaultStorage.Option memory)
     {
-        return l.epoch > 0 ? l.epoch - 1 : 0;
+        // sets the expiry for the next Friday
+        uint64 expiry = uint64(_getNextFriday(block.timestamp));
+
+        // calculates the delta strike price
+        int128 strike64x64 =
+            l.Pricer.getDeltaStrikePrice64x64(l.isCall, expiry, l.delta64x64);
+
+        // rounds the delta strike price
+        strike64x64 = l.Pricer.snapToGrid64x64(l.isCall, strike64x64);
+
+        // sets parameters for the next option
+        VaultStorage.Option storage option = l.options[l.epoch];
+        option.expiry = expiry;
+        option.strike64x64 = strike64x64;
+
+        TokenType longTokenType =
+            l.isCall ? TokenType.LONG_CALL : TokenType.LONG_PUT;
+
+        // get the formatted long token id
+        option.longTokenId = _formatTokenId(longTokenType, expiry, strike64x64);
+
+        TokenType shortTokenType =
+            l.isCall ? TokenType.SHORT_CALL : TokenType.SHORT_PUT;
+
+        // get the formatted short token id
+        option.shortTokenId = _formatTokenId(
+            shortTokenType,
+            expiry,
+            strike64x64
+        );
+
+        emit OptionParametersSet(
+            l.epoch,
+            option.expiry,
+            option.strike64x64,
+            option.longTokenId,
+            option.shortTokenId
+        );
+
+        return option;
     }
 
     /**
-     * @notice gets option from the last epoch
+     * @notice collects performance fees on epoch net income
+     * @dev auction must be processed before fees can be collected, do not call
+     * this function on epoch 0
      * @param l vault storage layout
-     * @return option from last epoch
      */
-    function _lastOption(VaultStorage.Layout storage l)
+    function _collectPerformanceFee(VaultStorage.Layout storage l) internal {
+        // pool must return all available "reserved liquidity" to the vault after the
+        // option expires and before performance fee can be collected
+        _withdrawReservedLiquidity(l);
+
+        uint256 netIncome;
+        uint256 feeInCollateral;
+
+        // adjusts total assets to account for assets withdrawn during the epoch
+        uint256 adjustedTotalAssets = _totalAssets() + l.totalWithdrawals;
+
+        if (adjustedTotalAssets > l.lastTotalAssets) {
+            // collect performance fee ONLY if the vault returns a positive net income
+            // if the net income is negative, last week's option expired ITM past breakeven,
+            // and the vault took a loss so we do not collect performance fee for last week
+            netIncome = adjustedTotalAssets - l.lastTotalAssets;
+
+            // calculate the performance fee denominated in the collateral asset
+            feeInCollateral = l.performanceFee64x64.mulu(netIncome);
+
+            // send collected fee to recipient wallet
+            ERC20.safeTransfer(l.feeRecipient, feeInCollateral);
+        }
+
+        // reset totalWithdrawals
+        l.totalWithdrawals = 0;
+
+        emit PerformanceFeeCollected(_lastEpoch(l), netIncome, feeInCollateral);
+    }
+
+    /**
+     * @notice removes reserved liquidity from Premia pool
+     * @param l vault storage layout
+     */
+    function _withdrawReservedLiquidity(VaultStorage.Layout storage l)
         internal
-        view
-        returns (VaultStorage.Option memory)
     {
-        return l.options[_lastEpoch(l)];
+        // gets the vaults reserved liquidity balance
+        uint256 reservedLiquidity =
+            Pool.balanceOf(
+                address(this),
+                l.isCall
+                    ? uint256(TokenType.UNDERLYING_RESERVED_LIQ) << 248
+                    : uint256(TokenType.BASE_RESERVED_LIQ) << 248
+            );
+
+        if (reservedLiquidity > 0) {
+            // remove reserved liquidity from the pool, if available
+            Pool.withdraw(reservedLiquidity, l.isCall);
+        }
+
+        emit ReservedLiquidityWithdrawn(l.epoch, reservedLiquidity);
+    }
+
+    /**
+     * @notice calculates and sets the auction prices
+     * @param l vault storage layout
+     */
+    function _setAuctionPrices(VaultStorage.Layout storage l) internal {
+        VaultStorage.Option memory lastOption = _lastOption(l);
+
+        // assumes that the strike price has been set
+        require(lastOption.strike64x64 > 0, "delta strike unset");
+
+        // the delta offset is used to calculate an offset strike price which should always be
+        // further OTM.
+
+        // calculates the delta strike price using the offset delta
+        int128 offsetStrike64x64 =
+            l.Pricer.getDeltaStrikePrice64x64(
+                l.isCall,
+                lastOption.expiry,
+                l.delta64x64.sub(l.deltaOffset64x64)
+            );
+
+        // fetches the spot price of the underlying
+        int128 spot64x64 = l.Pricer.latestAnswer64x64();
+
+        // fetches the time to maturity of the option
+        int128 timeToMaturity64x64 =
+            l.Pricer.getTimeToMaturity64x64(lastOption.expiry);
+
+        /**
+         * it is assumed that the rounded strike price will always be further ITM than the offset
+         * strike price. the further ITM option will always be more expensive and will therefore
+         * be used to determine the max price of the auction. likewise, the offset strike price
+         * (further OTM) should resemble a cheaper option and it is therefore used as the min
+         * option price in our auction.
+         *
+         *
+         * Call Option
+         * -----------
+         * Strike    Rounded Strike             Offset Strike
+         *   |  ---------> |                          |
+         *   |             |                          |
+         * -----------------------Price------------------------>
+         *
+         *
+         * Put Option
+         * -----------
+         * Offset Strike              Rounded Strike    Strike
+         *       |                           | <--------- |
+         *       |                           |            |
+         * -----------------------Price------------------------>
+         *
+         *
+         */
+
+        // calculates the auction max price using the strike price further (ITM)
+        int128 maxPrice64x64 =
+            l.Pricer.getBlackScholesPrice64x64(
+                spot64x64,
+                lastOption.strike64x64,
+                timeToMaturity64x64,
+                l.isCall
+            );
+
+        // calculates the auction min price using the offset strike price further (OTM)
+        int128 minPrice64x64 =
+            l.Pricer.getBlackScholesPrice64x64(
+                spot64x64,
+                offsetStrike64x64,
+                timeToMaturity64x64,
+                l.isCall
+            );
+
+        if (l.isCall) {
+            // denominates price in the collateral asset
+            maxPrice64x64 = maxPrice64x64.div(spot64x64);
+            minPrice64x64 = minPrice64x64.div(spot64x64);
+        }
+
+        uint64 epoch = _lastEpoch(l);
+
+        emit AuctionPricesSet(
+            epoch,
+            lastOption.strike64x64,
+            offsetStrike64x64,
+            spot64x64,
+            timeToMaturity64x64,
+            maxPrice64x64,
+            minPrice64x64
+        );
+
+        l.Auction.setAuctionPrices(epoch, maxPrice64x64, minPrice64x64);
     }
 
     /************************************************
@@ -595,10 +675,85 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
         TokenType tokenType,
         uint64 maturity,
         int128 strike64x64
-    ) private pure returns (uint256 tokenId) {
+    ) internal pure returns (uint256 tokenId) {
         tokenId =
             (uint256(tokenType) << 248) +
             (uint256(maturity) << 128) +
             uint256(int256(strike64x64));
+    }
+
+    /************************************************
+     *  HELPERS
+     ***********************************************/
+
+    /**
+     * @notice returns the last epoch
+     * @param l vault storage layout
+     * @return last epoch
+     */
+    function _lastEpoch(VaultStorage.Layout storage l)
+        internal
+        view
+        returns (uint64)
+    {
+        return l.epoch > 0 ? l.epoch - 1 : 0;
+    }
+
+    /**
+     * @notice returns option from the last epoch
+     * @param l vault storage layout
+     * @return option from last epoch
+     */
+    function _lastOption(VaultStorage.Layout storage l)
+        internal
+        view
+        returns (VaultStorage.Option memory)
+    {
+        return l.options[_lastEpoch(l)];
+    }
+
+    /**
+     * @notice returns the next Friday 8AM timestamp
+     * @param timestamp is the current timestamp
+     * Examples:
+     * getFriday(week 1 thursday) -> week 1 friday
+     * getFriday(week 1 friday) -> week 2 friday
+     * getFriday(week 1 saturday) -> week 2 friday
+     */
+    function _getFriday(uint256 timestamp) internal pure returns (uint256) {
+        // dayOfWeek = 0 (sunday) - 6 (saturday)
+        uint256 dayOfWeek = ((timestamp / 1 days) + 4) % 7;
+        uint256 nextFriday = timestamp + ((7 + 5 - dayOfWeek) % 7) * 1 days;
+        uint256 friday8am = nextFriday - (nextFriday % (24 hours)) + (8 hours);
+
+        // If the passed timestamp is day = Friday hour > 8am,
+        // we increment it by a week to next Friday
+        if (timestamp >= friday8am) {
+            friday8am += 7 days;
+        }
+        return friday8am;
+    }
+
+    /**
+     * @notice returns the Friday 8AM timestamp of the following week
+     * @param timestamp is the current timestamp
+     * Reference: https://codereview.stackexchange.com/a/33532
+     * Examples:
+     * getNextFriday(week 1 thursday) -> week 2 friday
+     * getNextFriday(week 1 friday) -> week 2 friday
+     * getNextFriday(week 1 saturday) -> week 2 friday
+     */
+    function _getNextFriday(uint256 timestamp) internal pure returns (uint256) {
+        // dayOfWeek = 0 (sunday) - 6 (saturday)
+        uint256 dayOfWeek = ((timestamp / 1 days) + 4) % 7;
+        uint256 nextFriday = timestamp + ((7 + 5 - dayOfWeek) % 7) * 1 days;
+        uint256 friday8am = nextFriday - (nextFriday % (24 hours)) + (8 hours);
+
+        // If the timestamp is on a Friday or between Monday-Thursday
+        // return Friday of the following week
+        if (timestamp >= friday8am || friday8am - timestamp < 4 days) {
+            friday8am += 7 days;
+        }
+        return friday8am;
     }
 }
