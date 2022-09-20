@@ -8,6 +8,7 @@ artifacts
 .env.prod
 coverage.json
 coverage/
+docgen/
 
 .DS_Store
 .vscode

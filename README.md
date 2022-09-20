@@ -12,7 +12,6 @@ Create a `.env` file with the following values defined:
 | ------------------ | ------------------------------------------------------------- |
 | `CHAINID`          | sets the default chain id                                     |
 | `ARBITRUM_URI`     | API key Arbitrum node                                         |
-| `DODOC_ON_COMPILE` | if `true`, docs will be generated on every compilation        |
 | `REPORT_GAS`       | if `true`, a gas report will be generated after running tests |
 | `SIZER_ON_COMPILE` | if `true`, contract sizes will be output on every compilation |
 

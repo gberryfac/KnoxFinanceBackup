@@ -34,7 +34,7 @@ library QueueStorage {
      ***********************************************/
 
     /**
-     * @notice gets current claim token id
+     * @notice returns the current claim token id
      * @return claim token id
      */
     function _getCurrentTokenId() internal view returns (uint256) {
@@ -42,7 +42,7 @@ library QueueStorage {
     }
 
     /**
-     * @notice gets current epoch of the queue
+     * @notice returns the current epoch of the queue
      * @return epoch id
      */
     function _getEpoch() internal view returns (uint64) {
@@ -50,7 +50,7 @@ library QueueStorage {
     }
 
     /**
-     * @notice gets max total value locked of the vault
+     * @notice returns the max total value locked of the vault
      * @return max total value
      */
     function _getMaxTVL() internal view returns (uint256) {
@@ -58,7 +58,7 @@ library QueueStorage {
     }
 
     /**
-     * @notice gets price per share for a given claim token id
+     * @notice returns the price per share for a given claim token id
      * @param tokenId claim token id
      * @return price per share
      */

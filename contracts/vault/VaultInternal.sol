@@ -96,7 +96,7 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
      ***********************************************/
 
     /**
-     * @notice gets the total active vault collateral
+     * @notice calculates the total active vault collateral
      * @return total vault collateral excluding the total reserves
      */
     function _totalCollateral() internal view returns (uint256) {
@@ -105,7 +105,7 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
     }
 
     /**
-     * @notice gets the short position value denominated in the collateral asset
+     * @notice calculates the short position value denominated in the collateral asset
      * @return total short position in collateral amount
      */
     function _totalShortAsCollateral() internal view returns (uint256) {
@@ -125,7 +125,7 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
     }
 
     /**
-     * @notice gets the amount in short contracts underwitten by the vault in the last epoch
+     * @notice returns the amount in short contracts underwitten by the vault
      * @return total short contracts
      */
     function _totalShortAsContracts() internal view returns (uint256) {
@@ -135,7 +135,7 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
     }
 
     /**
-     * @notice gets the total reserved collateral
+     * @notice calculates the total reserved collateral
      * @dev collateral is reserved from the auction to ensure the Vault has sufficent funds to
      * cover the APY fee
      * @return total reserved collateral
@@ -150,7 +150,7 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
      ***********************************************/
 
     /**
-     * @notice gets the total active assets by the vault denominated in the collateral asset
+     * @notice calculates the total active assets by the vault denominated in the collateral asset
      * @return total active asset amount
      */
     function _totalAssets()
@@ -687,7 +687,7 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
      ***********************************************/
 
     /**
-     * @notice gets the last epoch
+     * @notice returns the last epoch
      * @param l vault storage layout
      * @return last epoch
      */
@@ -700,7 +700,7 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
     }
 
     /**
-     * @notice gets option from the last epoch
+     * @notice returns option from the last epoch
      * @param l vault storage layout
      * @return option from last epoch
      */
