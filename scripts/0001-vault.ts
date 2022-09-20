@@ -194,14 +194,9 @@ async function main() {
     `\t(minSize: ${params.minSize}, exchange: ${EXCHANGE}, implementation: ${auction.address})`
   );
 
-  // inititialize Vault
-  const initImpl = {
-    auction: auction.address,
-    queue: queue.address,
-    pricer: PRICER,
-  };
-
-  await vault.connect(deployer).initialize(initImpl);
+  await vault.connect(deployer).setAuction(auction.address);
+  await vault.connect(deployer).setPricer(PRICER);
+  await vault.connect(deployer).setQueue(queue.address);
 
   console.log(`-------------------------------------------------------------`);
   console.log(`ChainId: ${network.config.chainId}`);

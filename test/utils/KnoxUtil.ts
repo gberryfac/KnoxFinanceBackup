@@ -1,24 +1,26 @@
-import { ethers } from "hardhat";
+import { ethers, network } from "hardhat";
 import { BigNumber } from "ethers";
 const { provider } = ethers;
 const { hexConcat, hexZeroPad } = ethers.utils;
 
 import { fixedFromFloat } from "@premia/utils";
-import { deployMockContract } from "ethereum-waffle";
+
+import { PREMIA_EXCHANGE_HELPER } from "../../constants";
 
 import {
   Auction,
-  ExchangeHelper,
   MockERC20,
   Queue,
   Auction__factory,
   AuctionProxy__factory,
-  ExchangeHelper__factory,
+  PricerMock__factory,
   Queue__factory,
   QueueProxy__factory,
 } from "../../types";
 
 import { accounts, time, types, uniswap, PoolUtil, VaultUtil } from ".";
+
+const chainId = network.config.chainId;
 
 export interface ClaimTokenId {
   address: string;
@@ -50,7 +52,6 @@ interface KnoxUtilArgs {
   asset: MockERC20;
   vaultUtil: VaultUtil;
   poolUtil: PoolUtil;
-  exchange: ExchangeHelper;
   queue: Queue;
   auction: Auction;
   uni: uniswap.IUniswap;
@@ -63,7 +64,6 @@ export class KnoxUtil {
   asset: MockERC20;
   vaultUtil: VaultUtil;
   poolUtil: PoolUtil;
-  exchange: ExchangeHelper;
   queue: Queue;
   auction: Auction;
   uni: uniswap.IUniswap;
@@ -75,7 +75,6 @@ export class KnoxUtil {
     this.asset = props.asset;
     this.vaultUtil = props.vaultUtil;
     this.poolUtil = props.poolUtil;
-    this.exchange = props.exchange;
     this.queue = props.queue;
     this.auction = props.auction;
     this.uni = props.uni;
@@ -105,29 +104,15 @@ export class KnoxUtil {
     const vault = vaultUtil.vault;
     addresses.vault = vault.address;
 
-    // deploy ExchangeHelper
-    const exchange = await new ExchangeHelper__factory(
-      signers.deployer
-    ).deploy();
-
-    addresses.exchange = exchange.address;
+    addresses.exchange = PREMIA_EXCHANGE_HELPER[chainId];
 
     // deploy mock Pricer
-    const mockVolatilityOracle = await deployMockContract(
-      signers.deployer as any,
-      [
-        "function getAnnualizedVolatility64x64(address,address,int128,int128,int128) external view returns (int128)",
-      ]
-    );
+    const mockPricer = await new PricerMock__factory(signers.deployer).deploy();
 
-    await mockVolatilityOracle.mock.getAnnualizedVolatility64x64.returns(
-      fixedFromFloat("0.9")
+    await mockPricer.setDelta64x64(
+      fixedFromFloat(params.delta),
+      fixedFromFloat(params.delta).sub(fixedFromFloat(params.deltaOffset))
     );
-
-    const mockPricer = await deployMockContract(signers.deployer as any, [
-      "function getDeltaStrikePrice64x64(bool,uint64,int128) external view returns (int128)",
-      "function snapToGrid64x64(bool,int128) external view returns (int128)",
-    ]);
 
     const underlyingPrice = params.underlying.oracle.price;
     const basePrice = params.base.oracle.price;
@@ -135,8 +120,16 @@ export class KnoxUtil {
     const strike = underlyingPrice / basePrice;
     const strike64x64 = fixedFromFloat(strike);
 
-    await mockPricer.mock.getDeltaStrikePrice64x64.returns(strike64x64);
-    await mockPricer.mock.snapToGrid64x64.returns(strike64x64);
+    const offsetStrike64x64 = params.isCall
+      ? fixedFromFloat(strike + strike / 10)
+      : fixedFromFloat(strike - strike / 10);
+
+    await mockPricer.setStrikePrices64x64(strike64x64, offsetStrike64x64);
+
+    await mockPricer.setPrices64x64(
+      fixedFromFloat(params.price.max),
+      fixedFromFloat(params.price.min)
+    );
 
     addresses.pricer = mockPricer.address;
 
@@ -176,14 +169,9 @@ export class KnoxUtil {
     addresses.auction = auction.address;
 
     // inititialize Vault
-    const initImpl = {
-      auction: addresses.auction,
-      exchange: addresses.exchange,
-      queue: addresses.queue,
-      pricer: addresses.pricer,
-    };
-
-    await vault.connect(signers.deployer).initialize(initImpl);
+    await vault.connect(signers.deployer).setAuction(addresses.auction);
+    await vault.connect(signers.deployer).setPricer(addresses.pricer);
+    await vault.connect(signers.deployer).setQueue(addresses.queue);
 
     const asset = vaultUtil.asset;
 
@@ -230,19 +218,18 @@ export class KnoxUtil {
       asset,
       vaultUtil,
       poolUtil,
-      exchange,
       queue,
       auction,
       uni,
     });
   }
 
-  async setAndInitializeAuction(): Promise<[BigNumber, BigNumber, BigNumber]> {
+  async initializeAuction(): Promise<[BigNumber, BigNumber, BigNumber]> {
     const block = await provider.getBlock(await provider.getBlockNumber());
     await time.increaseTo(await time.getThursday8AM(block.timestamp));
 
     const vault = this.vaultUtil.vault;
-    await vault.connect(this.signers.keeper).setAndInitializeAuction();
+    await vault.connect(this.signers.keeper).initializeAuction();
 
     const epoch = await vault.getEpoch();
     const auction = await this.auction.getAuction(epoch);
@@ -267,16 +254,8 @@ export class KnoxUtil {
     await pool.processExpired(expiredOption.longTokenId, balances);
   }
 
-  async initializeNextEpoch() {
+  async initializeEpoch() {
     const vault = this.vaultUtil.vault;
-    const epoch = await vault.getEpoch();
-
-    const maxPrice64x64 = fixedFromFloat(this.params.price.max);
-    const minPrice64x64 = fixedFromFloat(this.params.price.min);
-
-    await vault.connect(this.signers.keeper).initializeNextEpoch();
-    await this.auction
-      .connect(this.signers.vault)
-      .setAuctionPrices(epoch, maxPrice64x64, minPrice64x64);
+    await vault.connect(this.signers.keeper).initializeEpoch();
   }
 }

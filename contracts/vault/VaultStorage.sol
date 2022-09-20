@@ -61,9 +61,9 @@ library VaultStorage {
         // epoch id
         uint64 epoch;
         // auction start offset in seconds (startOffset = startTime - expiry)
-        uint64 startOffset;
+        uint256 startOffset;
         // auction end offset in seconds (endOffset = endTime - expiry)
-        uint64 endOffset;
+        uint256 endOffset;
         // auction start timestamp
         uint256 startTime;
         // total asset amount withdrawn during an epoch
@@ -103,16 +103,16 @@ library VaultStorage {
      ***********************************************/
 
     /**
-     * @notice gets the most recent epoch id from storage
-     * @return epoch id
+     * @notice returns the current epoch
+     * @return current epoch id
      */
     function _getEpoch() internal view returns (uint64) {
         return layout().epoch;
     }
 
     /**
-     * @notice gets the most recent option from storage
-     * @return vault option
+     * @notice returns the option by epoch id
+     * @return option parameters
      */
     function _getOption(uint64 epoch) internal view returns (Option memory) {
         return layout().options[epoch];

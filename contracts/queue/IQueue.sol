@@ -36,16 +36,14 @@ interface IQueue is IERC165, IERC1155, IERC1155Enumerable, IQueueEvents {
 
     /**
      * @notice deposits collateral asset
-     * @dev sent ETH will be wrapped as wETH
-     * @dev sender must approve contract
+     * @dev sent ETH will be wrapped as wETH, sender must approve contract
      * @param amount total collateral deposited
      */
     function deposit(uint256 amount) external payable;
 
     /**
      * @notice swaps into the collateral asset and deposits the proceeds
-     * @dev sent ETH will be wrapped as wETH
-     * @dev sender must approve contract
+     * @dev sent ETH will be wrapped as wETH, sender must approve contract
      * @param s swap arguments
      */
     function swapAndDeposit(IExchangeHelper.SwapArgs calldata s)
@@ -111,14 +109,8 @@ interface IQueue is IERC165, IERC1155, IERC1155Enumerable, IQueueEvents {
     function redeemMax(address receiver, address owner) external;
 
     /************************************************
-     *  INITIALIZE NEXT EPOCH
+     *  INITIALIZE EPOCH
      ***********************************************/
-
-    /**
-     * @notice syncs queue epoch with vault epoch
-     * @param epoch current epoch of vault
-     */
-    function syncEpoch(uint64 epoch) external;
 
     /**
      * @notice transfers deposited collateral to vault, calculates the price per share
@@ -130,25 +122,25 @@ interface IQueue is IERC165, IERC1155, IERC1155Enumerable, IQueueEvents {
      ***********************************************/
 
     /**
-     * @notice gets current claim token id
+     * @notice returns the current claim token id
      * @return claim token id
      */
     function getCurrentTokenId() external view returns (uint256);
 
     /**
-     * @notice gets current epoch of the queue
+     * @notice returns the current epoch of the queue
      * @return epoch id
      */
     function getEpoch() external view returns (uint64);
 
     /**
-     * @notice gets max total value locked of the vault
+     * @notice returns the max total value locked of the vault
      * @return max total value
      */
     function getMaxTVL() external view returns (uint256);
 
     /**
-     * @notice gets price per share for a given claim token id
+     * @notice returns the price per share for a given claim token id
      * @param tokenId claim token id
      * @return price per share
      */

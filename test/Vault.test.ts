@@ -1,10 +1,11 @@
 import { ethers } from "hardhat";
 const { parseUnits } = ethers.utils;
 
-import { accounts, assets, time, types, KnoxUtil } from "./utils";
+import { accounts, assets, types, KnoxUtil } from "./utils";
 
 import { describeBehaviorOfVaultAdmin } from "../spec/VaultAdmin.behavior";
 import { describeBehaviorOfVaultBase } from "../spec/VaultBase.behavior";
+import { describeBehaviorOfVaultMock } from "../spec/VaultMock.behavior";
 import { describeBehaviorOfVaultView } from "../spec/VaultView.behavior";
 
 describe("Vault Tests", () => {
@@ -68,12 +69,6 @@ function behavesLikeVault(params: types.VaultParams) {
       knoxUtil = await KnoxUtil.deploy(params, signers, addresses);
     });
 
-    describe("#constructor()", () => {
-      time.revertToSnapshotAfterEach(async () => {});
-
-      it("should initialize storage variables", async () => {});
-    });
-
     describeBehaviorOfVaultAdmin({
       getKnoxUtil: async () => knoxUtil,
       getParams: () => params,
@@ -90,6 +85,11 @@ function behavesLikeVault(params: types.VaultParams) {
       },
       ["::ERC4626Base"]
     );
+
+    describeBehaviorOfVaultMock({
+      getKnoxUtil: async () => knoxUtil,
+      getParams: () => params,
+    });
 
     describeBehaviorOfVaultView({
       getKnoxUtil: async () => knoxUtil,

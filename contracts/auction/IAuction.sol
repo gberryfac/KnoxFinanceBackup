@@ -51,21 +51,22 @@ interface IAuction is IAuctionEvents, IERC165, IERC1155Receiver {
      ***********************************************/
 
     /**
-     * @notice last price paid during the auction
+     * @notice returns the last price paid during the auction
      * @param epoch epoch id
      * @return price as 64x64 fixed point number
      */
     function lastPrice64x64(uint64 epoch) external view returns (int128);
 
     /**
-     * @notice calculates price as a function of time
+     * @notice calculates the current price using the price curve function
      * @param epoch epoch id
      * @return price as 64x64 fixed point number
      */
     function priceCurve64x64(uint64 epoch) external view returns (int128);
 
     /**
-     * @notice clearing price of the auction
+     * @notice returns the current price established by the price curve if the auction
+     * is still ongoing, otherwise the last price paid is returned
      * @param epoch epoch id
      * @return price as 64x64 fixed point number
      */
@@ -77,8 +78,7 @@ interface IAuction is IAuctionEvents, IERC165, IERC1155Receiver {
 
     /**
      * @notice adds an order specified by the price and size
-     * @dev sent ETH will be wrapped as wETH
-     * @dev sender must approve contract
+     * @dev sent ETH will be wrapped as wETH, sender must approve contract
      * @param epoch epoch id
      * @param price64x64 max price as 64x64 fixed point number
      * @param size amount of contracts
@@ -91,8 +91,7 @@ interface IAuction is IAuctionEvents, IERC165, IERC1155Receiver {
 
     /**
      * @notice swaps into the collateral asset and adds an order specified by the price and size
-     * @dev sent ETH will be wrapped as wETH
-     * @dev sender must approve contract
+     * @dev sent ETH will be wrapped as wETH, sender must approve contract
      * @param s swap arguments
      * @param epoch epoch id
      * @param price64x64 max price as 64x64 fixed point number
@@ -115,8 +114,7 @@ interface IAuction is IAuctionEvents, IERC165, IERC1155Receiver {
 
     /**
      * @notice adds an order specified by size only
-     * @dev sent ETH will be wrapped as wETH
-     * @dev sender must approve contract
+     * @dev sent ETH will be wrapped as wETH, sender must approve contract
      * @param epoch epoch id
      * @param size amount of contracts
      * @param maxCost max cost of buyer is willing to pay
@@ -129,8 +127,7 @@ interface IAuction is IAuctionEvents, IERC165, IERC1155Receiver {
 
     /**
      * @notice swaps into the collateral asset and adds an order specified by size only
-     * @dev sent ETH will be wrapped as wETH
-     * @dev sender must approve contract
+     * @dev sent ETH will be wrapped as wETH, sender must approve contract
      * @param s swap arguments
      * @param epoch epoch id
      * @param size amount of contracts
@@ -201,7 +198,7 @@ interface IAuction is IAuctionEvents, IERC165, IERC1155Receiver {
      ***********************************************/
 
     /**
-     * @notice gets the auction parameters
+     * @notice returns the auction parameters
      * @param epoch epoch id
      * @return auction parameters
      */
@@ -211,7 +208,7 @@ interface IAuction is IAuctionEvents, IERC165, IERC1155Receiver {
         returns (AuctionStorage.Auction memory);
 
     /**
-     * @notice displays the epochs the buyer has a fill and/or refund
+     * @notice returns the epochs the buyer has a fill and/or refund
      * @param buyer address of buyer
      * @return array of epoch ids
      */
@@ -221,13 +218,13 @@ interface IAuction is IAuctionEvents, IERC165, IERC1155Receiver {
         returns (uint64[] memory);
 
     /**
-     * @notice gets the minimum order size
+     * @notice returns the minimum order size
      * @return minimum order size
      */
     function getMinSize() external view returns (uint256);
 
     /**
-     * @notice gets the order from the auction orderbook
+     * @notice returns the order from the auction orderbook
      * @param epoch epoch id
      * @param id order id
      * @return order from auction orderbook
@@ -238,7 +235,7 @@ interface IAuction is IAuctionEvents, IERC165, IERC1155Receiver {
         returns (OrderBook.Data memory);
 
     /**
-     * @notice gets the status of the auction
+     * @notice returns the status of the auction
      * @param epoch epoch id
      * @return auction status
      */
@@ -248,14 +245,14 @@ interface IAuction is IAuctionEvents, IERC165, IERC1155Receiver {
         returns (AuctionStorage.Status);
 
     /**
-     * @notice gets the total number of contracts that can be sold during the auction
+     * @notice calculates the total number of contracts that can be sold during the auction
      * @param epoch epoch id
      * @return total number of contracts
      */
     function getTotalContracts(uint64 epoch) external view returns (uint256);
 
     /**
-     * @notice gets the total number of contracts sold during auction
+     * @notice calculates the total number of contracts sold during auction
      * @param epoch epoch id
      * @return total number of contracts sold
      */
