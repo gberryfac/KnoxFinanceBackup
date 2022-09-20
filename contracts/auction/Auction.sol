@@ -4,8 +4,6 @@ pragma solidity ^0.8.0;
 import "@solidstate/contracts/introspection/ERC165Storage.sol";
 import "@solidstate/contracts/utils/ReentrancyGuard.sol";
 
-import "../libraries/Helpers.sol";
-
 import "./AuctionInternal.sol";
 import "./IAuction.sol";
 

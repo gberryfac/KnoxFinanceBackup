@@ -1,24 +1,22 @@
-import { ethers } from "hardhat";
-const { getContractAt } = ethers;
-
 import { types } from "./";
-
 import { diamondCut } from "../../scripts/diamond";
 
 import {
-  IVault,
-  IVault__factory,
+  IVaultMock,
+  MockERC20,
+  IVaultMock__factory,
+  MockERC20__factory,
   VaultDiamond__factory,
   VaultAdmin__factory,
   VaultBase__factory,
+  VaultMock__factory,
   VaultView__factory,
-  MockERC20,
 } from "../../types";
 
 import { fixedFromFloat } from "@premia/utils";
 
 interface VaultUtilArgs {
-  vault: IVault;
+  vault: IVaultMock;
   asset: MockERC20;
   params: types.VaultParams;
   signers: types.Signers;
@@ -26,7 +24,7 @@ interface VaultUtilArgs {
 }
 
 export class VaultUtil {
-  vault: IVault;
+  vault: IVaultMock;
   asset: MockERC20;
   params: types.VaultParams;
   signers: types.Signers;
@@ -94,7 +92,6 @@ export class VaultUtil {
     );
 
     const vaultAdminFactory = new VaultAdmin__factory(signers.deployer);
-
     const vaultAdminContract = await vaultAdminFactory.deploy(
       params.isCall,
       addresses.pool
@@ -117,7 +114,7 @@ export class VaultUtil {
     );
     await vaultViewContract.deployed();
 
-    registeredSelectors.concat(
+    registeredSelectors = registeredSelectors.concat(
       await diamondCut(
         vaultDiamond,
         vaultViewContract.address,
@@ -126,11 +123,30 @@ export class VaultUtil {
       )
     );
 
-    addresses.vault = vaultDiamond.address;
-    const vault = IVault__factory.connect(addresses.vault, signers.lp1);
-    const collateralAsset = await vault.ERC20();
+    const vaultMockFactory = new VaultMock__factory(signers.deployer);
+    const vaultMockContract = await vaultMockFactory.deploy(
+      params.isCall,
+      addresses.pool
+    );
+    await vaultMockContract.deployed();
 
-    const asset = await getContractAt("MockERC20", collateralAsset);
+    registeredSelectors = registeredSelectors.concat(
+      await diamondCut(
+        vaultDiamond,
+        vaultMockContract.address,
+        vaultMockFactory,
+        registeredSelectors
+      )
+    );
+
+    addresses.vault = vaultDiamond.address;
+
+    const vault = IVaultMock__factory.connect(addresses.vault, signers.lp1);
+
+    const asset = MockERC20__factory.connect(
+      await vault.ERC20(),
+      signers.deployer
+    );
 
     return new VaultUtil({ vault, asset, params, signers, addresses });
   }

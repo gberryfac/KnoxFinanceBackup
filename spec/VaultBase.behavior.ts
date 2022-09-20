@@ -8,7 +8,7 @@ import { expect } from "chai";
 import moment from "moment-timezone";
 moment.tz.setDefault("UTC");
 
-import { Auction, IPremiaPool, IVault, MockERC20, Queue } from "../types";
+import { Auction, IPremiaPool, IVaultMock, MockERC20, Queue } from "../types";
 
 import { almost, assert, math, time, types, KnoxUtil } from "../test/utils";
 import { fixedFromFloat } from "@premia/utils";
@@ -44,6 +44,9 @@ export function describeBehaviorOfVaultBase(
   skips?: string[]
 ) {
   describe("::VaultBase", () => {
+    // Contract Utilities
+    let knoxUtil: KnoxUtil;
+
     // Signers and Addresses
     let addresses: types.Addresses;
     let signers: types.Signers;
@@ -52,11 +55,8 @@ export function describeBehaviorOfVaultBase(
     let asset: MockERC20;
     let queue: Queue;
     let auction: Auction;
-    let vault: IVault;
+    let vault: IVaultMock;
     let pool: IPremiaPool;
-
-    // Contract Utilities
-    let knoxUtil: KnoxUtil;
 
     const params = getParams();
 
@@ -143,11 +143,11 @@ export function describeBehaviorOfVaultBase(
           await queue.connect(signers.lp1)["deposit(uint256)"](params.deposit);
 
           // init epoch 0 auction
-          let [startTime, , epoch] = await knoxUtil.setAndInitializeAuction();
+          let [startTime, , epoch] = await knoxUtil.initializeAuction();
 
           // init epoch 1
           await time.fastForwardToFriday8AM();
-          await knoxUtil.initializeNextEpoch();
+          await knoxUtil.initializeEpoch();
 
           // auction 0 starts
           await time.increaseTo(startTime);
@@ -187,11 +187,11 @@ export function describeBehaviorOfVaultBase(
           await queue.connect(signers.lp1)["deposit(uint256)"](params.deposit);
 
           // init epoch 0 auction
-          let [startTime, , epoch] = await knoxUtil.setAndInitializeAuction();
+          let [startTime, , epoch] = await knoxUtil.initializeAuction();
 
           // init epoch 1
           await time.fastForwardToFriday8AM();
-          await knoxUtil.initializeNextEpoch();
+          await knoxUtil.initializeEpoch();
 
           // auction 0 starts
           await time.increaseTo(startTime);
@@ -215,8 +215,7 @@ export function describeBehaviorOfVaultBase(
 
         it("should permit withdrawals after withdrawal lock has been reset", async () => {
           // init auction 1
-          await time.fastForwardToThursday8AM();
-          let [startTime] = await knoxUtil.setAndInitializeAuction();
+          let [startTime] = await knoxUtil.initializeAuction();
 
           await queue
             .connect(signers.lp1)
@@ -258,16 +257,15 @@ export function describeBehaviorOfVaultBase(
             .setWithdrawalFee64x64(fixedFromFloat(0.02));
 
           // init auction 1
-          await knoxUtil.setAndInitializeAuction();
+          await knoxUtil.initializeAuction();
           await time.fastForwardToFriday8AM();
           await time.increase(100);
 
           // process epoch 0
           await knoxUtil.processExpiredOptions();
-          await vault.connect(signers.keeper).processLastEpoch();
 
           // init epoch 2
-          await knoxUtil.initializeNextEpoch();
+          await knoxUtil.initializeEpoch();
 
           await queue.connect(signers.lp1)["redeemMax()"]();
 
@@ -320,16 +318,15 @@ export function describeBehaviorOfVaultBase(
           );
 
           // init auction 1
-          await knoxUtil.setAndInitializeAuction();
+          await knoxUtil.initializeAuction();
           await time.fastForwardToFriday8AM();
           await time.increase(100);
 
           // process epoch 0
           await knoxUtil.processExpiredOptions();
-          await vault.connect(signers.keeper).processLastEpoch();
 
           // init epoch 2
-          await knoxUtil.initializeNextEpoch();
+          await knoxUtil.initializeEpoch();
 
           await queue.connect(signers.lp1)["redeemMax()"]();
 
@@ -531,11 +528,11 @@ export function describeBehaviorOfVaultBase(
           await queue.connect(signers.lp1)["deposit(uint256)"](params.deposit);
 
           // init epoch 0 auction
-          let [startTime, , epoch] = await knoxUtil.setAndInitializeAuction();
+          let [startTime, , epoch] = await knoxUtil.initializeAuction();
 
           // init epoch 1
           await time.fastForwardToFriday8AM();
-          await knoxUtil.initializeNextEpoch();
+          await knoxUtil.initializeEpoch();
 
           // auction 0 starts
           await time.increaseTo(startTime);
@@ -575,11 +572,11 @@ export function describeBehaviorOfVaultBase(
           await queue.connect(signers.lp1)["deposit(uint256)"](params.deposit);
 
           // init epoch 0 auction
-          let [startTime, , epoch] = await knoxUtil.setAndInitializeAuction();
+          let [startTime, , epoch] = await knoxUtil.initializeAuction();
 
           // init epoch 1
           await time.fastForwardToFriday8AM();
-          await knoxUtil.initializeNextEpoch();
+          await knoxUtil.initializeEpoch();
 
           // auction 0 starts
           await time.increaseTo(startTime);
@@ -603,8 +600,7 @@ export function describeBehaviorOfVaultBase(
 
         it("should permit withdrawals after withdrawal lock has been reset", async () => {
           // init auction 1
-          await time.fastForwardToThursday8AM();
-          let [startTime] = await knoxUtil.setAndInitializeAuction();
+          let [startTime] = await knoxUtil.initializeAuction();
 
           await queue
             .connect(signers.lp1)
@@ -646,16 +642,15 @@ export function describeBehaviorOfVaultBase(
             .setWithdrawalFee64x64(fixedFromFloat(0.02));
 
           // init auction 1
-          await knoxUtil.setAndInitializeAuction();
+          await knoxUtil.initializeAuction();
           await time.fastForwardToFriday8AM();
           await time.increase(100);
 
           // process epoch 0
           await knoxUtil.processExpiredOptions();
-          await vault.connect(signers.keeper).processLastEpoch();
 
           // init epoch 2
-          await knoxUtil.initializeNextEpoch();
+          await knoxUtil.initializeEpoch();
 
           await queue.connect(signers.lp1)["redeemMax()"]();
 
@@ -708,16 +703,15 @@ export function describeBehaviorOfVaultBase(
           );
 
           // init auction 1
-          await knoxUtil.setAndInitializeAuction();
+          await knoxUtil.initializeAuction();
           await time.fastForwardToFriday8AM();
           await time.increase(100);
 
           // process epoch 0
           await knoxUtil.processExpiredOptions();
-          await vault.connect(signers.keeper).processLastEpoch();
 
           // init epoch 2
-          await knoxUtil.initializeNextEpoch();
+          await knoxUtil.initializeEpoch();
 
           await queue.connect(signers.lp1)["redeemMax()"]();
 

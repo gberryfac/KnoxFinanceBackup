@@ -82,7 +82,7 @@ library AuctionStorage {
      ***********************************************/
 
     /**
-     * @notice gets the auction parameters
+     * @notice returns the auction parameters
      * @param epoch epoch id
      * @return auction parameters
      */
@@ -91,7 +91,7 @@ library AuctionStorage {
     }
 
     /**
-     * @notice gets the minimum order size
+     * @notice returns the minimum order size
      * @return minimum order size
      */
     function _getMinSize() internal view returns (uint256) {
@@ -99,7 +99,7 @@ library AuctionStorage {
     }
 
     /**
-     * @notice gets the order from the auction orderbook
+     * @notice returns the order from the auction orderbook
      * @param epoch epoch id
      * @param id order id
      * @return order from auction orderbook
@@ -114,7 +114,7 @@ library AuctionStorage {
     }
 
     /**
-     * @notice gets the status of the auction
+     * @notice returns the status of the auction
      * @param epoch epoch id
      * @return auction status
      */
@@ -127,7 +127,7 @@ library AuctionStorage {
     }
 
     /**
-     * @notice gets the total number of contracts that can be sold during the auction
+     * @notice calculates the total number of contracts that can be sold during the auction
      * @param epoch epoch id
      * @return total number of contracts
      */

@@ -103,16 +103,16 @@ library VaultStorage {
      ***********************************************/
 
     /**
-     * @notice gets the most recent epoch id from storage
-     * @return epoch id
+     * @notice returns the current epoch
+     * @return current epoch id
      */
     function _getEpoch() internal view returns (uint64) {
         return layout().epoch;
     }
 
     /**
-     * @notice gets the most recent option from storage
-     * @return vault option
+     * @notice returns the option by epoch id
+     * @return option parameters
      */
     function _getOption(uint64 epoch) internal view returns (Option memory) {
         return layout().options[epoch];

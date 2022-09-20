@@ -1,11 +1,11 @@
 import { HardhatUserConfig } from "hardhat/types";
 import "@nomiclabs/hardhat-ethers";
 import "@nomiclabs/hardhat-waffle";
-import "@primitivefi/hardhat-dodoc";
 import "@typechain/hardhat";
 import "hardhat-abi-exporter";
 import "hardhat-contract-sizer";
 import "hardhat-dependency-compiler";
+import "hardhat-docgen";
 import "hardhat-gas-reporter";
 import "hardhat-tracer";
 import "solidity-coverage";
@@ -15,13 +15,7 @@ require("dotenv").config({ path: "./.env.prod" });
 
 import { TEST_URI, BLOCK_NUMBER } from "./constants";
 
-let {
-  ARBITRUM_URI,
-  DODOC_ON_COMPILE,
-  REPORT_GAS,
-  SIZER_ON_COMPILE,
-  DEPLOYER_KEY,
-} = process.env;
+let { ARBITRUM_URI, REPORT_GAS, SIZER_ON_COMPILE, DEPLOYER_KEY } = process.env;
 
 // Defaults to CHAINID=42161 so things will run with mainnet fork if not specified
 const CHAINID = process.env.CHAINID ? Number(process.env.CHAINID) : 42161;
@@ -98,15 +92,7 @@ const config: HardhatUserConfig = {
       "@uniswap/v2-periphery/contracts/UniswapV2Router02.sol",
     ],
   },
-  dodoc: {
-    runOnCompile: DODOC_ON_COMPILE === "true",
-    include: [
-      "contracts/vault/IVault.sol",
-      "contracts/queue/IQueue.sol",
-      "contracts/auction/IAuction.sol",
-      "contracts/pricer/IPricer.sol",
-    ],
-  },
+  docgen: { clear: true },
   gasReporter: {
     enabled: REPORT_GAS === "true",
   },
