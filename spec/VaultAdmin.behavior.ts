@@ -180,6 +180,43 @@ export function describeBehaviorOfVaultAdmin(
       });
     });
 
+    describe("#setDeltaOffset64x64(int128)", () => {
+      const newDeltaOffset = fixedFromFloat(0.05);
+
+      time.revertToSnapshotAfterEach(async () => {});
+
+      it("should revert if !owner", async () => {
+        await expect(
+          vault.setDeltaOffset64x64(newDeltaOffset)
+        ).to.be.revertedWith("Ownable: sender must be owner");
+      });
+
+      it("should revert if option delta is <= 0", async () => {
+        await expect(
+          vault.connect(signers.deployer).setDeltaOffset64x64(0)
+        ).to.be.revertedWith("delta <= 0");
+      });
+
+      it("should revert if option delta is > 1", async () => {
+        await expect(
+          vault.connect(signers.deployer).setDeltaOffset64x64(fixedFromFloat(1))
+        ).to.be.revertedWith("delta > 1");
+      });
+
+      it("should set a new delta", async () => {
+        await expect(
+          vault.connect(signers.deployer).setDeltaOffset64x64(newDeltaOffset)
+        )
+          .to.emit(vault, "DeltaSet")
+          .withArgs(
+            0,
+            fixedFromFloat(params.deltaOffset),
+            newDeltaOffset,
+            addresses.deployer
+          );
+      });
+    });
+
     describe("#setFeeRecipient(address)", () => {
       time.revertToSnapshotAfterEach(async () => {});
 
