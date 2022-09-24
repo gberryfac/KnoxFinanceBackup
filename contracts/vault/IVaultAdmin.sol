@@ -36,6 +36,12 @@ interface IVaultAdmin {
     function setDelta64x64(int128 newDelta64x64) external;
 
     /**
+     * @notice sets the option delta offset value
+     * @param newDeltaOffset64x64 new option delta offset value as a 64x64 fixed point number
+     */
+    function setDeltaOffset64x64(int128 newDeltaOffset64x64) external;
+
+    /**
      * @notice sets the new fee recipient
      * @param newFeeRecipient address of the new fee recipient
      */

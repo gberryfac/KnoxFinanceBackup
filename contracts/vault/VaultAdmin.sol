@@ -74,6 +74,27 @@ contract VaultAdmin is IVaultAdmin, VaultInternal {
     /**
      * @inheritdoc IVaultAdmin
      */
+    function setDeltaOffset64x64(int128 newDeltaOffset64x64)
+        external
+        onlyOwner
+    {
+        VaultStorage.Layout storage l = VaultStorage.layout();
+        require(newDeltaOffset64x64 > 0, "delta <= 0");
+        require(newDeltaOffset64x64 < ONE_64x64, "delta > 1");
+
+        emit DeltaSet(
+            l.epoch,
+            l.deltaOffset64x64,
+            newDeltaOffset64x64,
+            msg.sender
+        );
+
+        l.deltaOffset64x64 = newDeltaOffset64x64;
+    }
+
+    /**
+     * @inheritdoc IVaultAdmin
+     */
     function setFeeRecipient(address newFeeRecipient) external onlyOwner {
         VaultStorage.Layout storage l = VaultStorage.layout();
         require(newFeeRecipient != address(0), "address not provided");
