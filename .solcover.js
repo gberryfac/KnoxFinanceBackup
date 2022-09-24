@@ -1,6 +1,6 @@
 module.exports = {
   skipFiles: [
-    "contracts/VaultRegistry.sol",
+    "contracts/Registry.sol",
     "vendor/CumulativeNormalDistribution.sol",
     "vendor/ExchangeHelper.sol",
     "vendor/IExchangeHelper.sol",

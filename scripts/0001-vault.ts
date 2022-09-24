@@ -12,10 +12,10 @@ import {
   IVault__factory,
   Queue__factory,
   QueueProxy__factory,
+  Registry__factory,
   VaultDiamond__factory,
   VaultAdmin__factory,
   VaultBase__factory,
-  VaultRegistry__factory,
   VaultView__factory,
 } from "../types";
 
@@ -199,7 +199,7 @@ async function main() {
   await vault.connect(deployer).setPricer(PRICER);
   await vault.connect(deployer).setQueue(queue.address);
 
-  await VaultRegistry__factory.connect(REGISTRY, deployer).addVault({
+  await Registry__factory.connect(REGISTRY, deployer).addVault({
     vault: vault.address,
     queue: queue.address,
     auction: auction.address,

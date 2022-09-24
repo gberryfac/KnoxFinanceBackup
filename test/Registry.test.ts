@@ -4,7 +4,7 @@ import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 
 import { expect } from "chai";
 
-import { VaultRegistry, VaultRegistry__factory } from "../types";
+import { Registry, Registry__factory } from "../types";
 import { assert, time } from "./utils";
 
 function bnToAddress(bn: BigNumber) {
@@ -13,7 +13,7 @@ function bnToAddress(bn: BigNumber) {
   );
 }
 
-let registry: VaultRegistry;
+let registry: Registry;
 let deployer: SignerWithAddress;
 let user: SignerWithAddress;
 
@@ -22,10 +22,10 @@ let queue = bnToAddress(BigNumber.from(2));
 let auction = bnToAddress(BigNumber.from(3));
 let pricer = bnToAddress(BigNumber.from(4));
 
-describe("Vault Registry Tests", () => {
+describe("Registry Tests", () => {
   before(async () => {
     [deployer, user] = await ethers.getSigners();
-    registry = await new VaultRegistry__factory(deployer).deploy();
+    registry = await new Registry__factory(deployer).deploy();
   });
 
   describe("#count()", () => {

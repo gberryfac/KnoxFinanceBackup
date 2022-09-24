@@ -11,7 +11,7 @@ struct Vault {
     address pricer;
 }
 
-contract VaultRegistry is OwnableInternal {
+contract Registry is OwnableInternal {
     using OwnableStorage for OwnableStorage.Layout;
 
     constructor() {
