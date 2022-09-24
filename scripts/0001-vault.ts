@@ -12,6 +12,7 @@ import {
   IVault__factory,
   Queue__factory,
   QueueProxy__factory,
+  Registry__factory,
   VaultDiamond__factory,
   VaultAdmin__factory,
   VaultBase__factory,
@@ -22,6 +23,7 @@ const {
   POOL,
   PRICER,
   EXCHANGE,
+  REGISTRY,
   KEEPER,
   FEE_RECIPIENT,
   IS_CALL,
@@ -99,7 +101,6 @@ async function main() {
   );
 
   const vaultAdminFactory = new VaultAdmin__factory(deployer);
-
   const vaultAdminContract = await vaultAdminFactory.deploy(
     params.isCall,
     POOL
@@ -197,6 +198,13 @@ async function main() {
   await vault.connect(deployer).setAuction(auction.address);
   await vault.connect(deployer).setPricer(PRICER);
   await vault.connect(deployer).setQueue(queue.address);
+
+  await Registry__factory.connect(REGISTRY, deployer).addVault({
+    vault: vault.address,
+    queue: queue.address,
+    auction: auction.address,
+    pricer: PRICER,
+  });
 
   console.log(`-------------------------------------------------------------`);
   console.log(`ChainId: ${network.config.chainId}`);
