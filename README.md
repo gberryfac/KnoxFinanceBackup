@@ -72,6 +72,7 @@ Create a `.env.prod` file with the following values defined:
 | `VOLATILITY_ORACLE` | Premia volatility oracle contract address    |
 | `PRICER`            | pricer contract proxy address                |
 | `EXCHANGE`          | exchange helper contract address             |
+| `REGISTRY`          | vault registry contract address              |
 | `KEEPER`            | keeper address                               |
 | `FEE_RECIPIENT`     | fee recipient address                        |
 | `WETH`              | wETH contract address                        |
