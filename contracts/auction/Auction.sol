@@ -81,9 +81,7 @@ contract Auction is AuctionInternal, IAuction, ReentrancyGuard {
             // the auction is cancelled if the start time is greater than or equal to
             // the end time, the current time is greater than the start time, or the
             // option parameters are invalid
-            l.auctions[initAuction.epoch].lastPrice64x64 = type(int128).max;
-            auction.status = AuctionStorage.Status.FINALIZED;
-            emit AuctionStatusSet(initAuction.epoch, auction.status);
+            _cancel(l.auctions[initAuction.epoch], initAuction.epoch);
         } else {
             auction.status = AuctionStorage.Status.INITIALIZED;
             auction.expiry = initAuction.expiry;
@@ -122,9 +120,7 @@ contract Auction is AuctionInternal, IAuction, ReentrancyGuard {
         ) {
             // if either price is 0 or the max price is less than or equal to the min price,
             // the auction should always be cancelled.
-            l.auctions[epoch].lastPrice64x64 = type(int128).max;
-            auction.status = AuctionStorage.Status.FINALIZED;
-            emit AuctionStatusSet(epoch, auction.status);
+            _cancel(l.auctions[epoch], epoch);
         }
     }
 
@@ -289,17 +285,20 @@ contract Auction is AuctionInternal, IAuction, ReentrancyGuard {
         AuctionStorage.Auction storage auction = l.auctions[epoch];
 
         require(
-            AuctionStorage.Status.PROCESSED == auction.status,
-            "status != processed"
+            AuctionStorage.Status.PROCESSED == auction.status ||
+                AuctionStorage.Status.CANCELLED == auction.status,
+            "status != processed || cancelled"
         );
 
-        // long tokens are withheld for 24 hours after the auction has been processed, otherwise
-        // if a long position is exercised within 24 hours of the position being underwritten
-        // the collateral from the position will be moved to the pools "free liquidity" queue.
-        require(
-            block.timestamp >= auction.processedTime + 24 hours,
-            "hold period has not ended"
-        );
+        if (AuctionStorage.Status.PROCESSED == auction.status) {
+            // long tokens are withheld for 24 hours after the auction has been processed, otherwise
+            // if a long position is exercised within 24 hours of the position being underwritten
+            // the collateral from the position will be moved to the pools "free liquidity" queue.
+            require(
+                block.timestamp >= auction.processedTime + 24 hours,
+                "hold period has not ended"
+            );
+        }
 
         _withdraw(l, epoch);
     }
@@ -331,8 +330,22 @@ contract Auction is AuctionInternal, IAuction, ReentrancyGuard {
     function finalizeAuction(uint64 epoch) external {
         AuctionStorage.Layout storage l = AuctionStorage.layout();
         AuctionStorage.Auction storage auction = l.auctions[epoch];
-        _finalizeAuctionAllowed(auction);
-        _finalizeAuction(l, auction, epoch);
+
+        if (
+            block.timestamp >= auction.endTime + 24 hours &&
+            (auction.status == AuctionStorage.Status.INITIALIZED ||
+                auction.status == AuctionStorage.Status.FINALIZED)
+        ) {
+            // cancel the auction if it has not been processed within 24 hours of the
+            // auction end time so that buyers may withdraw their refunded amount
+            _cancel(auction, epoch);
+        } else if (
+            block.timestamp > auction.startTime &&
+            auction.status == AuctionStorage.Status.INITIALIZED
+        ) {
+            // finalize the auction only if the auction has started
+            _finalizeAuction(l, auction, epoch);
+        }
     }
 
     /**
@@ -479,6 +492,13 @@ contract Auction is AuctionInternal, IAuction, ReentrancyGuard {
         returns (uint256)
     {
         return AuctionStorage._getTotalContractsSold(epoch);
+    }
+
+    /**
+     * @inheritdoc IAuction
+     */
+    function isCancelled(uint64 epoch) external view returns (bool) {
+        return AuctionStorage._isCancelled(epoch);
     }
 
     /**
