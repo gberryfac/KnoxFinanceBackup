@@ -1,16 +1,19 @@
 /* eslint-disable no-unused-vars */
 export enum CHAINID {
   ARB_MAINNET = 42161,
+  GOERLI = 5,
 }
 /* eslint-enable */
 
 export const BLOCK_NUMBER = {
   // MUST BE ON A MONDAY
   [CHAINID.ARB_MAINNET]: 19700000, // Aug-08-2022 09:31:23 AM +UTC
+  [CHAINID.GOERLI]: 7662000, // Sep-26-2022 08:44:00 AM +UTC
 };
 
 export const TEST_URI = {
   [CHAINID.ARB_MAINNET]: process.env.ARBITRUM_URI,
+  [CHAINID.GOERLI]: process.env.GOERLI_URI,
 };
 
 export const UNDERLYING_FREE_LIQ_TOKEN_ID =
