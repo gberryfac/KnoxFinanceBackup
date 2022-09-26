@@ -35,6 +35,7 @@ enum Status {
   INITIALIZED,
   FINALIZED,
   PROCESSED,
+  CANCELLED,
 }
 
 const gasPrice = parseUnits("0.1", "gwei");
@@ -293,7 +294,7 @@ export function describeBehaviorOfAuction(
           endTime: BigNumber.from(timestamp + 60),
         });
 
-        assert.equal(await auction.getStatus(0), Status.FINALIZED);
+        assert.equal(await auction.getStatus(0), Status.CANCELLED);
       });
 
       it("should revert if block.timestamp > startTime", async () => {
@@ -306,7 +307,7 @@ export function describeBehaviorOfAuction(
           endTime: BigNumber.from(timestamp + 86400),
         });
 
-        assert.equal(await auction.getStatus(0), Status.FINALIZED);
+        assert.equal(await auction.getStatus(0), Status.CANCELLED);
       });
 
       it("should revert if block.timestamp > expiry", async () => {
@@ -319,7 +320,7 @@ export function describeBehaviorOfAuction(
           endTime: BigNumber.from(timestamp + 86400),
         });
 
-        assert.equal(await auction.getStatus(0), Status.FINALIZED);
+        assert.equal(await auction.getStatus(0), Status.CANCELLED);
       });
 
       it("should revert if strike price == 0", async () => {
@@ -332,7 +333,7 @@ export function describeBehaviorOfAuction(
           endTime: BigNumber.from(timestamp + 86400),
         });
 
-        assert.equal(await auction.getStatus(0), Status.FINALIZED);
+        assert.equal(await auction.getStatus(0), Status.CANCELLED);
       });
 
       it("should revert if long token id == 0", async () => {
@@ -345,7 +346,7 @@ export function describeBehaviorOfAuction(
           endTime: BigNumber.from(timestamp + 86400),
         });
 
-        assert.equal(await auction.getStatus(0), Status.FINALIZED);
+        assert.equal(await auction.getStatus(0), Status.CANCELLED);
       });
 
       it("should initialize new auction with correct state", async () => {
@@ -418,7 +419,7 @@ export function describeBehaviorOfAuction(
             .connect(signers.vault)
             .setAuctionPrices(epoch, minPrice64x64, maxPrice64x64);
 
-          assert.equal(await auction.getStatus(epoch), Status.FINALIZED);
+          assert.equal(await auction.getStatus(epoch), Status.CANCELLED);
         });
 
         it("should finalize auction if maxPrice64x64 <= 0", async () => {
@@ -426,7 +427,7 @@ export function describeBehaviorOfAuction(
             .connect(signers.vault)
             .setAuctionPrices(epoch, 0, minPrice64x64);
 
-          assert.equal(await auction.getStatus(epoch), Status.FINALIZED);
+          assert.equal(await auction.getStatus(epoch), Status.CANCELLED);
         });
 
         it("should finalize auction if minPrice64x64 <= 0", async () => {
@@ -434,7 +435,7 @@ export function describeBehaviorOfAuction(
             .connect(signers.vault)
             .setAuctionPrices(epoch, maxPrice64x64, 0);
 
-          assert.equal(await auction.getStatus(epoch), Status.FINALIZED);
+          assert.equal(await auction.getStatus(epoch), Status.CANCELLED);
         });
 
         it("should set correct auction prices", async () => {
@@ -535,7 +536,7 @@ export function describeBehaviorOfAuction(
               fixedFromFloat(params.price.max),
               params.size
             )
-          ).to.be.revertedWith("end time is not set");
+          ).to.be.revertedWith("status != initialized");
         });
       });
 
@@ -846,7 +847,7 @@ export function describeBehaviorOfAuction(
               fixedFromFloat(params.price.max),
               params.size
             )
-          ).to.be.revertedWith("status == finalized");
+          ).to.be.revertedWith("status != initialized");
         });
       });
 
@@ -862,7 +863,25 @@ export function describeBehaviorOfAuction(
               fixedFromFloat(params.price.max),
               params.size
             )
-          ).to.be.revertedWith("status == processed");
+          ).to.be.revertedWith("status != initialized");
+        });
+      });
+
+      describe("else if cancelled", () => {
+        time.revertToSnapshotAfterEach(async () => {
+          await knoxUtil.initializeAuction();
+          await time.fastForwardToFriday8AM();
+          await auction.connect(signers.vault).setAuctionPrices(0, 0, 0);
+        });
+
+        it("should revert", async () => {
+          await expect(
+            auction.addLimitOrder(
+              0,
+              fixedFromFloat(params.price.max),
+              params.size
+            )
+          ).to.be.revertedWith("status != initialized");
         });
       });
     });
@@ -1237,7 +1256,7 @@ export function describeBehaviorOfAuction(
               fixedFromFloat(params.price.max),
               params.size
             )
-          ).to.be.revertedWith("end time is not set");
+          ).to.be.revertedWith("status != initialized");
         });
       });
 
@@ -1404,7 +1423,7 @@ export function describeBehaviorOfAuction(
 
         it("should revert", async () => {
           await expect(auction.cancelLimitOrder(0, 1)).to.be.revertedWith(
-            "status == finalized"
+            "status != initialized"
           );
         });
       });
@@ -1416,7 +1435,21 @@ export function describeBehaviorOfAuction(
 
         it("should revert", async () => {
           await expect(auction.cancelLimitOrder(0, 1)).to.be.revertedWith(
-            "status == processed"
+            "status != initialized"
+          );
+        });
+      });
+
+      describe("else if cancelled", () => {
+        time.revertToSnapshotAfterEach(async () => {
+          await knoxUtil.initializeAuction();
+          await time.fastForwardToFriday8AM();
+          await auction.connect(signers.vault).setAuctionPrices(0, 0, 0);
+        });
+
+        it("should revert", async () => {
+          await expect(auction.cancelLimitOrder(0, 1)).to.be.revertedWith(
+            "status != initialized"
           );
         });
       });
@@ -1427,7 +1460,7 @@ export function describeBehaviorOfAuction(
         it("should revert", async () => {
           await expect(
             auction.addMarketOrder(0, params.size, ethers.constants.MaxUint256)
-          ).to.be.revertedWith("start time is not set");
+          ).to.be.revertedWith("status != initialized");
         });
       });
 
@@ -1753,7 +1786,7 @@ export function describeBehaviorOfAuction(
         it("should revert", async () => {
           await expect(
             auction.addMarketOrder(0, params.size, ethers.constants.MaxUint256)
-          ).to.be.revertedWith("status == finalized");
+          ).to.be.revertedWith("status != initialized");
         });
       });
 
@@ -1765,7 +1798,21 @@ export function describeBehaviorOfAuction(
         it("should revert", async () => {
           await expect(
             auction.addMarketOrder(0, params.size, ethers.constants.MaxUint256)
-          ).to.be.revertedWith("status == processed");
+          ).to.be.revertedWith("status != initialized");
+        });
+      });
+
+      describe("else if cancelled", () => {
+        time.revertToSnapshotAfterEach(async () => {
+          await knoxUtil.initializeAuction();
+          await time.fastForwardToFriday8AM();
+          await auction.connect(signers.vault).setAuctionPrices(0, 0, 0);
+        });
+
+        it("should revert", async () => {
+          await expect(
+            auction.addMarketOrder(0, params.size, ethers.constants.MaxUint256)
+          ).to.be.revertedWith("status != initialized");
         });
       });
     });
@@ -2162,10 +2209,9 @@ export function describeBehaviorOfAuction(
 
     describe("#finalizeAuction(uint64)", () => {
       describe("if not initialized", () => {
-        it("should revert", async () => {
-          await expect(auction.finalizeAuction(0)).to.be.revertedWith(
-            "start time is not set"
-          );
+        it("should not finalize auction", async () => {
+          await auction.finalizeAuction(0);
+          assert.isFalse(await auction.isFinalized(0));
         });
       });
 
@@ -2176,10 +2222,9 @@ export function describeBehaviorOfAuction(
           await knoxUtil.initializeEpoch();
         });
 
-        it("should revert", async () => {
-          await expect(auction.finalizeAuction(0)).to.be.revertedWith(
-            "auction not started"
-          );
+        it("should not finalize auction", async () => {
+          await auction.finalizeAuction(0);
+          assert.isFalse(await auction.isFinalized(0));
         });
       });
 
@@ -2211,21 +2256,30 @@ export function describeBehaviorOfAuction(
             .to.emit(auction, "AuctionStatusSet")
             .withArgs(0, Status.FINALIZED);
         });
+
+        it("should cancel auction if it has not been processed within 24 hours of end time", async () => {
+          await time.increaseTo(endTime.add(86400));
+          await auction.finalizeAuction(epoch);
+          assert.equal(await auction.getStatus(0), Status.CANCELLED);
+        });
       });
 
       describe("else if finalized", () => {
+        let endTime: BigNumber;
+        let epoch: BigNumber;
+
         time.revertToSnapshotAfterEach(async () => {
-          const [, endTime] = await knoxUtil.initializeAuction();
+          [, endTime, epoch] = await knoxUtil.initializeAuction();
           await time.fastForwardToFriday8AM();
           await knoxUtil.initializeEpoch();
           await time.increaseTo(endTime.add(1));
           await auction.finalizeAuction(0);
         });
 
-        it("should revert", async () => {
-          await expect(auction.finalizeAuction(0)).to.be.revertedWith(
-            "status == finalized"
-          );
+        it("should cancel auction if it has not been processed within 24 hours of end time", async () => {
+          await time.increaseTo(endTime.add(86400));
+          await auction.finalizeAuction(epoch);
+          assert.equal(await auction.getStatus(0), Status.CANCELLED);
         });
       });
 
@@ -2234,10 +2288,22 @@ export function describeBehaviorOfAuction(
           await setupSimpleAuction(true);
         });
 
-        it("should revert", async () => {
-          await expect(auction.finalizeAuction(0)).to.be.revertedWith(
-            "status == processed"
-          );
+        it("should not finalize auction", async () => {
+          await auction.finalizeAuction(0);
+          assert.isFalse(await auction.isFinalized(0));
+        });
+      });
+
+      describe("else if cancelled", () => {
+        time.revertToSnapshotAfterEach(async () => {
+          await knoxUtil.initializeAuction();
+          await time.fastForwardToFriday8AM();
+          await auction.connect(signers.vault).setAuctionPrices(0, 0, 0);
+        });
+
+        it("should not finalize auction", async () => {
+          await auction.finalizeAuction(0);
+          assert.isFalse(await auction.isFinalized(0));
         });
       });
     });
@@ -2293,6 +2359,20 @@ export function describeBehaviorOfAuction(
       describe("else if processed", () => {
         time.revertToSnapshotAfterEach(async () => {
           await setupSimpleAuction(true);
+        });
+
+        it("should revert", async () => {
+          await expect(
+            auction.connect(signers.vault).transferPremium(0)
+          ).to.be.revertedWith("status != finalized");
+        });
+      });
+
+      describe("else if cancelled", () => {
+        time.revertToSnapshotAfterEach(async () => {
+          await knoxUtil.initializeAuction();
+          await time.fastForwardToFriday8AM();
+          await auction.connect(signers.vault).setAuctionPrices(0, 0, 0);
         });
 
         it("should revert", async () => {
@@ -2369,7 +2449,21 @@ export function describeBehaviorOfAuction(
 
         it("should revert", async () => {
           await expect(
-            auction.connect(signers.vault).transferPremium(0)
+            auction.connect(signers.vault).processAuction(0)
+          ).to.be.revertedWith("status != finalized");
+        });
+      });
+
+      describe("else if cancelled", () => {
+        time.revertToSnapshotAfterEach(async () => {
+          await knoxUtil.initializeAuction();
+          await time.fastForwardToFriday8AM();
+          await auction.connect(signers.vault).setAuctionPrices(0, 0, 0);
+        });
+
+        it("should revert", async () => {
+          await expect(
+            auction.connect(signers.vault).processAuction(0)
           ).to.be.revertedWith("status != finalized");
         });
       });
@@ -2459,7 +2553,7 @@ export function describeBehaviorOfAuction(
         it("should revert", async () => {
           await expect(
             auction.connect(signers.buyer1).withdraw(0)
-          ).to.be.revertedWith("status != processed");
+          ).to.be.revertedWith("status != processed || cancelled");
         });
       });
 
@@ -2520,8 +2614,6 @@ export function describeBehaviorOfAuction(
           // prices are unset, auction is cancelled
           await vault.connect(signers.keeper).initializeEpoch();
           await auction.connect(signers.vault).setAuctionPrices(epoch, 0, 0);
-          await vault.connect(signers.keeper).processAuction();
-          await fastForwardToHoldPeriodEnd(epoch);
         });
 
         it("should send buyer1 refund, only", async () => {

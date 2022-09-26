@@ -104,7 +104,7 @@ interface IVaultAdmin {
      ***********************************************/
 
     /**
-     * @notice processes the auction when it has been finalized
+     * @notice processes the auction when it has been finalized or cancelled
      * @dev it assumed that an auction has already been initialized and the auction prices
      * have been set
      */

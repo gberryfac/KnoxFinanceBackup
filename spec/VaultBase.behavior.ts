@@ -177,6 +177,68 @@ export function describeBehaviorOfVaultBase(
         });
       });
 
+      describe("else if auction is cancelled", () => {
+        time.revertToSnapshotAfterEach(async () => {
+          // lp1 deposits into queue
+          await asset
+            .connect(signers.lp1)
+            .approve(addresses.queue, params.deposit);
+
+          await queue.connect(signers.lp1)["deposit(uint256)"](params.deposit);
+
+          // init epoch 0 auction
+          let [startTime, endTime, epoch] = await knoxUtil.initializeAuction();
+
+          // init epoch 1
+          await time.fastForwardToFriday8AM();
+          await knoxUtil.initializeEpoch();
+
+          // auction 0 starts
+          await time.increaseTo(startTime);
+
+          // buyer1 purchases all available options
+          await asset
+            .connect(signers.buyer1)
+            .approve(addresses.auction, ethers.constants.MaxUint256);
+
+          await auction
+            .connect(signers.buyer1)
+            .addMarketOrder(
+              epoch,
+              await auction.getTotalContracts(epoch),
+              ethers.constants.MaxUint256
+            );
+
+          // fast forward to 24 hours after auction ends
+          await time.increaseTo(endTime.add(86400));
+          // await auction.finalizeAuction(epoch);
+
+          // process auction 0
+          await vault.connect(signers.keeper).processAuction();
+        });
+
+        it("should permit withdrawals after withdrawal lock has been reset", async () => {
+          // init auction 1
+          let [startTime] = await knoxUtil.initializeAuction();
+
+          await queue
+            .connect(signers.lp1)
+            .setApprovalForAll(addresses.vault, true);
+
+          await vault
+            .connect(signers.lp1)
+            .withdraw(0, addresses.lp1, addresses.lp1);
+
+          // auction 1 starts
+          await time.increaseTo(startTime);
+
+          // lock should activate when auction starts
+          await expect(
+            vault.connect(signers.lp1).withdraw(0, addresses.lp1, addresses.lp1)
+          ).to.be.revertedWith("auction has not been processed");
+        });
+      });
+
       describe("else if auction has been processed", () => {
         time.revertToSnapshotAfterEach(async () => {
           // lp1 deposits into queue
@@ -562,6 +624,68 @@ export function describeBehaviorOfVaultBase(
         });
       });
 
+      describe("else if auction is cancelled", () => {
+        time.revertToSnapshotAfterEach(async () => {
+          // lp1 deposits into queue
+          await asset
+            .connect(signers.lp1)
+            .approve(addresses.queue, params.deposit);
+
+          await queue.connect(signers.lp1)["deposit(uint256)"](params.deposit);
+
+          // init epoch 0 auction
+          let [startTime, endTime, epoch] = await knoxUtil.initializeAuction();
+
+          // init epoch 1
+          await time.fastForwardToFriday8AM();
+          await knoxUtil.initializeEpoch();
+
+          // auction 0 starts
+          await time.increaseTo(startTime);
+
+          // buyer1 purchases all available options
+          await asset
+            .connect(signers.buyer1)
+            .approve(addresses.auction, ethers.constants.MaxUint256);
+
+          await auction
+            .connect(signers.buyer1)
+            .addMarketOrder(
+              epoch,
+              await auction.getTotalContracts(epoch),
+              ethers.constants.MaxUint256
+            );
+
+          // fast forward to 24 hours after auction ends
+          await time.increaseTo(endTime.add(86400));
+          // await auction.finalizeAuction(epoch);
+
+          // process auction 0
+          await vault.connect(signers.keeper).processAuction();
+        });
+
+        it("should permit redemptions after withdrawal lock has been reset", async () => {
+          // init auction 1
+          let [startTime] = await knoxUtil.initializeAuction();
+
+          await queue
+            .connect(signers.lp1)
+            .setApprovalForAll(addresses.vault, true);
+
+          await vault
+            .connect(signers.lp1)
+            .redeem(0, addresses.lp1, addresses.lp1);
+
+          // auction 1 starts
+          await time.increaseTo(startTime);
+
+          // lock should activate when auction starts
+          await expect(
+            vault.connect(signers.lp1).redeem(0, addresses.lp1, addresses.lp1)
+          ).to.be.revertedWith("auction has not been processed");
+        });
+      });
+
       describe("else if auction has been processed", () => {
         time.revertToSnapshotAfterEach(async () => {
           // lp1 deposits into queue
@@ -598,7 +722,7 @@ export function describeBehaviorOfVaultBase(
           await vault.connect(signers.keeper).processAuction();
         });
 
-        it("should permit withdrawals after withdrawal lock has been reset", async () => {
+        it("should permit redemptions after withdrawal lock has been reset", async () => {
           // init auction 1
           let [startTime] = await knoxUtil.initializeAuction();
 

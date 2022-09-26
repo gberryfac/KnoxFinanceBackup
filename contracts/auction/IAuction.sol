@@ -262,6 +262,13 @@ interface IAuction is IAuctionEvents, IERC165, IERC1155Receiver {
         returns (uint256);
 
     /**
+     * @notice checks if the auction is cancelled
+     * @param epoch epoch id
+     * @return true if the auction is cancelled
+     */
+    function isCancelled(uint64 epoch) external view returns (bool);
+
+    /**
      * @notice checks if the auction is finalized
      * @param epoch epoch id
      * @return true if the auction is finalized

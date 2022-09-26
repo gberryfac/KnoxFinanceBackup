@@ -266,51 +266,65 @@ contract VaultAdmin is IVaultAdmin, VaultInternal {
         uint64 lastEpoch = _lastEpoch(l);
         VaultStorage.Option memory lastOption = _lastOption(l);
 
-        if (!l.Auction.isFinalized(lastEpoch)) {
-            // if the auction is not finalized already, finalize it
-            l.Auction.finalizeAuction(lastEpoch);
-        }
+        uint256 totalCollateralUsed;
+        uint256 totalPremiums;
 
-        // transfers the premiums from the auction contract to the vault
-        uint256 totalPremiums = l.Auction.transferPremium(lastEpoch);
-        //fetches the total number of contracts sold during the auction
-        uint256 totalContractsSold = l.Auction.getTotalContractsSold(lastEpoch);
+        bool cancelled = l.Auction.isCancelled(lastEpoch);
+        bool finalized = l.Auction.isFinalized(lastEpoch);
 
-        // calculates the total amount of collateral required to underwrite the contracts
-        // sold during the auction
-        uint256 totalCollateralUsed =
-            totalContractsSold.fromContractsToCollateral(
-                l.isCall,
-                l.underlyingDecimals,
-                l.baseDecimals,
-                lastOption.strike64x64
-            );
-
-        // approves the Premia pool to spend, the collateral amount + the reserves needed
-        // to pay the APY fee
-        ERC20.approve(address(Pool), totalCollateralUsed + _totalReserves());
-
-        // underwrites the contracts sold during the auction, the pool sends the short tokens
-        // to the vault, and long tokens to the auction contract
-        Pool.writeFrom(
-            address(this),
-            address(l.Auction),
-            lastOption.expiry,
-            lastOption.strike64x64,
-            totalContractsSold,
-            l.isCall
+        require(
+            (!finalized && cancelled) || (finalized && !cancelled),
+            "auction is not finalized nor cancelled"
         );
 
-        // the divestment timestamp is the time at which collateral locked in the Premia pool
-        // will be moved into the pools "reserved liquidity" queue. if the divestment timestamp
-        // is not set, collateral will remain in the "free liquidity" queue and could potentially
-        // be used to underwrite a position without the directive of the vault. note, the minimum
-        // amount of time the divestment timestamp can be set to is 24 hours after the position
-        // has been underwritten.
-        uint64 divestmentTimestamp = uint64(block.timestamp + 24 hours);
-        Pool.setDivestmentTimestamp(divestmentTimestamp, l.isCall);
+        if (finalized && !cancelled) {
+            // transfers the premiums from the auction contract to the vault
+            totalPremiums = l.Auction.transferPremium(lastEpoch);
+            //fetches the total number of contracts sold during the auction
+            uint256 totalContractsSold =
+                l.Auction.getTotalContractsSold(lastEpoch);
 
-        l.Auction.processAuction(lastEpoch);
+            if (totalContractsSold > 0) {
+                // calculates the total amount of collateral required to underwrite the contracts
+                // sold during the auction
+                totalCollateralUsed = totalContractsSold
+                    .fromContractsToCollateral(
+                    l.isCall,
+                    l.underlyingDecimals,
+                    l.baseDecimals,
+                    lastOption.strike64x64
+                );
+
+                // approves the Premia pool to spend, the collateral amount + the reserves needed
+                // to pay the APY fee
+                ERC20.approve(
+                    address(Pool),
+                    totalCollateralUsed + _totalReserves()
+                );
+
+                // underwrites the contracts sold during the auction, the pool sends the short tokens
+                // to the vault, and long tokens to the auction contract
+                Pool.writeFrom(
+                    address(this),
+                    address(l.Auction),
+                    lastOption.expiry,
+                    lastOption.strike64x64,
+                    totalContractsSold,
+                    l.isCall
+                );
+
+                // the divestment timestamp is the time at which collateral locked in the Premia pool
+                // will be moved into the pools "reserved liquidity" queue. if the divestment timestamp
+                // is not set, collateral will remain in the "free liquidity" queue and could potentially
+                // be used to underwrite a position without the directive of the vault. note, the minimum
+                // amount of time the divestment timestamp can be set to is 24 hours after the position
+                // has been underwritten.
+                uint64 divestmentTimestamp = uint64(block.timestamp + 24 hours);
+                Pool.setDivestmentTimestamp(divestmentTimestamp, l.isCall);
+            }
+
+            l.Auction.processAuction(lastEpoch);
+        }
 
         // deactivates withdrawal lock
         l.auctionProcessed = true;

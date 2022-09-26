@@ -23,7 +23,7 @@ library AuctionStorage {
         uint256 endTime;
     }
 
-    enum Status {UNINITIALIZED, INITIALIZED, FINALIZED, PROCESSED}
+    enum Status {UNINITIALIZED, INITIALIZED, FINALIZED, PROCESSED, CANCELLED}
 
     struct Auction {
         // status of the auction
@@ -137,6 +137,15 @@ library AuctionStorage {
         returns (uint256)
     {
         return layout().auctions[epoch].totalContractsSold;
+    }
+
+    /**
+     * @notice checks if the auction is cancelled
+     * @param epoch epoch id
+     * @return true if the auction is cancelled
+     */
+    function _isCancelled(uint64 epoch) internal view returns (bool) {
+        return layout().auctions[epoch].status == Status.CANCELLED;
     }
 
     /**

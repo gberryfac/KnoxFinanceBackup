@@ -76,18 +76,6 @@ contract AuctionInternal is IAuctionEvents, OwnableInternal {
     }
 
     /**
-     * @dev Throws if auction finalization is not allowed
-     * @param auction storage params
-     */
-    function _finalizeAuctionAllowed(AuctionStorage.Auction storage auction)
-        internal
-        view
-    {
-        _auctionNotFinalizedOrProcessed(auction.status);
-        _auctionHasStarted(auction);
-    }
-
-    /**
      * @dev Throws if limit orders are not allowed
      * @param auction storage params
      */
@@ -95,7 +83,10 @@ contract AuctionInternal is IAuctionEvents, OwnableInternal {
         internal
         view
     {
-        _auctionNotFinalizedOrProcessed(auction.status);
+        require(
+            AuctionStorage.Status.INITIALIZED == auction.status,
+            "status != initialized"
+        );
         _auctionHasNotEnded(auction);
     }
 
@@ -107,7 +98,10 @@ contract AuctionInternal is IAuctionEvents, OwnableInternal {
         internal
         view
     {
-        _auctionNotFinalizedOrProcessed(auction.status);
+        require(
+            AuctionStorage.Status.INITIALIZED == auction.status,
+            "status != initialized"
+        );
         _auctionHasStarted(auction);
         _auctionHasNotEnded(auction);
     }
@@ -134,24 +128,6 @@ contract AuctionInternal is IAuctionEvents, OwnableInternal {
     {
         require(auction.endTime > 0, "end time is not set");
         require(block.timestamp <= auction.endTime, "auction has ended");
-    }
-
-    /**
-     * @dev Throws if auction has been finalized or processed.
-     * @param status auction status
-     */
-    function _auctionNotFinalizedOrProcessed(AuctionStorage.Status status)
-        private
-        pure
-    {
-        require(
-            AuctionStorage.Status.FINALIZED != status,
-            "status == finalized"
-        );
-        require(
-            AuctionStorage.Status.PROCESSED != status,
-            "status == processed"
-        );
     }
 
     /************************************************
@@ -221,7 +197,8 @@ contract AuctionInternal is IAuctionEvents, OwnableInternal {
     {
         if (
             auction.status == AuctionStorage.Status.FINALIZED ||
-            auction.status == AuctionStorage.Status.PROCESSED
+            auction.status == AuctionStorage.Status.PROCESSED ||
+            auction.status == AuctionStorage.Status.CANCELLED
         ) {
             return _lastPrice64x64(auction);
         }
@@ -666,6 +643,19 @@ contract AuctionInternal is IAuctionEvents, OwnableInternal {
     /************************************************
      * HELPERS
      ***********************************************/
+
+    /**
+     * @notice cancels all orders and finalizes the auction
+     * @param auction the auction to cancel
+     */
+    function _cancel(AuctionStorage.Auction storage auction, uint64 epoch)
+        internal
+    {
+        auction.lastPrice64x64 = type(int128).max;
+        auction.status = AuctionStorage.Status.CANCELLED;
+        auction.totalPremiums = 0;
+        emit AuctionStatusSet(epoch, auction.status);
+    }
 
     /**
      * @notice calculates the expected proceeds of the option if it has expired
