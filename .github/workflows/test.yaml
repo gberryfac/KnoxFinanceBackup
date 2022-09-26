@@ -11,6 +11,7 @@ jobs:
 
     env:
       ARBITRUM_URI: ${{ secrets.ARBITRUM_URI }}
+      GOERLI_URI: ${{ secrets.GOERLI_URI }}
 
     steps:
       - uses: actions/checkout@v2

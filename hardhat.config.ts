@@ -15,7 +15,8 @@ require("dotenv").config({ path: "./.env.prod" });
 
 import { TEST_URI, BLOCK_NUMBER } from "./constants";
 
-let { ARBITRUM_URI, REPORT_GAS, SIZER_ON_COMPILE, DEPLOYER_KEY } = process.env;
+let { ARBITRUM_URI, GOERLI_URI, REPORT_GAS, SIZER_ON_COMPILE, DEPLOYER_KEY } =
+  process.env;
 
 // Defaults to CHAINID=42161 so things will run with mainnet fork if not specified
 const CHAINID = process.env.CHAINID ? Number(process.env.CHAINID) : 42161;
@@ -76,6 +77,10 @@ const config: HardhatUserConfig = {
       url: ARBITRUM_URI,
       chainId: CHAINID,
     },
+    goerli: {
+      url: GOERLI_URI,
+      chainId: CHAINID,
+    },
   },
   mocha: {
     timeout: 60000,
@@ -103,6 +108,7 @@ const config: HardhatUserConfig = {
 
 if (DEPLOYER_KEY != null) {
   config.networks.arbitrum.accounts = [DEPLOYER_KEY];
+  config.networks.goerli.accounts = [DEPLOYER_KEY];
 }
 
 export default config;
