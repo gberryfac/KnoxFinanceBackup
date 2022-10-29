@@ -751,7 +751,10 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
 
         // If the timestamp is on a Friday or between Monday-Thursday
         // return Friday of the following week
-        if (timestamp >= friday8am || friday8am - timestamp < 4 days) {
+        if (
+            timestamp >= friday8am ||
+            friday8am - timestamp <= (4 days) + (8 hours)
+        ) {
             friday8am += 7 days;
         }
         return friday8am;
