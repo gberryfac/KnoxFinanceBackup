@@ -565,6 +565,61 @@ export function describeBehaviorOfVaultMock(
           assert.isTrue(fridayDate.isSame(nextFriday));
         });
 
+        it("should return next Friday, given the day of week is Monday 12 AM", async () => {
+          const { timestamp } = await provider.getBlock("latest");
+          const currentTime = moment.unix(timestamp);
+
+          // The block we're hardcoded to is a Monday
+          const monday = currentTime.hours(0);
+          const actualFriday = await vault.getNextFriday(monday.unix());
+          const fridayDate = moment.unix(actualFriday.toNumber());
+
+          assert.equal(fridayDate.weekday(), 5);
+          assert.isTrue(fridayDate.isSame(nextFriday));
+        });
+
+        it("should return next Friday, given the day of week is Monday 1 AM", async () => {
+          const { timestamp } = await provider.getBlock("latest");
+          const currentTime = moment.unix(timestamp);
+
+          // The block we're hardcoded to is a Monday
+          const monday = currentTime.hours(1);
+
+          const actualFriday = await vault.getNextFriday(monday.unix());
+          const fridayDate = moment.unix(actualFriday.toNumber());
+
+          assert.equal(fridayDate.weekday(), 5);
+          assert.isTrue(fridayDate.isSame(nextFriday));
+        });
+
+        it("should return next Friday, given the day of week is Monday 5 AM", async () => {
+          const { timestamp } = await provider.getBlock("latest");
+          const currentTime = moment.unix(timestamp);
+
+          // The block we're hardcoded to is a Monday
+          const monday = currentTime.hours(5);
+
+          const actualFriday = await vault.getNextFriday(monday.unix());
+          const fridayDate = moment.unix(actualFriday.toNumber());
+
+          assert.equal(fridayDate.weekday(), 5);
+          assert.isTrue(fridayDate.isSame(nextFriday));
+        });
+
+        it("should return next Friday, given the day of week is Monday 8 AM", async () => {
+          const { timestamp } = await provider.getBlock("latest");
+          const currentTime = moment.unix(timestamp);
+
+          // The block we're hardcoded to is a Monday
+          const monday = currentTime.hours(8);
+
+          const actualFriday = await vault.getNextFriday(monday.unix());
+          const fridayDate = moment.unix(actualFriday.toNumber());
+
+          assert.equal(fridayDate.weekday(), 5);
+          assert.isTrue(fridayDate.isSame(nextFriday));
+        });
+
         it("should return next Friday, given the day of week is Tuesday", async () => {
           const { timestamp } = await provider.getBlock("latest");
           const currentTime = moment.unix(timestamp);
