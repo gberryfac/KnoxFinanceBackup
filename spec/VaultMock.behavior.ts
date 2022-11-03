@@ -3,8 +3,6 @@ const { provider } = ethers;
 import { BigNumber } from "ethers";
 import { fixedFromFloat, formatTokenId, TokenType } from "@premia/utils";
 
-import { expect } from "chai";
-
 import moment from "moment-timezone";
 moment.tz.setDefault("UTC");
 
@@ -55,9 +53,6 @@ export function describeBehaviorOfVaultMock(
     let auction: Auction;
     let vault: IVaultMock;
     let pool: IPremiaPool;
-
-    let thisFriday: moment.Moment;
-    let nextFriday: moment.Moment;
 
     const params = getParams();
 
