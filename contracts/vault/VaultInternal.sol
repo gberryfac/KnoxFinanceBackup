@@ -716,9 +716,10 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
      * @notice returns the next Friday 8AM timestamp
      * @param timestamp is the current timestamp
      * Examples:
-     * getFriday(week 1 thursday) -> week 1 friday
-     * getFriday(week 1 friday) -> week 2 friday
-     * getFriday(week 1 saturday) -> week 2 friday
+    /**
+     * @notice returns the next approaching Friday 8AM UTC timestamp
+     * @param timestamp is the current timestamp
+     * @return Friday 8am UTC timestamp
      */
     function _getFriday(uint256 timestamp) internal pure returns (uint256) {
         // dayOfWeek = 0 (sunday) - 6 (saturday)
@@ -726,8 +727,8 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
         uint256 nextFriday = timestamp + ((7 + 5 - dayOfWeek) % 7) * 1 days;
         uint256 friday8am = nextFriday - (nextFriday % (24 hours)) + (8 hours);
 
-        // If the passed timestamp is day = Friday hour > 8am,
-        // we increment it by a week to next Friday
+        // if the timestamp is past Friday 8am UTC, return the next calendar
+        // week Friday
         if (timestamp >= friday8am) {
             friday8am += 7 days;
         }
