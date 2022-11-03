@@ -713,9 +713,28 @@ contract VaultInternal is ERC4626BaseInternal, IVaultEvents, OwnableInternal {
     }
 
     /**
-     * @notice returns the next Friday 8AM timestamp
-     * @param timestamp is the current timestamp
+     * Assuming a standard calendar week (Sunday - Saturday).
+     *
+     * getFriday will always return the next approaching Friday.
+     * getNextFriday will always return the Friday after getFriday.
+     *
      * Examples:
+     * getFriday(2022-08-18T09:00:00Z) -> 2022-08-19T08:00:00Z
+     * getNextFriday(2022-08-18T09:00:00Z) -> 2022-08-26T08:00:00Z
+     *
+     * getFriday(2022-08-19T07:00:00Z) -> 2022-08-19T08:00:00Z
+     * getNextFriday(2022-08-19T07:00:00Z) -> 2022-08-26T08:00:00Z
+     *
+     * getFriday(2022-08-19T08:00:00Z) -> 2022-08-26T08:00:00Z
+     * getNextFriday(2022-08-19T08:00:00Z) -> 2022-09-02T08:00:00Z
+     *
+     * getFriday(2022-08-20T09:00:00Z) -> 2022-08-26T08:00:00Z
+     * getNextFriday(2022-08-20T09:00:00Z) -> 2022-09-02T08:00:00Z
+     *
+     * getFriday(2022-08-21T09:00:00Z) -> 2022-08-26T08:00:00Z
+     * getNextFriday(2022-08-21T09:00:00Z) -> 2022-09-02T08:00:00Z
+     */
+
     /**
      * @notice returns the next approaching Friday 8AM UTC timestamp
      * @param timestamp is the current timestamp
